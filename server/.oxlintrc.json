@@ -9,8 +9,17 @@
   "rules": {
     "typescript/no-explicit-any": "off",
     "typescript/no-floating-promises": "error",
-    "typescript/no-extraneous-class": ["error", { "allowWithDecorator": true }]
+    "typescript/no-extraneous-class": ["error", { "allowWithDecorator": true }],
+    "eslint/max-lines": ["error", { "max": 200, "skipBlankLines": true }]
   },
+  "overrides": [
+    {
+      "files": ["**/*.spec.ts", "**/*.e2e-spec.ts"],
+      "rules": {
+        "eslint/max-lines": ["error", { "max": 400, "skipBlankLines": true }]
+      }
+    }
+  ],
   "env": {
     "node": true
   }
