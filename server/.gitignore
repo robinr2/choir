@@ -29,3 +29,5 @@
 !.vscode/extensions.json
 
 /coverage
+/reports
+/.stryker-tmp

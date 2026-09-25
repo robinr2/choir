@@ -8,3 +8,4 @@ npm run --silent lint
 npx tsc --noEmit -p tsconfig.json
 npm run --silent test:cov
 npx nestjs-doctor . --staged --blocking error
+npx stryker run
