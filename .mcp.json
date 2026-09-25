@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "jscpd": {
+      "command": "npx",
+      "args": ["--prefix", "server", "jscpd", "--mcp", "server/src", "server/test"]
+    }
+  }
+}

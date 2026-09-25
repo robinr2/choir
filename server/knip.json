@@ -4,6 +4,7 @@
     "-lintignore"
   ],
   "ignoreDependencies": [
-    "nestjs-doctor"
+    "nestjs-doctor",
+    "jscpd"
   ]
 }

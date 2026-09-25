@@ -1,0 +1,6 @@
+{
+  "path": ["src", "test"],
+  "reporters": ["ai"],
+  "threshold": 1,
+  "noTips": true
+}
