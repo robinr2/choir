@@ -5,6 +5,7 @@
   ],
   "ignoreDependencies": [
     "nestjs-doctor",
-    "jscpd"
+    "jscpd",
+    "dependency-cruiser"
   ]
 }
