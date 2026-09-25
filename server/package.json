@@ -42,6 +42,7 @@
     "knip": "^6.38.0",
     "nestjs-doctor": "0.9.9",
     "oxlint": "^1.58.0",
+    "oxlint-plugin-complexity": "^3.0.0",
     "oxlint-tsgolint": "^7.0.2001",
     "prettier": "^3.4.2",
     "supertest": "^7.0.0",
