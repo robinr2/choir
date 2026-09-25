@@ -5,6 +5,7 @@ gitleaks git --staged --no-banner --redact
 cd server
 npx prettier --check "src/**/*.ts" "test/**/*.ts"
 npm run --silent lint
+npx knip
 npx tsc --noEmit -p tsconfig.json
 npm run --silent test:cov
 npx nestjs-doctor . --staged --blocking error
