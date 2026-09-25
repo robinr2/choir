@@ -1,8 +1,105 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
+  "plugins": [
+    "react",
+    "typescript",
+    "unicorn",
+    "oxc",
+    "import"
+  ],
+  "jsPlugins": [
+    "oxlint-plugin-complexity"
+  ],
+  "categories": {
+    "correctness": "error",
+    "suspicious": "error",
+    "perf": "error"
+  },
   "rules": {
+    "typescript/no-explicit-any": "off",
+    "typescript/no-floating-promises": "error",
+    "typescript/no-extraneous-class": [
+      "error",
+      {
+        "allowWithDecorator": true
+      }
+    ],
+    "eslint/max-lines": [
+      "error",
+      {
+        "max": 200,
+        "skipBlankLines": true
+      }
+    ],
+    "eslint/max-lines-per-function": [
+      "error",
+      {
+        "max": 30,
+        "skipBlankLines": true
+      }
+    ],
+    "eslint/max-params": [
+      "error",
+      {
+        "max": 4
+      }
+    ],
+    "eslint/max-statements": [
+      "error",
+      {
+        "max": 10
+      }
+    ],
+    "complexity/complexity": [
+      "error",
+      {
+        "cyclomatic": 5,
+        "cognitive": 8,
+        "minLines": 0
+      }
+    ],
+    "eslint/max-depth": [
+      "error",
+      {
+        "max": 2
+      }
+    ],
+    "eslint/max-classes-per-file": [
+      "error",
+      {
+        "max": 1
+      }
+    ],
+    "eslint/no-nested-ternary": "error",
+    "typescript/switch-exhaustiveness-check": "error",
+    "typescript/no-non-null-assertion": "error",
+    "eslint/no-console": "error",
+    "eslint/eqeqeq": "error",
     "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
+    "react/only-export-components": [
+      "error",
+      {
+        "allowConstantExport": true
+      }
+    ],
+    "react/react-in-jsx-scope": "off",
+    "import/no-unassigned-import": [
+      "error",
+      {
+        "allow": [
+          "**/*.css"
+        ]
+      }
+    ]
+  },
+  "overrides": [],
+  "env": {
+    "browser": true
+  },
+  "ignorePatterns": [
+    "src/components/ui/**",
+    "src/components/assistant-ui/**",
+    "src/hooks/use-attachment-src.ts",
+    "src/hooks/use-copy-to-clipboard.ts"
+  ]
 }

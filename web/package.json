@@ -6,8 +6,9 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "lint": "oxlint",
-    "preview": "vite preview"
+    "lint": "oxlint --type-aware src/",
+    "preview": "vite preview",
+    "format": "prettier --write \"src/**/*.{ts,tsx}\""
   },
   "dependencies": {
     "@assistant-ui/react": "^0.15.22",
@@ -32,7 +33,13 @@
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.7",
     "@vitejs/plugin-react": "^6.1.1",
-    "oxlint": "^1.81.0",
+    "dependency-cruiser": "^18.4.0",
+    "jscpd": "5.3.2",
+    "knip": "6.38.0",
+    "oxlint": "1.85.0",
+    "oxlint-plugin-complexity": "3.0.0",
+    "oxlint-tsgolint": "7.0.2003",
+    "prettier": "3.9.9",
     "typescript": "~6.0.2",
     "vite": "^8.3.0"
   }

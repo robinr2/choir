@@ -1,0 +1,20 @@
+{
+  "path": [
+    "src"
+  ],
+  "format": [
+    "typescript",
+    "tsx"
+  ],
+  "ignore": [
+    "src/components/ui/**",
+    "src/components/assistant-ui/**",
+    "src/hooks/use-attachment-src.ts",
+    "src/hooks/use-copy-to-clipboard.ts"
+  ],
+  "reporters": [
+    "ai"
+  ],
+  "threshold": 1,
+  "noTips": true
+}

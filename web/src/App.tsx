@@ -1,5 +1,5 @@
-import { Thread } from "@/components/assistant-ui/elements/thread.aui";
-import { EchoRuntimeProvider } from "@/runtime/echo-runtime-provider";
+import { Thread } from '@/components/assistant-ui/elements/thread.aui';
+import { EchoRuntimeProvider } from '@/runtime/echo-runtime-provider';
 
 function App() {
   return (
