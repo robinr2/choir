@@ -5,11 +5,12 @@
     "typescript",
     "unicorn",
     "oxc",
-    "import"
+    "import",
+    "jsx-a11y",
+    "react-perf",
+    "vitest"
   ],
-  "jsPlugins": [
-    "oxlint-plugin-complexity"
-  ],
+  "jsPlugins": ["oxlint-plugin-complexity"],
   "categories": {
     "correctness": "error",
     "suspicious": "error",
@@ -86,18 +87,13 @@
     "import/no-unassigned-import": [
       "error",
       {
-        "allow": [
-          "**/*.css"
-        ]
+        "allow": ["**/*.css"]
       }
     ]
   },
   "overrides": [
     {
-      "files": [
-        "**/*.spec.ts",
-        "**/*.spec.tsx"
-      ],
+      "files": ["**/*.spec.ts", "**/*.spec.tsx"],
       "rules": {
         "eslint/max-lines": [
           "error",

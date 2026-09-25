@@ -2,7 +2,19 @@
   "mcpServers": {
     "jscpd": {
       "command": "npx",
-      "args": ["--prefix", "server", "jscpd", "--mcp", "server/src", "server/test"]
+      "args": [
+        "--prefix",
+        "server",
+        "jscpd",
+        "--mcp",
+        "--format",
+        "typescript,tsx",
+        "--ignore",
+        "**/web/src/components/ui/**,**/web/src/components/assistant-ui/**,**/web/src/hooks/use-attachment-src.ts,**/web/src/hooks/use-copy-to-clipboard.ts",
+        "server/src",
+        "server/test",
+        "web/src"
+      ]
     }
   }
 }

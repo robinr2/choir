@@ -21,5 +21,6 @@ npx jscpd
 npx depcruise src
 npx depcruise src --config .dependency-cruiser-stability.cjs
 npx tsc -b --noEmit
+npx react-doctor . --staged --no-score --no-supply-chain --blocking warning
 npm run --silent test:cov
 npx stryker run

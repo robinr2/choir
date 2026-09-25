@@ -1,7 +1,15 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["typescript", "unicorn", "oxc", "import"],
-  "jsPlugins": ["oxlint-plugin-complexity"],
+  "plugins": [
+    "typescript",
+    "unicorn",
+    "oxc",
+    "import",
+    "vitest"
+  ],
+  "jsPlugins": [
+    "oxlint-plugin-complexity"
+  ],
   "categories": {
     "correctness": "error",
     "suspicious": "error",
@@ -70,7 +78,10 @@
   },
   "overrides": [
     {
-      "files": ["**/*.spec.ts", "**/*.e2e-spec.ts"],
+      "files": [
+        "**/*.spec.ts",
+        "**/*.e2e-spec.ts"
+      ],
       "rules": {
         "eslint/max-lines": [
           "error",
