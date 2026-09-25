@@ -7,13 +7,11 @@ import {
 
 const echoAdapter: ChatModelAdapter = {
   async run({ messages }) {
-    const last = messages.at(-1);
-    const text =
-      last?.content
-        .filter((part) => part.type === 'text')
-        .map((part) => part.text)
-        .join('\n') ?? '';
-    return { content: [{ type: 'text', text }] };
+    const content = messages
+      .slice(-1)
+      .flatMap((message) => message.content.map((part) => part))
+      .filter((part) => part.type === 'text');
+    return { content };
   },
 };
 

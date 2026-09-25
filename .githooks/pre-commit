@@ -8,6 +8,7 @@ npm run --silent lint
 npx knip
 npx jscpd
 npx depcruise src test
+npx depcruise src test --config .dependency-cruiser-stability.cjs
 npx tsc --noEmit -p tsconfig.json
 npm run --silent test:cov
 npx nestjs-doctor . --staged --blocking error
@@ -18,4 +19,7 @@ npm run --silent lint
 npx knip
 npx jscpd
 npx depcruise src
+npx depcruise src --config .dependency-cruiser-stability.cjs
 npx tsc -b --noEmit
+npm run --silent test:cov
+npx stryker run

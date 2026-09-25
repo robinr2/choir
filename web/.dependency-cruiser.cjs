@@ -122,14 +122,6 @@ module.exports = {
         dependencyTypes: ['npm-peer'],
       },
     },
-    {
-      name: 'no-unstable-dependencies',
-      severity: 'error',
-      from: {},
-      to: {
-        moreUnstable: true,
-      },
-    },
   ],
   options: {
     doNotFollow: {

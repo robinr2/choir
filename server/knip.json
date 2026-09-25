@@ -7,5 +7,9 @@
     "nestjs-doctor",
     "jscpd",
     "dependency-cruiser"
+  ],
+  "entry": [
+    "src/main.ts!",
+    ".dependency-cruiser-stability.cjs"
   ]
 }

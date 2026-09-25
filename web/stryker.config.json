@@ -1,0 +1,25 @@
+{
+  "$schema": "./node_modules/@stryker-mutator/core/schema/stryker-schema.json",
+  "testRunner": "vitest",
+  "vitest": {
+    "configFile": "vitest.config.ts"
+  },
+  "checkers": ["typescript"],
+  "tsconfigFile": "tsconfig.app.json",
+  "mutate": [
+    "src/**/*.{ts,tsx}",
+    "!src/**/*.spec.{ts,tsx}",
+    "!src/main.tsx",
+    "!src/components/ui/**",
+    "!src/components/assistant-ui/**",
+    "!src/hooks/use-attachment-src.ts",
+    "!src/hooks/use-copy-to-clipboard.ts"
+  ],
+  "incremental": true,
+  "reporters": ["clear-text", "progress"],
+  "thresholds": {
+    "high": 100,
+    "low": 100,
+    "break": 100
+  }
+}

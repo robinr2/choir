@@ -7,5 +7,8 @@
   "ignoreDependencies": [
     "jscpd",
     "dependency-cruiser"
+  ],
+  "entry": [
+    ".dependency-cruiser-stability.cjs"
   ]
 }

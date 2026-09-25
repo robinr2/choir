@@ -92,7 +92,25 @@
       }
     ]
   },
-  "overrides": [],
+  "overrides": [
+    {
+      "files": [
+        "**/*.spec.ts",
+        "**/*.spec.tsx"
+      ],
+      "rules": {
+        "eslint/max-lines": [
+          "error",
+          {
+            "max": 400,
+            "skipBlankLines": true
+          }
+        ],
+        "eslint/max-lines-per-function": "off",
+        "eslint/max-statements": "off"
+      }
+    }
+  ],
   "env": {
     "browser": true
   },
