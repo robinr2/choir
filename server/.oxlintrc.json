@@ -49,7 +49,24 @@
         "cognitive": 8,
         "minLines": 0
       }
-    ]
+    ],
+    "eslint/max-depth": [
+      "error",
+      {
+        "max": 2
+      }
+    ],
+    "eslint/max-classes-per-file": [
+      "error",
+      {
+        "max": 1
+      }
+    ],
+    "eslint/no-nested-ternary": "error",
+    "typescript/switch-exhaustiveness-check": "error",
+    "typescript/no-non-null-assertion": "error",
+    "eslint/no-console": "error",
+    "eslint/eqeqeq": "error"
   },
   "overrides": [
     {
