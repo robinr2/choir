@@ -10,4 +10,4 @@ Do all work based on the documentation of the tools the current task involves. O
 
 - Never write comments.
 - Never write documentation.
-- When rules contradict each other or leave no clean way forward, stop working and consult me. Briefly introduce the problem, then give me the cleanest option to fix it.
+- When the instructions in this file or the checks in the pre-commit hook contradict each other or leave no clean way forward, stop working and consult me. Briefly introduce the problem, then give me the cleanest option to fix it.
