@@ -81,3 +81,4 @@ jobs:
       - run: uv run --frozen ruff format --check
       - run: uv run --frozen ruff check
       - run: ./check-max-lines.sh
+      - run: uv run --frozen pyright
