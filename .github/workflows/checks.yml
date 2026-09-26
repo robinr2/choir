@@ -42,7 +42,14 @@ jobs:
       - run: npx tsc --noEmit -p tsconfig.json
       - run: npm run --silent test:cov
       - run: npx nestjs-doctor . --blocking error
-      - run: npx stryker run
+      - run: npx stryker run --reporters json,clear-text,progress-append-only --fileLogLevel trace
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: core-mutation
+          path: |
+            apps/core/reports
+            apps/core/stryker.log
 
   web:
     runs-on: ubuntu-latest
@@ -67,7 +74,14 @@ jobs:
       - run: npx tsc -b --noEmit
       - run: npx react-doctor . --no-score --no-supply-chain --blocking warning -y
       - run: npm run --silent test:cov
-      - run: npx stryker run
+      - run: npx stryker run --reporters json,clear-text,progress-append-only --fileLogLevel trace
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-mutation
+          path: |
+            apps/web/reports
+            apps/web/stryker.log
 
   voice:
     runs-on: ubuntu-latest
@@ -91,7 +105,12 @@ jobs:
       - run: uv run --frozen pytest
       - run: uv run --frozen vulture src tests
       - run: uv run --frozen deptry src
-      - run: ./check-mutants.sh
+      - run: sed -i 's/^trap .*//' check-mutants.sh && /usr/bin/time -v ./check-mutants.sh
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: voice-mutation
+          path: apps/voice/mutants
       - run: ../core/node_modules/.bin/jscpd
 
   e2e:
