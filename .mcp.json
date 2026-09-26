@@ -4,21 +4,21 @@
       "command": "npx",
       "args": [
         "--prefix",
-        "server",
+        "apps/core",
         "jscpd",
         "--mcp",
         "--format",
         "typescript,tsx",
         "--ignore",
-        "**/web/src/components/ui/**,**/web/src/components/assistant-ui/**,**/web/src/hooks/use-attachment-src.ts,**/web/src/hooks/use-copy-to-clipboard.ts",
-        "server/src",
-        "server/test",
-        "web/src"
+        "**/apps/web/src/components/ui/**,**/apps/web/src/components/assistant-ui/**,**/apps/web/src/hooks/use-attachment-src.ts,**/apps/web/src/hooks/use-copy-to-clipboard.ts",
+        "apps/core/src",
+        "apps/core/test",
+        "apps/web/src"
       ]
     },
     "shadcn": {
       "command": "sh",
-      "args": ["-c", "cd web && exec npx shadcn mcp"]
+      "args": ["-c", "cd apps/web && exec npx shadcn mcp"]
     }
   }
 }

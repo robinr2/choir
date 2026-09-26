@@ -20,18 +20,18 @@ jobs:
           tar xzf gitleaks.tar.gz gitleaks
       - run: ./gitleaks dir . --no-banner --redact
 
-  server:
+  core:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: server
+        working-directory: apps/core
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
         with:
           node-version: 24
           cache: npm
-          cache-dependency-path: server/package-lock.json
+          cache-dependency-path: apps/core/package-lock.json
       - run: npm ci
       - run: npx prettier --check "src/**/*.ts" "test/**/*.ts"
       - run: npm run --silent lint
@@ -48,14 +48,14 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: web
+        working-directory: apps/web
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
         with:
           node-version: 24
           cache: npm
-          cache-dependency-path: web/package-lock.json
+          cache-dependency-path: apps/web/package-lock.json
       - run: npm ci
       - run: npx playwright install --with-deps chromium
       - run: npx prettier --check "src/**/*.{ts,tsx}"
