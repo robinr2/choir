@@ -1,6 +1,7 @@
 #!/bin/sh
 set -e
 rm -rf mutants
+trap 'rm -rf mutants' EXIT
 uv run --frozen mutmut run > /dev/null || true
 uv run --frozen mutmut export-cicd-stats > /dev/null
 uv run --frozen python - <<'EOF'

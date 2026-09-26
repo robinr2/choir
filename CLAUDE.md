@@ -6,6 +6,8 @@ Do all work based on the documentation of the tools the current task involves. O
 
 - NestJS: https://docs.nestjs.com/llms.txt
 - React: https://react.dev/llms.txt
+- Pipecat: https://docs.pipecat.ai/llms.txt
+- FastAPI: https://fastapi.tiangolo.com/
 
 ## Development
 

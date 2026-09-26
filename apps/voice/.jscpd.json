@@ -1,0 +1,7 @@
+{
+  "path": ["src", "tests"],
+  "format": ["python"],
+  "reporters": ["ai"],
+  "threshold": 1,
+  "noTips": true
+}

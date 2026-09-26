@@ -21,6 +21,7 @@ dev = [
 ]
 
 [tool.pyright]
+include = ["src", "tests"]
 typeCheckingMode = "strict"
 
 [tool.ruff.format]

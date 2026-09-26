@@ -77,6 +77,12 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: astral-sh/setup-uv@v10.2.0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: apps/core/package-lock.json
+      - run: npm ci --prefix ../core
       - run: uv sync --frozen
       - run: uv run --frozen ruff format --check
       - run: uv run --frozen ruff check
@@ -86,3 +92,4 @@ jobs:
       - run: uv run --frozen vulture src tests
       - run: uv run --frozen deptry src
       - run: ./check-mutants.sh
+      - run: ../core/node_modules/.bin/jscpd
