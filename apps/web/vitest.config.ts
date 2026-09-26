@@ -22,6 +22,8 @@ export default mergeConfig(
           'src/components/assistant-ui/**',
           'src/hooks/use-attachment-src.ts',
           'src/hooks/use-copy-to-clipboard.ts',
+          'src/components/pipecat/**',
+          'src/lib/visualizer.ts',
         ],
         thresholds: {
           lines: 100,

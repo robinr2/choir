@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "lint": "oxlint --type-aware src/",
+    "lint": "oxlint --type-aware src/ e2e/",
     "preview": "vite preview",
     "format": "prettier --write \"src/**/*.{ts,tsx}\"",
     "test": "vitest run",
@@ -17,9 +17,13 @@
     "@assistant-ui/react-markdown": "^0.14.17",
     "@base-ui/react": "^1.8.0",
     "@fontsource-variable/geist": "^5.3.0",
+    "@pipecat-ai/client-js": "^1.13.1",
+    "@pipecat-ai/client-react": "^1.8.2",
+    "@pipecat-ai/small-webrtc-transport": "^1.10.8",
     "@tailwindcss/vite": "^4.3.3",
     "class-variance-authority": "^0.7.1",
     "cn": "^0.4.0",
+    "eventsource-parser": "^4.1.1",
     "lucide-react": "^1.48.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
@@ -30,6 +34,7 @@
     "zustand": "^5.0.15"
   },
   "devDependencies": {
+    "@playwright/test": "^1.63.0",
     "@stryker-mutator/core": "^10.0.0",
     "@stryker-mutator/typescript-checker": "^10.0.0",
     "@stryker-mutator/vitest-runner": "^10.0.0",

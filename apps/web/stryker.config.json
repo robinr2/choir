@@ -1,6 +1,7 @@
 {
   "$schema": "./node_modules/@stryker-mutator/core/schema/stryker-schema.json",
   "testRunner": "vitest",
+  "concurrency": "50%",
   "vitest": {
     "configFile": "vitest.config.ts"
   },
@@ -13,7 +14,9 @@
     "!src/components/ui/**",
     "!src/components/assistant-ui/**",
     "!src/hooks/use-attachment-src.ts",
-    "!src/hooks/use-copy-to-clipboard.ts"
+    "!src/hooks/use-copy-to-clipboard.ts",
+    "!src/components/pipecat/**",
+    "!src/lib/visualizer.ts"
   ],
   "incremental": true,
   "reporters": ["clear-text", "progress"],

@@ -26,3 +26,8 @@ dist-ssr
 /coverage
 /reports
 /.stryker-tmp
+
+/test-results
+/playwright-report
+/.vitest-attachments
+__screenshots__

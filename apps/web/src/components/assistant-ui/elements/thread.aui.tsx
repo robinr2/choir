@@ -25,6 +25,7 @@ import {
 import { TooltipIconButton } from "@/components/assistant-ui/elements/tooltip-icon-button";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { VoiceControls } from "@/components/voice/voice-controls";
 import { cn } from "@/lib/utils";
 import {
   ActionBarMorePrimitive,
@@ -431,6 +432,7 @@ const ComposerAction: FC = () => {
             <ComposerPrimitive.StopDictation render={<TooltipIconButton tooltip="Stop dictation" side="bottom" type="button" variant="ghost" size="icon" className="aui-composer-stop-dictation text-destructive size-7 rounded-full" aria-label="Stop voice input" />}><SquareIcon className="aui-composer-stop-dictation-icon size-3.5 animate-pulse fill-current" /></ComposerPrimitive.StopDictation>
           </AuiIf>
         </AuiIf>
+        <VoiceControls />
         <AuiIf
           condition={(s) =>
             !s.composer.canCancel ||

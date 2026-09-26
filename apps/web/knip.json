@@ -1,6 +1,10 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
-  "ignore": ["src/components/ui/**", "src/components/assistant-ui/**"],
+  "ignore": [
+    "src/components/ui/**",
+    "src/components/assistant-ui/**",
+    "src/components/pipecat/**"
+  ],
   "ignoreDependencies": ["jscpd", "dependency-cruiser", "react-doctor"],
   "entry": [".dependency-cruiser-stability.cjs"]
 }

@@ -2,7 +2,13 @@
 name = "voice"
 version = "0.1.0"
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "fastapi[standard]>=0.141.1",
+    "httpx>=0.28.1",
+    "pipecat-ai[silero,webrtc,xai]>=1.12.0",
+    "pydantic>=2.13.5",
+    "pydantic-settings>=2.15.0",
+]
 
 [build-system]
 requires = ["uv_build>=0.12.17,<0.13.0"]
@@ -50,6 +56,10 @@ max-nested-blocks = 2
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["S101", "PLR0915"]
+
+[tool.vulture]
+ignore_decorators = ["@router.*", "@transport.event_handler", "@pytest.fixture"]
+ignore_names = ["add_event_handler"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
