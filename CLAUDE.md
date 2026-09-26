@@ -10,6 +10,7 @@ Do all work based on the documentation of the tools the current task involves. O
 - Pipecat FastAPI integration: https://docs.pipecat.ai/api-reference/server/services/transport/fastapi-websocket.md
 - Pipecat React SDK: https://docs.pipecat.ai/api-reference/client/react/overview.md
 - FastAPI: https://fastapi.tiangolo.com/
+- just: https://just.systems/man/en/
 
 ## Development
 
