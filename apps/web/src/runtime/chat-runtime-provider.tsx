@@ -1,16 +1,35 @@
-import type { ReactNode } from 'react';
+import { type ReactNode, useSyncExternalStore } from 'react';
 import {
+  type AppendMessage,
   AssistantRuntimeProvider,
   type RealtimeVoiceAdapter,
-  useLocalRuntime,
+  useExternalStoreRuntime,
 } from '@assistant-ui/react';
-import { coreConversationAdapter } from './core-conversation-adapter';
+import type { CoreConversation } from '@/conversation/core-conversation';
+import {
+  textOf,
+  threadMessageOf,
+  type TranscriptMessage,
+} from '@/conversation/transcript';
 
 export function ChatRuntimeProvider({
+  conversation,
   voice,
   children,
-}: Readonly<{ voice: RealtimeVoiceAdapter; children: ReactNode }>) {
-  const runtime = useLocalRuntime(coreConversationAdapter, {
+}: Readonly<{
+  conversation: CoreConversation;
+  voice: RealtimeVoiceAdapter;
+  children: ReactNode;
+}>) {
+  const { messages, running } = useSyncExternalStore(
+    conversation.subscribe,
+    conversation.getSnapshot,
+  );
+  const runtime = useExternalStoreRuntime<TranscriptMessage>({
+    messages,
+    isRunning: running,
+    convertMessage: threadMessageOf,
+    onNew: (message: AppendMessage) => conversation.send(textOf(message)),
     adapters: { voice },
   });
   return (

@@ -2,10 +2,10 @@ import { Module, StandardSchemaValidationPipe } from '@nestjs/common';
 import { APP_PIPE } from '@nestjs/core';
 import { AppController } from './app.controller.js';
 import { AppService } from './app.service.js';
-import { ConversationModule } from './conversation/conversation.module.js';
+import { ConversationsModule } from './conversations/conversations.module.js';
 
 @Module({
-  imports: [ConversationModule],
+  imports: [ConversationsModule],
   controllers: [AppController],
   providers: [
     AppService,

@@ -31,19 +31,7 @@ function receivedAudioEnergy(page: Page): Promise<number> {
   });
 }
 
-function spokenMessage(page: Page, role: 'user' | 'assistant') {
-  return page
-    .locator(`[data-slot="aui_spoken-message-root"][data-role="${role}"]`)
-    .filter({ hasText: SENTENCE })
-    .first();
-}
-
-async function keptConversation(page: Page): Promise<unknown> {
-  const response = await page.request.get('/conversation');
-  return response.json();
-}
-
-test('echoes a spoken sentence back in the chat and as speech', async ({
+test('answers a spoken sentence with Claude Code, out loud and with a tool call', async ({
   page,
 }) => {
   await page.addInitScript(recordPeerConnections);
@@ -51,18 +39,18 @@ test('echoes a spoken sentence back in the chat and as speech', async ({
 
   await page.getByRole('button', { name: 'Voice' }).click();
 
-  await expect(spokenMessage(page, 'user')).toBeVisible({ timeout: 60_000 });
-  await expect(spokenMessage(page, 'assistant')).toBeVisible({
-    timeout: 60_000,
+  const asked = page
+    .locator('[data-slot="aui_user-message-root"]')
+    .filter({ hasText: SENTENCE })
+    .first();
+  await expect(asked).toBeVisible({ timeout: 90_000 });
+  const answer = page.locator('[data-slot="aui_assistant-message-root"]').last();
+  await expect(answer.getByRole('button', { name: /tool call/ })).toBeVisible({
+    timeout: 120_000,
   });
+  await expect(answer).toContainText(/words/i, { timeout: 120_000 });
   await expect
-    .poll(() => receivedAudioEnergy(page), { timeout: 30_000 })
+    .poll(() => receivedAudioEnergy(page), { timeout: 60_000 })
     .toBeGreaterThan(0.01);
   await expect(page.locator('audio')).toHaveJSProperty('paused', false);
-  expect(await keptConversation(page)).toEqual(
-    expect.arrayContaining([
-      { role: 'user', text: expect.stringMatching(SENTENCE) },
-      { role: 'assistant', text: expect.stringMatching(SENTENCE) },
-    ]),
-  );
 });

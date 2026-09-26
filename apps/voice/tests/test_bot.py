@@ -11,6 +11,7 @@ from pipecat.processors.aggregators.llm_response_universal import (
 from pipecat.transports.base_transport import TransportParams
 from pipecat.transports.smallwebrtc.connection import SmallWebRTCConnection
 from pipecat.transports.smallwebrtc.transport import SmallWebRTCTransport
+from pipecat.turns.user_turn_strategies import EagerUserTurnStrategies
 from pydantic import SecretStr
 
 from tests.conftest import RecordingCore
@@ -69,6 +70,7 @@ def test_builds_the_voice_pipeline(
     llm = spy(monkeypatch, 'ConversationLLMService')
     aggregators = spy(monkeypatch, 'LLMContextAggregatorPair')
     user_params = spy(monkeypatch, 'LLMUserAggregatorParams')
+    vad = spy(monkeypatch, 'VADProcessor')
     transport = SmallWebRTCTransport(
         webrtc_connection=SmallWebRTCConnection(), params=TransportParams()
     )
@@ -76,7 +78,9 @@ def test_builds_the_voice_pipeline(
     pipeline = bot.create_pipeline(transport, SETTINGS, conversation)
     assert [type(processor).__name__ for processor in pipeline.processors][1:-1] == [
         'SmallWebRTCInputTransport',
+        'VADProcessor',
         'XAISTTService',
+        'EagerEndOfTurn',
         'LLMUserAggregator',
         'ConversationLLMService',
         'XAITTSService',
@@ -90,7 +94,9 @@ def test_builds_the_voice_pipeline(
     assert isinstance(context, LLMContext)
     assert isinstance(aggregator_options['user_params'], LLMUserAggregatorParams)
     [(_, params)] = user_params
-    assert isinstance(params['vad_analyzer'], SileroVADAnalyzer)
+    assert isinstance(params['user_turn_strategies'], EagerUserTurnStrategies)
+    [(_, vad_options)] = vad
+    assert isinstance(vad_options['vad_analyzer'], SileroVADAnalyzer)
 
 
 async def test_runs_the_bot_until_the_client_disconnects(
@@ -106,15 +112,16 @@ async def test_runs_the_bot_until_the_client_disconnects(
         cancelled.append(worker)
 
     monkeypatch.setattr(PipelineWorker, 'cancel', cancel)
-    await bot.run_bot(SmallWebRTCConnection(), SETTINGS)
+    await bot.run_bot(SmallWebRTCConnection(), SETTINGS, 'c1')
     options, worker = DisconnectingRunner.runs[-1]
     transport = RecordingTransport.created[-1]
     assert options == {'handle_sigint': False}
     assert transport.params.audio_in_enabled
     assert transport.params.audio_out_enabled
     assert cancelled == [worker]
-    [((client,), _)] = conversations
+    [((client, conversation_id), _)] = conversations
     assert str(client.base_url) == 'http://core'
+    assert conversation_id == 'c1'
     [((piped_transport, settings, conversation), _)] = pipelines
     assert piped_transport is transport
     assert settings is SETTINGS

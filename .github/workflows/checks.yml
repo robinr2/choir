@@ -99,6 +99,7 @@ jobs:
     env:
       CI: true
       XAI_API_KEY: ${{ secrets.XAI_API_KEY }}
+      CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
     steps:
       - uses: actions/checkout@v7
       - uses: astral-sh/setup-uv@v10.2.0
@@ -112,6 +113,7 @@ jobs:
           cache-dependency-path: |
             apps/core/package-lock.json
             apps/web/package-lock.json
+      - run: npm install --global @anthropic-ai/claude-code
       - run: npm ci --prefix apps/core
       - run: npm ci --prefix apps/web
       - run: uv sync --frozen --directory apps/voice

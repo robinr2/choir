@@ -5,32 +5,47 @@ from tests.conftest import RecordingCore
 
 
 async def test_streams_the_reply_to_the_user_turn(core: RecordingCore) -> None:
-    chunks = [chunk async for chunk in core.conversation().reply_to('hello choir')]
-    assert chunks == ['hello choir']
-    assert core.requests == [('/conversation/user-turns', {'text': 'hello choir'})]
+    conversation = core.conversation()
+    chunks = [chunk async for chunk in conversation.reply_to('hi', early=False)]
+    assert chunks == ['hi']
+    early = [chunk async for chunk in conversation.reply_to('hello', early=True)]
+    assert early == ['hello']
+    assert core.requests == [
+        ('/user-turns', {'text': 'hi', 'early': False, 'voice': True}),
+        ('/user-turns', {'text': 'hello', 'early': True, 'voice': True}),
+    ]
+    assert core.methods == ['POST', 'POST']
+
+
+async def test_confirms_the_turn_that_started_early(core: RecordingCore) -> None:
+    await core.conversation().confirm()
+    assert core.requests == [('/confirmations', None)]
     assert core.methods == ['POST']
 
 
 async def test_withdraws_the_latest_user_turn(core: RecordingCore) -> None:
     await core.conversation().withdraw()
-    assert core.requests == [('/conversation/withdrawals', None)]
+    assert core.requests == [('/withdrawals', None)]
 
 
 async def test_reports_what_was_heard_of_the_reply(core: RecordingCore) -> None:
     await core.conversation().interrupt('hello')
-    assert core.requests == [('/conversation/interruptions', {'heard': 'hello'})]
+    assert core.requests == [('/interruptions', {'heard': 'hello'})]
 
 
 async def test_fails_when_core_rejects_a_user_turn(core: RecordingCore) -> None:
     core.status = httpx.codes.BAD_REQUEST
     with pytest.raises(httpx.HTTPStatusError):
-        [chunk async for chunk in core.conversation().reply_to('hello choir')]
+        [chunk async for chunk in core.conversation().reply_to('hi', early=False)]
 
 
-async def test_fails_when_core_rejects_a_withdrawal(core: RecordingCore) -> None:
+@pytest.mark.parametrize('action', ['confirm', 'withdraw'])
+async def test_fails_when_core_rejects_a_turn_change(
+    core: RecordingCore, action: str
+) -> None:
     core.status = httpx.codes.BAD_REQUEST
     with pytest.raises(httpx.HTTPStatusError):
-        await core.conversation().withdraw()
+        await getattr(core.conversation(), action)()
 
 
 async def test_fails_when_core_rejects_an_interruption(core: RecordingCore) -> None:

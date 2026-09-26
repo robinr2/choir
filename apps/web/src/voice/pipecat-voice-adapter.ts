@@ -11,9 +11,12 @@ const OFFER_URL = '/api/offer';
 
 export class PipecatVoiceAdapter implements RealtimeVoiceAdapter {
   readonly #client: PipecatClient;
+  readonly #endpoint: string;
 
-  constructor(client: PipecatClient) {
+  constructor(client: PipecatClient, conversationId: string) {
     this.#client = client;
+    const query = new URLSearchParams({ conversation_id: conversationId });
+    this.#endpoint = `${OFFER_URL}?${query}`;
   }
 
   connect(options: {
@@ -27,7 +30,9 @@ export class PipecatVoiceAdapter implements RealtimeVoiceAdapter {
     const events = new PipecatVoiceEvents(client, helpers);
     events.subscribe();
     try {
-      await client.connect({ webrtcRequestParams: { endpoint: OFFER_URL } });
+      await client.connect({
+        webrtcRequestParams: { endpoint: this.#endpoint },
+      });
     } catch (error) {
       events.unsubscribe();
       throw error;

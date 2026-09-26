@@ -1,23 +1,11 @@
-import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
-import { App } from 'supertest/types.js';
-import { createApp } from './create-app.js';
+import { TestApp } from './test-app.js';
 
-describe('AppController (e2e)', () => {
-  let app: INestApplication<App>;
+const testApp = TestApp.use();
 
-  beforeEach(async () => {
-    app = await createApp();
-  });
-
-  it('/ (GET)', () => {
-    return request(app.getHttpServer())
-      .get('/')
-      .expect(200)
-      .expect('Hello World!');
-  });
-
-  afterEach(async () => {
-    await app.close();
-  });
+it('/ (GET)', () => {
+  return request(testApp.app.getHttpServer())
+    .get('/')
+    .expect(200)
+    .expect('Hello World!');
 });

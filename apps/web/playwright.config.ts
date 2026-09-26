@@ -1,5 +1,6 @@
 import path from 'node:path';
 import { defineConfig, devices } from '@playwright/test';
+import { E2E_DATA_DIR } from './e2e/data-dir.js';
 
 const repoRoot = path.resolve(import.meta.dirname, '../..');
 const fakeMicrophone = path.resolve(
@@ -12,6 +13,7 @@ function server(recipe: string, url: string) {
     command: `just ${recipe}`,
     cwd: repoRoot,
     url,
+    env: { CHOIR_DATA_DIR: E2E_DATA_DIR },
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
   };
@@ -20,7 +22,8 @@ function server(recipe: string, url: string) {
 export default defineConfig({
   testDir: 'e2e',
   testMatch: '**/*.e2e.ts',
-  timeout: 120_000,
+  globalSetup: './e2e/global-setup.ts',
+  timeout: 240_000,
   forbidOnly: !!process.env.CI,
   use: {
     ...devices['Desktop Chrome'],
