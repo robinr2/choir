@@ -12,7 +12,9 @@ import {
   type ConversationAgent,
   ConversationsService,
 } from './conversations.service.js';
-import type { VoiceTurnsService } from './voice-turns.service.js';
+import type { TurnMark } from './transcript.js';
+import type { VoiceService } from '../voice/voice.service.js';
+import type { TurnMarksService } from './turn-marks.service.js';
 
 class ScriptedTurn implements AcpRuntimeTurn {
   readonly requestId = 'request-1';
@@ -78,12 +80,19 @@ const agent = {
     turns.push(turn);
     return turn;
   }),
+  close: vi.fn<ConversationAgent['close']>(async () => undefined),
 } satisfies ConversationAgent;
 
-let voicePrompts: string[];
-const voiceTurns = {
-  load: vi.fn<VoiceTurnsService['load']>(async () => new Set(voicePrompts)),
-  save: vi.fn<VoiceTurnsService['save']>(async () => undefined),
+let savedMarks: [string, TurnMark][];
+const turnMarks = {
+  load: vi.fn<TurnMarksService['load']>(async () => new Map(savedMarks)),
+  save: vi.fn<TurnMarksService['save']>(async () => undefined),
+};
+
+let voiceAgent: string | undefined;
+const voiceChannel = {
+  isActive: vi.fn<VoiceService['isActive']>((id) => id === voiceAgent),
+  speak: vi.fn<VoiceService['speak']>(),
 };
 
 let conversations: ConversationsService;
@@ -111,8 +120,9 @@ beforeEach(() => {
   saved = [user('hi'), agentSaid('Hello.')];
   turns = [];
   failure = undefined;
-  voicePrompts = [];
-  conversations = new ConversationsService(agent, voiceTurns);
+  savedMarks = [];
+  voiceAgent = undefined;
+  conversations = new ConversationsService(agent, turnMarks, voiceChannel);
 });
 
 afterEach(() => {
@@ -275,7 +285,7 @@ it('knows which submitted prompts belong to voice turns', async () => {
 });
 
 it('marks spoken exchanges while they run and once they are saved', async () => {
-  voicePrompts = ['hi'];
+  savedMarks = [['hi', { voice: true, aloud: true }]];
   await conversations.addUserTurn(ID, 'tell me', SPOKEN);
   latestTurn().emit({ type: 'text_delta', text: 'Sure.' });
   await vi.waitFor(async () =>
@@ -287,11 +297,15 @@ it('marks spoken exchanges while they run and once they are saved', async () => 
     true,
     true,
   ]);
-  expect(voiceTurns.load).toHaveBeenCalledExactlyOnceWith(ID);
-  expect(voiceTurns.save).toHaveBeenCalledExactlyOnceWith(
+  expect(turnMarks.load).toHaveBeenCalledExactlyOnceWith(ID);
+  expect(turnMarks.save).toHaveBeenCalledExactlyOnceWith(
     ID,
-    new Set(['hi', 'tell me']),
+    new Map([
+      ['hi', { voice: true, aloud: true }],
+      ['tell me', { voice: true, aloud: true }],
+    ]),
   );
+  expect(voiceChannel.speak).not.toHaveBeenCalled();
   saved = [...saved, user('tell me'), agentSaid('Sure.')];
   latestTurn().end({ status: 'completed' });
   await reloaded(2);
@@ -302,7 +316,7 @@ it('marks spoken exchanges while they run and once they are saved', async () => 
     true,
   ]);
   await conversations.addUserTurn(ID, 'typed', TYPED);
-  expect(voiceTurns.save).toHaveBeenCalledOnce();
+  expect(turnMarks.save).toHaveBeenCalledOnce();
   expect(
     (await conversations.messages(ID)).slice(-2).map(({ voice }) => voice),
   ).toEqual([undefined, undefined]);
@@ -320,4 +334,34 @@ it('keeps a confirmation that arrives before its early turn', async () => {
     Promise.resolve('pending'),
   ]);
   expect(unconfirmed).toBe('pending');
+});
+
+it('never withdraws a message from another agent', async () => {
+  await conversations.sendMessage(ID, 'hi', { id: 'a2', name: 'helper' });
+  await conversations.withdraw(ID);
+  expect(latestTurn().cancel).not.toHaveBeenCalled();
+  expect(await conversations.toolCallAllowed(ID)).toBe(true);
+});
+
+it('forgets a closed conversation and stops following it', async () => {
+  const working = firstValueFrom(
+    conversations.workingChanges.pipe(take(3), toArray()),
+  );
+  await conversations.addUserTurn(ID, 'hello', TYPED);
+  const updates = lastValueFrom(conversations.updates(ID).pipe(toArray()));
+  await conversations.close(ID);
+  expect(await working).toEqual([new Set(), new Set([ID]), new Set()]);
+  expect(await updates).toEqual([]);
+  await conversations.messages(ID);
+  expect(agent.open).toHaveBeenCalledTimes(2);
+});
+
+it('ends only the sessions it opened when a conversation closes', async () => {
+  await conversations.close(ID);
+  conversations.confirm(ID, 'hello');
+  await conversations.close(ID);
+  expect(agent.close).not.toHaveBeenCalled();
+  await conversations.messages(ID);
+  await conversations.close(ID);
+  expect(agent.close).toHaveBeenCalledExactlyOnceWith(handle);
 });

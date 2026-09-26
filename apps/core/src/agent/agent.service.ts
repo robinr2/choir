@@ -76,6 +76,10 @@ export class AgentService implements OnApplicationShutdown {
     });
   }
 
+  async close(handle: AcpRuntimeHandle): Promise<void> {
+    await this.runtime.close({ handle, reason: 'The agent was closed' });
+  }
+
   async onApplicationShutdown(): Promise<void> {
     await this.runtime.shutdown();
   }

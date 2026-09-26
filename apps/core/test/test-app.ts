@@ -2,6 +2,7 @@ import { INestApplication } from '@nestjs/common';
 import { App } from 'supertest/types.js';
 import { ConversationClient } from './conversation-client.js';
 import { createApp, createDataDir, removeDataDir } from './create-app.js';
+import { WorkspaceClient } from './workspace-client.js';
 
 export class TestApp {
   private started?: { app: INestApplication<App>; dataDir: string };
@@ -22,6 +23,10 @@ export class TestApp {
     return this.running().dataDir;
   }
 
+  get workspace(): WorkspaceClient {
+    return new WorkspaceClient(this.app);
+  }
+
   get conversation(): ConversationClient {
     if (!this.client) throw new Error('The app has not started');
     return this.client;
@@ -33,6 +38,10 @@ export class TestApp {
     const reopened = await createApp(dataDir);
     this.started = { app: reopened, dataDir };
     return new ConversationClient(reopened, this.conversation.id);
+  }
+
+  talkTo(id: string): ConversationClient {
+    return new ConversationClient(this.app, id);
   }
 
   private running(): { app: INestApplication<App>; dataDir: string } {

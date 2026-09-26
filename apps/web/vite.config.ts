@@ -12,7 +12,8 @@ export default defineConfig({
   },
   server: {
     proxy: {
-      '/conversation': 'http://localhost:3000',
+      '/conversations': 'http://localhost:3000',
+      '/workspace': 'http://localhost:3000',
       '/api': 'http://localhost:7860',
     },
   },

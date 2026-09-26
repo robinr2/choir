@@ -51,9 +51,7 @@ def create_pipeline(
     )
 
 
-async def run_bot(
-    connection: SmallWebRTCConnection, settings: Settings, conversation_id: str
-) -> None:
+async def run_bot(connection: SmallWebRTCConnection, settings: Settings) -> None:
     transport = SmallWebRTCTransport(
         webrtc_connection=connection,
         params=TransportParams(audio_in_enabled=True, audio_out_enabled=True),
@@ -61,7 +59,7 @@ async def run_bot(
     async with httpx.AsyncClient(
         base_url=settings.core_url, timeout=ANSWER_TIMEOUT
     ) as client:
-        conversation = CoreConversation(client, conversation_id)
+        conversation = CoreConversation(client)
         worker = PipelineWorker(create_pipeline(transport, settings, conversation))
 
         @transport.event_handler('on_client_disconnected')

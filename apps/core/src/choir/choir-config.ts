@@ -28,8 +28,23 @@ export function choirConfigFrom(environment: NodeJS.ProcessEnv): ChoirConfig {
   };
 }
 
+const APP_ROOT = path.resolve(import.meta.dirname, '..', '..');
+const VOICE_PROMPT = 'default-voice-prompt.md';
+
+export const PROFILE_TEMPLATE = path.join(APP_ROOT, 'profile-template');
+
+export const DEFAULT_VOICE_PROMPT = path.join(APP_ROOT, VOICE_PROMPT);
+
 export function profileDir(config: ChoirConfig): string {
   return path.join(config.dataDir, 'profiles', 'default');
+}
+
+export function profileVoicePrompt(config: ChoirConfig): string {
+  return path.join(profileDir(config), VOICE_PROMPT);
+}
+
+export function workspaceFile(config: ChoirConfig): string {
+  return path.join(config.dataDir, 'workspaces', 'default.json');
 }
 
 export function defaultFolder(config: ChoirConfig): string {

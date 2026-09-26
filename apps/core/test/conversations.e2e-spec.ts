@@ -3,19 +3,10 @@ import path from 'node:path';
 import { AcpxRuntime } from 'acpx/runtime';
 import request from 'supertest';
 import { AgentService } from '../src/agent/agent.service.js';
+import { EventStream } from './event-stream.js';
 import { TestApp } from './test-app.js';
 
 const testApp = TestApp.use();
-
-async function receiveUntil(
-  reader: ReadableStreamDefaultReader<string> | undefined,
-  received: string,
-  text: string,
-): Promise<string> {
-  if (received.includes(text)) return received;
-  const { value } = (await reader?.read()) ?? {};
-  return receiveUntil(reader, received + value, text);
-}
 
 it('starts a conversation in the default folder with the default profile', async () => {
   const setMode = vi.spyOn(AcpxRuntime.prototype, 'setMode');
@@ -78,25 +69,18 @@ it('shows the tool calls of a turn and their results', async () => {
 
 it('streams every change of the conversation', async () => {
   const { app, conversation } = testApp;
-  await app.listen(0);
-  const events = new AbortController();
-  const response = await fetch(
-    `${await app.getUrl()}/conversations/${conversation.id}/events`,
-    { signal: events.signal },
+  const events = await EventStream.open(
+    app,
+    `/conversations/${conversation.id}/events`,
   );
-  const reader = response.body
-    ?.pipeThrough(new TextDecoderStream())
-    .getReader();
   try {
-    const started = await receiveUntil(reader, '', 'data: {"messages":[]}\n\n');
+    await events.until('data: {"messages":[]}\n\n');
     await conversation.say('echo hi');
-    await receiveUntil(
-      reader,
-      started,
+    await events.until(
       '{"id":"m1","role":"assistant","parts":[{"type":"text","text":"hi"}]}',
     );
   } finally {
-    events.abort();
+    events.close();
   }
 });
 

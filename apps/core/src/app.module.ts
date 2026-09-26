@@ -2,10 +2,11 @@ import { Module, StandardSchemaValidationPipe } from '@nestjs/common';
 import { APP_PIPE } from '@nestjs/core';
 import { AppController } from './app.controller.js';
 import { AppService } from './app.service.js';
-import { ConversationsModule } from './conversations/conversations.module.js';
+import { ChoirModule } from './choir/choir.module.js';
+import { WorkspaceModule } from './workspace/workspace.module.js';
 
 @Module({
-  imports: [ConversationsModule],
+  imports: [ChoirModule, WorkspaceModule],
   controllers: [AppController],
   providers: [
     AppService,

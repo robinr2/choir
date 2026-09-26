@@ -1,6 +1,11 @@
 import type { AcpRuntimeEvent, AcpRuntimeTurn } from 'acpx/runtime';
 import { ReplaySubject } from 'rxjs';
-import { answerText, type TranscriptPart, withEvent } from './transcript.js';
+import {
+  answerText,
+  type TranscriptPart,
+  type TurnMark,
+  withEvent,
+} from './transcript.js';
 import { describeUsage, turnUsage } from './turn-usage.js';
 
 export type TurnKind = {
@@ -8,9 +13,11 @@ export type TurnKind = {
   voice: boolean;
 };
 
-export type TurnRequest = TurnKind & {
+export type TurnRequest = {
   prompt: string;
   words: string;
+  early: boolean;
+  mark: TurnMark;
 };
 
 export class ConversationTurn {
@@ -28,6 +35,10 @@ export class ConversationTurn {
 
   get parts(): TranscriptPart[] {
     return this.currentParts;
+  }
+
+  get settled(): Promise<unknown> {
+    return this.turn.result;
   }
 
   get confirmed(): Promise<boolean> {

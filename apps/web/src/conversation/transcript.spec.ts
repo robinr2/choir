@@ -1,6 +1,6 @@
 import type { AppendMessage } from '@assistant-ui/react';
 import { expect, test } from 'vitest';
-import { textOf, threadMessageOf } from './transcript';
+import { senderIn, textOf, threadMessageOf } from './transcript';
 
 test('shows the text and tool calls of a message in the thread', () => {
   expect(
@@ -47,6 +47,7 @@ test('shows the text and tool calls of a message in the thread', () => {
       },
       { type: 'text', text: 'Done.' },
     ],
+    metadata: { custom: {} },
   });
 });
 
@@ -74,6 +75,32 @@ test('shows spoken exchanges as voice messages', () => {
     id: 'm0',
     role: 'user',
     content: [{ type: 'text', text: 'hello' }],
-    metadata: { modality: 'voice' },
+    metadata: { modality: 'voice', custom: {} },
   });
+});
+
+test('marks replies that were spoken and messages from other agents', () => {
+  const from = { id: 'a2', name: 'helper' };
+  const message = threadMessageOf({
+    id: 'm0',
+    role: 'user',
+    parts: [{ type: 'text', text: 'hello' }],
+    from,
+  });
+  expect(message.metadata).toEqual({ custom: { from } });
+  expect(
+    threadMessageOf({ id: 'm1', role: 'assistant', parts: [], spoken: true })
+      .metadata,
+  ).toEqual({ custom: { spoken: true } });
+});
+
+test('reads the sender of a message from another agent', () => {
+  const from = { id: 'a2', name: 'helper' };
+  const nobody = { id: '', name: '' };
+  expect(senderIn({ from })).toEqual(from);
+  expect(senderIn({})).toEqual(nobody);
+  expect(senderIn({ from: null })).toEqual(nobody);
+  expect(senderIn({ from: 'helper' })).toEqual(nobody);
+  expect(senderIn({ from: { id: 'a2' } })).toEqual(nobody);
+  expect(senderIn({ from: { name: 'helper' } })).toEqual(nobody);
 });

@@ -4,6 +4,7 @@ import path from 'node:path';
 import { Test } from '@nestjs/testing';
 import { AcpxRuntime, createAcpRuntime } from 'acpx/runtime';
 import { CHOIR_CONFIG, choirConfigFrom } from '../choir/choir-config.js';
+import { ChoirModule } from '../choir/choir.module.js';
 import { findExecutable } from '../choir/executable.js';
 import { AgentModule } from './agent.module.js';
 import { AgentService } from './agent.service.js';
@@ -30,7 +31,7 @@ afterEach(async () => {
 
 it('configures the agent from the environment', async () => {
   const moduleRef = await Test.createTestingModule({
-    imports: [AgentModule],
+    imports: [ChoirModule, AgentModule],
   }).compile();
   expect(moduleRef.get(CHOIR_CONFIG)).toEqual({
     ...choirConfigFrom(process.env),

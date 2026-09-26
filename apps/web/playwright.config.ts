@@ -5,7 +5,7 @@ import { E2E_DATA_DIR } from './e2e/data-dir.js';
 const repoRoot = path.resolve(import.meta.dirname, '../..');
 const fakeMicrophone = path.resolve(
   import.meta.dirname,
-  'e2e/fixtures/quick-brown-fox.wav',
+  'e2e/fixtures/new-agent-says-hello.wav',
 );
 
 function server(recipe: string, url: string) {

@@ -1,11 +1,16 @@
+from typing import TYPE_CHECKING
+
 from pipecat.frames.frames import (
+    CancelFrame,
     EagerEndOfTurnCancelFrame,
+    EndFrame,
     Frame,
     InterruptionFrame,
     LLMContextAssistantTurnFrame,
     LLMContextFrame,
     LLMFullResponseEndFrame,
     LLMFullResponseStartFrame,
+    StartFrame,
     UserStoppedSpeakingFrame,
 )
 from pipecat.processors.aggregators.llm_context import LLMContext
@@ -13,7 +18,10 @@ from pipecat.processors.frame_processor import FrameDirection
 from pipecat.services.llm_service import LLMService
 from pipecat.services.settings import LLMSettings
 
-from voice.core_conversation import CoreConversation
+from voice.core_conversation import AgentChanged, CoreConversation, Reply, VoiceEvent
+
+if TYPE_CHECKING:
+    import asyncio
 
 NO_MODEL_SETTINGS = LLMSettings(
     model=None,
@@ -28,6 +36,12 @@ NO_MODEL_SETTINGS = LLMSettings(
     filter_incomplete_user_turns=None,
     user_turn_completion_config=None,
 )
+
+
+QUIET = 'quiet'
+SPEAKING = 'speaking'
+IGNORED = 'ignored'
+REPLY = 'reply'
 
 
 def latest_user_words(context: LLMContext) -> str:
@@ -45,15 +59,67 @@ class ConversationLLMService(LLMService):
         self._conversation = conversation
         self._early_words = ''
         self._answered_words = ''
-        self._interrupted_words = ''
+        self._interrupted = ''
+        self._reply = QUIET
+        self._listener: asyncio.Task[None] | None = None
 
     async def process_frame(self, frame: Frame, direction: FrameDirection) -> None:
         await super().process_frame(frame, direction)
+        await self._follow_pipeline(frame)
         if isinstance(frame, LLMContextFrame):
             await self._answer(frame)
             return
         await self._follow(frame)
         await self.push_frame(frame, direction)
+
+    async def _follow_pipeline(self, frame: Frame) -> None:
+        if isinstance(frame, StartFrame):
+            self._listener = self.create_task(self._listen())  # pyright: ignore[reportUnknownMemberType]
+        elif isinstance(frame, EndFrame | CancelFrame):
+            await self._stop_listening()
+
+    async def _stop_listening(self) -> None:
+        if self._listener is not None:
+            self._listener.cancel()
+            self._listener = None
+
+    async def _listen(self) -> None:
+        async for event in self._conversation.events():
+            await self._on_voice_event(event)
+
+    async def _on_voice_event(self, event: VoiceEvent) -> None:
+        if isinstance(event, AgentChanged):
+            await self._talk_to(event.agent_id)
+        elif isinstance(event, Reply):
+            await self._say(event.text)
+        else:
+            await self._end_reply()
+
+    async def _talk_to(self, agent_id: str | None) -> None:
+        if self._conversation.agent_id not in {None, agent_id}:
+            await self._confirm()
+            await self._fall_silent()
+        self._conversation.agent_id = agent_id
+
+    async def _fall_silent(self) -> None:
+        self._answered_words = ''
+        self._interrupted = ''
+        self._reply = QUIET
+        await self._start_interruption()
+        await self.broadcast_interruption()
+
+    async def _say(self, text: str) -> None:
+        if self._reply == IGNORED:
+            return
+        if self._reply == QUIET:
+            await self.push_frame(LLMFullResponseStartFrame())
+        self._reply = SPEAKING
+        await self._push_llm_text(text)
+
+    async def _end_reply(self) -> None:
+        if self._reply == SPEAKING:
+            await self.push_frame(LLMFullResponseEndFrame())
+        self._reply = QUIET
 
     async def _follow(self, frame: Frame) -> None:
         if isinstance(frame, UserStoppedSpeakingFrame):
@@ -67,7 +133,10 @@ class ConversationLLMService(LLMService):
 
     async def _interrupt(self) -> None:
         await self._withdraw()
-        self._interrupted_words = self._answered_words
+        self._interrupted = self._answered_words
+        if self._reply == SPEAKING:
+            self._interrupted = REPLY
+            self._reply = IGNORED
 
     async def _answer(self, frame: LLMContextFrame) -> None:
         await self._finish_reply('')
@@ -97,7 +166,7 @@ class ConversationLLMService(LLMService):
         await self._conversation.withdraw()
 
     async def _finish_reply(self, heard: str) -> None:
-        if self._interrupted_words != '':
+        if self._interrupted.strip():
             await self._conversation.interrupt(heard)
-        self._interrupted_words = ''
+        self._interrupted = ''
         self._answered_words = ''

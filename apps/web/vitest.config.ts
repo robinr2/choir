@@ -17,6 +17,7 @@ export default mergeConfig(
         include: ['src/**/*.{ts,tsx}'],
         exclude: [
           'src/**/*.spec.{ts,tsx}',
+          'src/test/**',
           'src/main.tsx',
           'src/components/ui/**',
           'src/components/assistant-ui/**',
