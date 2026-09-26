@@ -10,4 +10,10 @@ export default defineConfig({
       '@': path.resolve(import.meta.dirname, './src'),
     },
   },
+  server: {
+    proxy: {
+      '/conversation': 'http://localhost:3000',
+      '/api': 'http://localhost:7860',
+    },
+  },
 });

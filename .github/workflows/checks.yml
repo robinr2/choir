@@ -93,3 +93,29 @@ jobs:
       - run: uv run --frozen deptry src
       - run: ./check-mutants.sh
       - run: ../core/node_modules/.bin/jscpd
+
+  e2e:
+    runs-on: ubuntu-latest
+    env:
+      CI: true
+      XAI_API_KEY: ${{ secrets.XAI_API_KEY }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.2.0
+      - uses: extractions/setup-just@v3
+        with:
+          just-version: 1.58.0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: |
+            apps/core/package-lock.json
+            apps/web/package-lock.json
+      - run: npm ci --prefix apps/core
+      - run: npm ci --prefix apps/web
+      - run: uv sync --frozen --directory apps/voice
+      - run: npx playwright install --with-deps chromium
+        working-directory: apps/web
+      - run: npx playwright test
+        working-directory: apps/web

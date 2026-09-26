@@ -10,7 +10,7 @@
         "--format",
         "typescript,tsx",
         "--ignore",
-        "**/apps/web/src/components/ui/**,**/apps/web/src/components/assistant-ui/**,**/apps/web/src/hooks/use-attachment-src.ts,**/apps/web/src/hooks/use-copy-to-clipboard.ts",
+        "**/apps/web/src/components/ui/**,**/apps/web/src/components/assistant-ui/**,**/apps/web/src/hooks/use-attachment-src.ts,**/apps/web/src/hooks/use-copy-to-clipboard.ts,**/apps/web/src/components/pipecat/**,**/apps/web/src/lib/visualizer.ts",
         "apps/core/src",
         "apps/core/test",
         "apps/web/src"

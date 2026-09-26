@@ -11,6 +11,6 @@ module.exports = {
   ],
   options: {
     ...options,
-    exclude: { path: '\\.(e2e-)?spec\\.tsx?$' },
+    exclude: { path: ['\\.(e2e-)?spec\\.tsx?$', '^test/'] },
   },
 };
