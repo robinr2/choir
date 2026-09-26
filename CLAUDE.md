@@ -14,6 +14,7 @@ Do all work based on the documentation of the tools the current task involves. O
 
 ## Development
 
+- Run `just --list` to see the available commands. Prefer the just commands over running their tools directly.
 - Build every feature end to end across all apps it touches, so it can be seen working.
 - Work strictly in a git worktree and open a pull request when the work is done, without asking first.
 - Never write comments.
