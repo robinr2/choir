@@ -29,3 +29,4 @@ uv run --frozen ruff format --check
 uv run --frozen ruff check
 ./check-max-lines.sh
 uv run --frozen pyright
+uv run --frozen pytest
