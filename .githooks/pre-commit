@@ -32,3 +32,4 @@ uv run --frozen pyright
 uv run --frozen pytest
 uv run --frozen vulture src tests
 uv run --frozen deptry src
+./check-mutants.sh

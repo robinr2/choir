@@ -11,6 +11,7 @@ build-backend = "uv_build"
 [dependency-groups]
 dev = [
     "deptry>=0.25.1",
+    "mutmut>=3.8.0",
     "pyright>=1.1.414",
     "pytest>=9.1.1",
     "pytest-asyncio>=1.4.0",
@@ -53,3 +54,8 @@ max-nested-blocks = 2
 testpaths = ["tests"]
 asyncio_mode = "auto"
 addopts = "--cov=voice --cov-branch --cov-report=term-missing --cov-fail-under=100"
+
+[tool.mutmut]
+source_paths = ["src/"]
+pytest_add_cli_args = ["--no-cov"]
+pytest_add_cli_args_test_selection = ["tests/"]
