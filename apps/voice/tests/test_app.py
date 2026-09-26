@@ -2,6 +2,7 @@ from collections.abc import Awaitable, Callable, Iterator
 from typing import Any
 
 import pytest
+from fastapi import status
 from fastapi.testclient import TestClient
 from pipecat.transports.smallwebrtc.request_handler import (
     SmallWebRTCPatchRequest,
@@ -17,6 +18,8 @@ from voice.routers import offer
 
 SETTINGS = Settings(xai_api_key=SecretStr('xai-key'))
 ANSWER = {'sdp': 'answer-sdp', 'type': 'answer', 'pc_id': 'pc-1'}
+CONVERSATION_ID = '0b6f2c9e-3f5d-4a8e-9c1b-2d7e6f5a4b3c'
+OFFER = {'sdp': 'offer-sdp', 'type': 'offer'}
 
 
 class FakeHandler(SmallWebRTCRequestHandler):
@@ -78,17 +81,32 @@ def test_closes_the_webrtc_connections_at_shutdown(handler: FakeHandler) -> None
 def test_answers_an_offer_and_starts_the_bot(
     monkeypatch: pytest.MonkeyPatch, handler: FakeHandler
 ) -> None:
-    started: list[tuple[Any, Settings]] = []
+    started: list[tuple[Any, Settings, str]] = []
 
-    async def run_bot(connection: Any, settings: Settings) -> None:
-        started.append((connection, settings))
+    async def run_bot(
+        connection: Any, settings: Settings, conversation_id: str
+    ) -> None:
+        started.append((connection, settings, conversation_id))
 
     monkeypatch.setattr(offer, 'run_bot', run_bot)
     with TestClient(main.app) as client:
-        response = client.post('/api/offer', json={'sdp': 'offer-sdp', 'type': 'offer'})
+        response = client.post(
+            '/api/offer', params={'conversation_id': CONVERSATION_ID}, json=OFFER
+        )
     assert response.json() == ANSWER
     assert handler.offers == [SmallWebRTCRequest(sdp='offer-sdp', type='offer')]
-    assert started == [('connection', SETTINGS)]
+    assert started == [('connection', SETTINGS, CONVERSATION_ID)]
+
+
+@pytest.mark.parametrize('params', [{}, {'conversation_id': 'not-a-uuid'}])
+def test_rejects_an_offer_without_a_conversation(
+    handler: FakeHandler, params: dict[str, str]
+) -> None:
+    with TestClient(main.app) as client:
+        response = client.post('/api/offer', params=params, json=OFFER)
+    assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
+    assert response.json()['detail'][0]['loc'] == ['query', 'conversation_id']
+    assert handler.offers == []
 
 
 def test_adds_ice_candidates(handler: FakeHandler) -> None:

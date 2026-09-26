@@ -6,6 +6,8 @@ import pytest
 
 from voice.core_conversation import CoreConversation
 
+CONVERSATION = '/conversations/c1'
+
 
 class RecordingCore:
     def __init__(self) -> None:
@@ -15,11 +17,11 @@ class RecordingCore:
 
     def handle(self, request: httpx.Request) -> httpx.Response:
         body = json.loads(request.content) if request.content else None
-        self.requests.append((request.url.path, body))
+        self.requests.append((request.url.path.removeprefix(CONVERSATION), body))
         self.methods.append(request.method)
         if self.status != httpx.codes.OK:
             return httpx.Response(self.status)
-        if request.url.path == '/conversation/user-turns':
+        if request.url.path.endswith('/user-turns'):
             reply = json.dumps({'text': json.loads(request.content)['text']})
             return httpx.Response(self.status, text=f'id: 1\ndata: {reply}\n\n')
         return httpx.Response(httpx.codes.NO_CONTENT)
@@ -28,7 +30,8 @@ class RecordingCore:
         return CoreConversation(
             httpx.AsyncClient(
                 transport=httpx.MockTransport(self.handle), base_url='http://core'
-            )
+            ),
+            'c1',
         )
 
 

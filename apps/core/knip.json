@@ -6,7 +6,8 @@
   "ignoreDependencies": [
     "nestjs-doctor",
     "jscpd",
-    "dependency-cruiser"
+    "dependency-cruiser",
+    "acpx-mock-agent"
   ],
   "entry": [
     "src/main.ts!",

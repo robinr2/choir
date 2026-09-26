@@ -1,12 +1,47 @@
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { Test } from '@nestjs/testing';
 import { INestApplication } from '@nestjs/common';
 import { App } from 'supertest/types.js';
 import { AppModule } from './../src/app.module.js';
+import { CHOIR_CONFIG, type ChoirConfig } from '../src/choir/choir-config.js';
 
-export async function createApp(): Promise<INestApplication<App>> {
+const MOCK_AGENT = path.resolve(
+  import.meta.dirname,
+  '../node_modules/acpx-mock-agent/test/mock-agent.ts',
+);
+
+const MOCK_AGENT_COMMAND = [
+  process.execPath,
+  fileURLToPath(import.meta.resolve('tsx/cli')),
+  MOCK_AGENT,
+  '--supports-load-session',
+];
+
+export function createDataDir(): Promise<string> {
+  return mkdtemp(path.join(tmpdir(), 'choir-core-'));
+}
+
+export function removeDataDir(dataDir: string): Promise<void> {
+  return rm(dataDir, { recursive: true, force: true });
+}
+
+export async function createApp(
+  dataDir: string,
+): Promise<INestApplication<App>> {
+  const config: ChoirConfig = {
+    dataDir,
+    coreUrl: 'http://localhost:3000',
+    agentCommand: MOCK_AGENT_COMMAND,
+  };
   const moduleFixture = await Test.createTestingModule({
     imports: [AppModule],
-  }).compile();
+  })
+    .overrideProvider(CHOIR_CONFIG)
+    .useValue(config)
+    .compile();
 
   const app = moduleFixture.createNestApplication<INestApplication<App>>();
   await app.init();

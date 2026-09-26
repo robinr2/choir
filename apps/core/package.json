@@ -25,6 +25,7 @@
     "@nestjs/common": "^12.0.1",
     "@nestjs/core": "^12.0.1",
     "@nestjs/platform-express": "^12.0.1",
+    "acpx": "^0.19.3",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
     "zod": "^4.6.5"
@@ -40,6 +41,7 @@
     "@types/node": "^24.13.6",
     "@types/supertest": "^7.0.0",
     "@vitest/coverage-v8": "^4.1.2",
+    "acpx-mock-agent": "https://codeload.github.com/openclaw/acpx/tar.gz/refs/tags/v0.19.3",
     "dependency-cruiser": "^18.4.0",
     "jscpd": "5.3.2",
     "knip": "^6.38.0",
@@ -49,6 +51,7 @@
     "oxlint-tsgolint": "^7.0.2001",
     "prettier": "^3.4.2",
     "supertest": "^7.0.0",
+    "tsx": "^4.23.15",
     "typescript": "^6.0.3",
     "unplugin-swc": "^2.0.0",
     "vite-tsconfig-paths": "^5.1.4",

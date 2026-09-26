@@ -1,4 +1,8 @@
-from fastapi import APIRouter, BackgroundTasks
+from collections.abc import Awaitable, Callable
+from typing import Annotated
+from uuid import UUID
+
+from fastapi import APIRouter, BackgroundTasks, Depends
 from pipecat.transports.smallwebrtc.connection import SmallWebRTCConnection
 from pipecat.transports.smallwebrtc.request_handler import (
     SmallWebRTCPatchRequest,
@@ -10,17 +14,24 @@ from voice.dependencies import SettingsDep, WebRTCHandlerDep
 
 router = APIRouter(prefix='/api/offer', tags=['webrtc'])
 
+BotStarter = Callable[[SmallWebRTCConnection], Awaitable[None]]
+
+
+def bot_starter(
+    conversation_id: UUID, background_tasks: BackgroundTasks, settings: SettingsDep
+) -> BotStarter:
+    async def start_bot(connection: SmallWebRTCConnection) -> None:
+        background_tasks.add_task(run_bot, connection, settings, str(conversation_id))
+
+    return start_bot
+
 
 @router.post('')
 async def offer(
     request: SmallWebRTCRequest,
-    background_tasks: BackgroundTasks,
-    settings: SettingsDep,
+    start_bot: Annotated[BotStarter, Depends(bot_starter)],
     handler: WebRTCHandlerDep,
 ) -> dict[str, str] | None:
-    async def start_bot(connection: SmallWebRTCConnection) -> None:
-        background_tasks.add_task(run_bot, connection, settings)
-
     return await handler.handle_web_request(request, start_bot)
 
 

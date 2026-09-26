@@ -20,6 +20,9 @@ export default defineConfig({
         test: {
           name: 'e2e',
           include: ['test/**/*.e2e-spec.ts'],
+          testTimeout: 60_000,
+          hookTimeout: 60_000,
+          restoreMocks: true,
         },
       },
     ],

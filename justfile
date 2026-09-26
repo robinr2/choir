@@ -5,7 +5,7 @@ dev: web core voice
 
 [working-directory('apps/web')]
 web:
-    npm run dev -- --port 5173 --strictPort
+    npm run dev -- --port 5173 --strictPort < /dev/null
 
 [working-directory('apps/core')]
 core:

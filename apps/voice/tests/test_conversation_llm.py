@@ -23,8 +23,13 @@ from pipecat.tests.utils import SleepFrame, run_test
 from tests.conftest import RecordingCore
 from voice.conversation_llm import ConversationLLMService, latest_user_words
 
-USER_TURN = '/conversation/user-turns'
-WITHDRAWAL = ('/conversation/withdrawals', None)
+USER_TURN = '/user-turns'
+WITHDRAWAL = ('/withdrawals', None)
+CONFIRMATION = ('/confirmations', {'text': 'hello choir'})
+
+
+def asked(text: str, *, early: bool = False) -> tuple[str, dict[str, object]]:
+    return (USER_TURN, {'text': text, 'early': early, 'voice': True})
 
 
 def user_said(text: str, *, speculation: bool = False) -> LLMContextFrame:
@@ -119,7 +124,7 @@ async def test_speaks_the_reply_core_streams_back(core: RecordingCore) -> None:
     assert [frame.text for frame in down if isinstance(frame, LLMTextFrame)] == [
         'hello choir'
     ]
-    assert core.requests == [(USER_TURN, {'text': 'hello choir'})]
+    assert core.requests == [asked('hello choir')]
 
 
 async def test_asks_core_nothing_without_new_words(core: RecordingCore) -> None:
@@ -162,8 +167,8 @@ async def test_reports_how_much_of_an_interrupted_reply_was_heard(
         turn_heard('hello'),
     )
     assert core.requests == [
-        (USER_TURN, {'text': 'hello choir'}),
-        ('/conversation/interruptions', {'heard': 'hello'}),
+        asked('hello choir'),
+        ('/interruptions', {'heard': 'hello'}),
     ]
 
 
@@ -178,9 +183,9 @@ async def test_reports_an_interruption_nothing_was_heard_of(
         user_said('wait'),
     )
     assert core.requests == [
-        (USER_TURN, {'text': 'hello choir'}),
-        ('/conversation/interruptions', {'heard': ''}),
-        (USER_TURN, {'text': 'wait'}),
+        asked('hello choir'),
+        ('/interruptions', {'heard': ''}),
+        asked('wait'),
     ]
 
 
@@ -198,8 +203,8 @@ async def test_reports_no_interruption_once_the_reply_was_heard(
         user_said('again'),
     )
     assert core.requests == [
-        (USER_TURN, {'text': 'hello choir'}),
-        (USER_TURN, {'text': 'again'}),
+        asked('hello choir'),
+        asked('again'),
     ]
 
 
@@ -213,7 +218,7 @@ async def test_reports_no_interruption_of_an_answer_without_words(
         InterruptionFrame(),
         user_said('hello choir'),
     )
-    assert core.requests == [(USER_TURN, {'text': 'hello choir'})]
+    assert core.requests == [asked('hello choir')]
 
 
 async def test_withdraws_an_early_start_the_user_talked_past(
@@ -228,9 +233,9 @@ async def test_withdraws_an_early_start_the_user_talked_past(
         user_said('hello choir'),
     )
     assert core.requests == [
-        (USER_TURN, {'text': 'hello'}),
+        asked('hello', early=True),
         WITHDRAWAL,
-        (USER_TURN, {'text': 'hello choir'}),
+        asked('hello choir'),
     ]
 
 
@@ -245,9 +250,9 @@ async def test_withdraws_an_early_start_the_user_interrupted(
         user_said('hello choir'),
     )
     assert core.requests == [
-        (USER_TURN, {'text': 'hello'}),
+        asked('hello', early=True),
         WITHDRAWAL,
-        (USER_TURN, {'text': 'hello choir'}),
+        asked('hello choir'),
     ]
 
 
@@ -260,15 +265,54 @@ async def test_keeps_an_early_start_the_user_confirmed(
         SleepFrame(sleep=0.1),
         UserStoppedSpeakingFrame(),
         EagerEndOfTurnCancelFrame(),
+        UserStoppedSpeakingFrame(),
     )
-    assert core.requests == [(USER_TURN, {'text': 'hello choir'})]
+    assert core.requests == [asked('hello choir', early=True), CONFIRMATION]
+
+
+async def test_confirms_nothing_that_did_not_start_early(
+    core: RecordingCore,
+) -> None:
+    await run(core, UserStoppedSpeakingFrame(), user_said('hello choir'))
+    await run(
+        core, user_said('again'), SleepFrame(sleep=0.1), UserStoppedSpeakingFrame()
+    )
+    assert core.requests == [asked('hello choir'), asked('again')]
+
+
+async def test_answers_a_turn_that_ended_before_its_early_start_as_ended(
+    core: RecordingCore,
+) -> None:
+    await run(
+        core,
+        UserStoppedSpeakingFrame(),
+        user_said('hello choir', speculation=True),
+        SleepFrame(sleep=0.1),
+        UserStoppedSpeakingFrame(),
+    )
+    assert core.requests == [asked('hello choir')]
+
+
+async def test_withdraws_an_early_start_a_later_one_replaces(
+    core: RecordingCore,
+) -> None:
+    await run(
+        core,
+        user_said('hello', speculation=True),
+        user_said('hello choir', speculation=True),
+    )
+    assert core.requests == [
+        asked('hello', early=True),
+        WITHDRAWAL,
+        asked('hello choir', early=True),
+    ]
 
 
 async def test_withdraws_nothing_before_anything_was_said(
     core: RecordingCore,
 ) -> None:
     await run(core, EagerEndOfTurnCancelFrame(), user_said('hello choir'))
-    assert core.requests == [(USER_TURN, {'text': 'hello choir'})]
+    assert core.requests == [asked('hello choir')]
 
 
 async def test_withdraws_nothing_that_did_not_start_early(
@@ -280,4 +324,4 @@ async def test_withdraws_nothing_that_did_not_start_early(
         SleepFrame(sleep=0.1),
         EagerEndOfTurnCancelFrame(),
     )
-    assert core.requests == [(USER_TURN, {'text': 'hello choir'})]
+    assert core.requests == [asked('hello choir')]
