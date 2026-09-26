@@ -27,3 +27,4 @@ npx stryker run
 cd ../voice
 uv run --frozen ruff format --check
 uv run --frozen ruff check
+./check-max-lines.sh

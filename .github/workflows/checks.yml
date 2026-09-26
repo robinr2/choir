@@ -80,3 +80,4 @@ jobs:
       - run: uv sync --frozen
       - run: uv run --frozen ruff format --check
       - run: uv run --frozen ruff check
+      - run: ./check-max-lines.sh

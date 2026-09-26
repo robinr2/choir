@@ -4,9 +4,6 @@ version = "0.1.0"
 requires-python = ">=3.12"
 dependencies = []
 
-[project.scripts]
-voice = "voice:main"
-
 [build-system]
 requires = ["uv_build>=0.12.17,<0.13.0"]
 build-backend = "uv_build"
@@ -15,3 +12,30 @@ build-backend = "uv_build"
 dev = [
     "ruff>=0.16.9",
 ]
+
+[tool.ruff.format]
+quote-style = "single"
+
+[tool.ruff.lint]
+preview = true
+explicit-preview-rules = true
+select = [
+    "F", "E", "W", "B", "PERF", "PL", "RUF",
+    "SIM", "PIE", "UP", "I", "TID", "PT", "T20", "C90",
+    "S", "ANN", "ASYNC", "ARG", "ERA", "FBT", "BLE", "TRY", "EM",
+    "RET", "C4", "A", "N", "SLF", "PTH", "DTZ", "LOG", "G", "T10",
+    "TC", "FURB", "TD", "FIX",
+    "PLR0904", "PLR0914", "PLR0916", "PLR1702",
+]
+ignore = ["ANN401"]
+
+[tool.ruff.lint.mccabe]
+max-complexity = 5
+
+[tool.ruff.lint.pylint]
+max-args = 4
+max-statements = 10
+max-nested-blocks = 2
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101", "PLR0915"]
