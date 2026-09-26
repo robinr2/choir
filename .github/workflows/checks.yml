@@ -83,3 +83,5 @@ jobs:
       - run: ./check-max-lines.sh
       - run: uv run --frozen pyright
       - run: uv run --frozen pytest
+      - run: uv run --frozen vulture src tests
+      - run: uv run --frozen deptry src
