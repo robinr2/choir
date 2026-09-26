@@ -13,6 +13,8 @@ Do all work based on the documentation of the tools the current task involves. O
 
 ## Development
 
+- Build every feature end to end across all apps it touches, so it can be seen working.
+- Work strictly in a git worktree and open a pull request when the work is done, without asking first.
 - Never write comments.
 - Never write documentation.
 - When the instructions in this file or the checks in the pre-commit hook contradict each other or leave no clean way forward, stop working and consult me. Briefly introduce the problem, then give me the cleanest option to fix it.
