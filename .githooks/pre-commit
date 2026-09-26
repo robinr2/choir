@@ -24,3 +24,6 @@ npx tsc -b --noEmit
 npx react-doctor . --staged --no-score --no-supply-chain --blocking warning
 npm run --silent test:cov
 npx stryker run
+cd ../voice
+uv run --frozen ruff format --check
+uv run --frozen ruff check
