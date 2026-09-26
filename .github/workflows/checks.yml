@@ -42,7 +42,7 @@ jobs:
       - run: npx tsc --noEmit -p tsconfig.json
       - run: npm run --silent test:cov
       - run: npx nestjs-doctor . --blocking error
-      - run: npx stryker run --reporters json,clear-text,progress-append-only --fileLogLevel trace
+      - run: npx stryker run --concurrency 4 --reporters json,clear-text,progress-append-only --fileLogLevel trace
       - if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -74,7 +74,7 @@ jobs:
       - run: npx tsc -b --noEmit
       - run: npx react-doctor . --no-score --no-supply-chain --blocking warning -y
       - run: npm run --silent test:cov
-      - run: npx stryker run --reporters json,clear-text,progress-append-only --fileLogLevel trace
+      - run: npx stryker run --concurrency 4 --reporters json,clear-text,progress-append-only --fileLogLevel trace
       - if: always()
         uses: actions/upload-artifact@v4
         with:
