@@ -31,6 +31,12 @@ function receivedAudioEnergy(page: Page): Promise<number> {
   });
 }
 
+function spokenMessage(page: Page, role: 'user' | 'assistant') {
+  return page.locator(
+    `[data-slot="aui_spoken-message-root"][data-role="${role}"]`,
+  );
+}
+
 test('answers a spoken sentence with Claude Code, out loud and with a tool call', async ({
   page,
 }) => {
@@ -39,15 +45,11 @@ test('answers a spoken sentence with Claude Code, out loud and with a tool call'
 
   await page.getByRole('button', { name: 'Voice' }).click();
 
-  const asked = page
-    .locator('[data-slot="aui_user-message-root"]')
-    .filter({ hasText: SENTENCE })
-    .first();
-  await expect(asked).toBeVisible({ timeout: 90_000 });
-  const answer = page.locator('[data-slot="aui_assistant-message-root"]').last();
-  await expect(answer.getByRole('button', { name: /tool call/ })).toBeVisible({
-    timeout: 120_000,
-  });
+  await expect(
+    spokenMessage(page, 'user').filter({ hasText: SENTENCE }).first(),
+  ).toBeVisible({ timeout: 90_000 });
+  const answer = spokenMessage(page, 'assistant').last();
+  await expect(answer).toContainText('Used tool:', { timeout: 120_000 });
   await expect(answer).toContainText(/words/i, { timeout: 120_000 });
   await expect
     .poll(() => receivedAudioEnergy(page), { timeout: 60_000 })

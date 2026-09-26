@@ -61,3 +61,19 @@ test('takes the words of a typed message', () => {
   } as const satisfies Pick<AppendMessage, 'role' | 'content'>;
   expect(textOf(message)).toBe('hello choir');
 });
+
+test('shows spoken exchanges as voice messages', () => {
+  expect(
+    threadMessageOf({
+      id: 'm0',
+      role: 'user',
+      parts: [{ type: 'text', text: 'hello' }],
+      voice: true,
+    }),
+  ).toEqual({
+    id: 'm0',
+    role: 'user',
+    content: [{ type: 'text', text: 'hello' }],
+    metadata: { modality: 'voice' },
+  });
+});

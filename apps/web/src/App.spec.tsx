@@ -192,7 +192,7 @@ test('fills the composer with what the user says until the turn is sent', async 
   await expect.element(screen.getByText('hello choir')).toBeVisible();
 });
 
-test('hands typed text to the bot while voice is on', async () => {
+test('hands typed text to the bot while voice is on and shows it once', async () => {
   const { sendText } = stubVoice();
   const screen = await renderApp();
   await turnVoiceOn(screen);
@@ -201,6 +201,16 @@ test('hands typed text to the bot while voice is on', async () => {
     expect(sendText).toHaveBeenCalledWith('typed to the bot'),
   );
   expect(window.fetch).not.toHaveBeenCalled();
+  coreShows({ ...userSaid('typed to the bot'), voice: true });
+  await expect.element(screen.getByText('typed to the bot')).toBeVisible();
+  await expect
+    .poll(
+      () =>
+        document.querySelectorAll('[data-slot="aui_spoken-message-root"]')
+          .length,
+    )
+    .toBe(1);
+  expect(screen.getByText('typed to the bot').elements()).toHaveLength(1);
 });
 
 test('follows the conversation it was last given', async () => {
@@ -216,4 +226,28 @@ test('follows the conversation it was last given', async () => {
   await expect.element(screen.getByRole('textbox')).toHaveValue('hi');
   coreShows(userSaid('hi'));
   await expect.element(screen.getByRole('textbox')).toHaveValue('');
+});
+
+test('shows a spoken exchange apart, with its tool calls', async () => {
+  const screen = await renderApp();
+  coreShows(
+    { ...userSaid('what is in my notes'), voice: true },
+    {
+      id: 'm1',
+      role: 'assistant',
+      voice: true,
+      parts: [
+        {
+          type: 'tool-call',
+          toolCallId: 'tool-1',
+          toolName: 'Read',
+          args: { filePath: 'notes.md' },
+        },
+        { type: 'text', text: 'Milk.' },
+      ],
+    },
+  );
+  await expect.element(screen.getByText('Voice conversation')).toBeVisible();
+  await expect.element(screen.getByText('Used tool:')).toBeVisible();
+  await expect.element(screen.getByText('Milk.')).toBeVisible();
 });

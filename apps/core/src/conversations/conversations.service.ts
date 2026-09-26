@@ -9,7 +9,7 @@ import { AgentService } from '../agent/agent.service.js';
 import { ConversationTurn, type TurnKind } from './conversation-turn.js';
 import { type TranscriptMessage, transcriptOf } from './transcript.js';
 import { type Continuation, framed } from './turn-framing.js';
-import { describeUsage, turnUsage } from './turn-usage.js';
+import { VoiceTurnsService } from './voice-turns.service.js';
 
 export type ConversationAgent = {
   open(conversationId: string): Promise<AcpRuntimeHandle>;
@@ -25,7 +25,9 @@ type Conversation = {
   opened?: Promise<AcpRuntimeHandle>;
   current?: ConversationTurn;
   unfinished: Set<ConversationTurn>;
+  voicePrompts: Set<string>;
   continuation?: Continuation;
+  confirmedWords?: string;
 };
 
 @Injectable()
@@ -35,6 +37,8 @@ export class ConversationsService {
 
   constructor(
     @Inject(AgentService) private readonly agent: ConversationAgent,
+    @Inject(VoiceTurnsService)
+    private readonly voiceTurns: Pick<VoiceTurnsService, 'load' | 'save'>,
   ) {}
 
   async messages(id: string): Promise<TranscriptMessage[]> {
@@ -64,8 +68,7 @@ export class ConversationsService {
       { prompt, words, ...kind },
       () => this.publish(conversation),
     );
-    conversation.current = turn;
-    conversation.unfinished.add(turn);
+    await this.track(conversation, turn);
     this.publish(conversation);
     void this.finish(conversation, handle, turn).catch((error: unknown) => {
       this.logger.error(`Conversation ${id} turn failed: ${String(error)}`);
@@ -73,8 +76,11 @@ export class ConversationsService {
     return turn.answer.asObservable();
   }
 
-  confirm(id: string): void {
-    this.conversation(id).current?.confirm();
+  confirm(id: string, words: string): void {
+    const conversation = this.conversation(id);
+    const turn = conversation.current;
+    if (turn?.request.words === words) turn.confirm();
+    else conversation.confirmedWords = words;
   }
 
   async withdraw(id: string): Promise<void> {
@@ -115,6 +121,7 @@ export class ConversationsService {
       history: [],
       nextIndex: 0,
       unfinished: new Set(),
+      voicePrompts: new Set(),
     };
     this.conversations.set(id, conversation);
     return conversation;
@@ -127,6 +134,7 @@ export class ConversationsService {
 
   private async open(conversation: Conversation): Promise<AcpRuntimeHandle> {
     const handle = await this.agent.open(conversation.id);
+    conversation.voicePrompts = await this.voiceTurns.load(conversation.id);
     await this.reload(conversation, handle);
     return handle;
   }
@@ -136,7 +144,7 @@ export class ConversationsService {
     handle: AcpRuntimeHandle,
   ): Promise<void> {
     const record = await this.agent.record(handle);
-    conversation.history = transcriptOf(record);
+    conversation.history = transcriptOf(record, conversation.voicePrompts);
     conversation.nextIndex = record.messages.length;
     this.publish(conversation);
   }
@@ -150,14 +158,34 @@ export class ConversationsService {
 
   private live({ current, nextIndex }: Conversation): TranscriptMessage[] {
     if (!current) return [];
+    const voice = current.request.voice ? { voice: true as const } : {};
     return [
       {
         id: `m${nextIndex}`,
         role: 'user',
         parts: [{ type: 'text', text: current.request.prompt }],
+        ...voice,
       },
-      { id: `m${nextIndex + 1}`, role: 'assistant', parts: current.parts },
+      {
+        id: `m${nextIndex + 1}`,
+        role: 'assistant',
+        parts: current.parts,
+        ...voice,
+      },
     ];
+  }
+
+  private async track(
+    conversation: Conversation,
+    turn: ConversationTurn,
+  ): Promise<void> {
+    conversation.current = turn;
+    conversation.unfinished.add(turn);
+    if (conversation.confirmedWords === turn.request.words) turn.confirm();
+    conversation.confirmedWords = undefined;
+    if (!turn.request.voice) return;
+    conversation.voicePrompts.add(turn.request.prompt);
+    await this.voiceTurns.save(conversation.id, conversation.voicePrompts);
   }
 
   private async finish(
@@ -165,12 +193,10 @@ export class ConversationsService {
     handle: AcpRuntimeHandle,
     turn: ConversationTurn,
   ): Promise<void> {
-    const result = await turn.run().finally(() => {
+    const summary = await turn.run().finally(() => {
       conversation.unfinished.delete(turn);
     });
-    this.logger.log(
-      `Conversation ${conversation.id} turn ${result.status}: ${describeUsage(turnUsage(result))}`,
-    );
+    this.logger.log(`Conversation ${conversation.id} turn ${summary}`);
     if (conversation.current === turn) conversation.current = undefined;
     await this.reload(conversation, handle);
   }

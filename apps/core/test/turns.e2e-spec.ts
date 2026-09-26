@@ -23,7 +23,9 @@ it('holds the tool calls of an early start until the turn is confirmed', async (
   const running = conversation.say('stream-sleep 1000 thinking', true);
   await conversation.waitForAnswer('thinking');
   const decision = toolCallDecision();
-  await conversation.post('confirmations').expect(204);
+  await conversation
+    .post('confirmations', { text: 'stream-sleep 1000 thinking' })
+    .expect(204);
   expect(await decision).toEqual({});
   expect((await running).text).toContain('data: {"text":"thinking"}');
 });
@@ -86,4 +88,15 @@ it('tells the prompt hook which turns were spoken', async () => {
   await conversation.post('voice-turns', hookInput).expect(400);
   await running;
   await typed;
+  const reopened = await testApp.reopen();
+  const marks = (await reopened.messages()).map(({ role, voice }) => [
+    role,
+    voice,
+  ]);
+  expect(marks).toEqual([
+    ['user', true],
+    ['assistant', true],
+    ['user', undefined],
+    ['assistant', undefined],
+  ]);
 });

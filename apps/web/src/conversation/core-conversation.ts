@@ -7,6 +7,14 @@ export type ConversationSnapshot = {
 
 type ConversationEvent = { messages: TranscriptMessage[] };
 
+type TypedMessage = { id: string; text: string };
+
+function wordsOf({ parts }: TranscriptMessage): string {
+  return parts
+    .flatMap((part) => (part.type === 'text' ? [part.text] : []))
+    .join('');
+}
+
 function messagesIn(data: string): TranscriptMessage[] | undefined {
   const event: Partial<ConversationEvent> | null = JSON.parse(data);
   return event?.messages;
@@ -16,6 +24,9 @@ export class CoreConversation {
   readonly id: string;
   #snapshot: ConversationSnapshot = { messages: [], running: false };
   #source?: EventSource;
+  #received: readonly TranscriptMessage[] = [];
+  #typed: TypedMessage[] = [];
+  readonly #adopted = new Map<string, string>();
   readonly #listeners = new Set<() => void>();
 
   constructor(id: string) {
@@ -38,6 +49,11 @@ export class CoreConversation {
   };
 
   readonly getSnapshot = (): ConversationSnapshot => this.#snapshot;
+
+  adopt(message: TypedMessage): void {
+    this.#typed.push(message);
+    this.#receive(this.#received);
+  }
 
   async send(text: string): Promise<void> {
     this.#update({ running: true });
@@ -62,9 +78,30 @@ export class CoreConversation {
     const source = new EventSource(`${this.#path}/events`);
     source.addEventListener('message', ({ data }: MessageEvent<string>) => {
       const messages = messagesIn(data);
-      if (messages) this.#update({ messages });
+      if (messages) this.#receive(messages);
     });
     return source;
+  }
+
+  #receive(messages: readonly TranscriptMessage[]): void {
+    this.#received = messages;
+    this.#typed = this.#typed.filter((typed) => !this.#adoptFor(typed));
+    const id = (message: TranscriptMessage) =>
+      this.#adopted.get(message.id) ?? message.id;
+    this.#update({
+      messages: messages.map((message) => ({ ...message, id: id(message) })),
+    });
+  }
+
+  #adoptFor({ id, text }: TypedMessage): boolean {
+    const match = this.#received.findLast(
+      (message) =>
+        message.role === 'user' &&
+        !this.#adopted.has(message.id) &&
+        wordsOf(message).endsWith(text.trim()),
+    );
+    if (match) this.#adopted.set(match.id, id);
+    return match !== undefined;
   }
 
   #update(change: Partial<ConversationSnapshot>): void {

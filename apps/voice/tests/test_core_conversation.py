@@ -18,8 +18,8 @@ async def test_streams_the_reply_to_the_user_turn(core: RecordingCore) -> None:
 
 
 async def test_confirms_the_turn_that_started_early(core: RecordingCore) -> None:
-    await core.conversation().confirm()
-    assert core.requests == [('/confirmations', None)]
+    await core.conversation().confirm('hello')
+    assert core.requests == [('/confirmations', {'text': 'hello'})]
     assert core.methods == ['POST']
 
 
@@ -39,13 +39,16 @@ async def test_fails_when_core_rejects_a_user_turn(core: RecordingCore) -> None:
         [chunk async for chunk in core.conversation().reply_to('hi', early=False)]
 
 
-@pytest.mark.parametrize('action', ['confirm', 'withdraw'])
-async def test_fails_when_core_rejects_a_turn_change(
-    core: RecordingCore, action: str
-) -> None:
+async def test_fails_when_core_rejects_a_confirmation(core: RecordingCore) -> None:
     core.status = httpx.codes.BAD_REQUEST
     with pytest.raises(httpx.HTTPStatusError):
-        await getattr(core.conversation(), action)()
+        await core.conversation().confirm('hello')
+
+
+async def test_fails_when_core_rejects_a_withdrawal(core: RecordingCore) -> None:
+    core.status = httpx.codes.BAD_REQUEST
+    with pytest.raises(httpx.HTTPStatusError):
+        await core.conversation().withdraw()
 
 
 async def test_fails_when_core_rejects_an_interruption(core: RecordingCore) -> None:

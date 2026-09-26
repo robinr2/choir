@@ -1,6 +1,7 @@
 from collections.abc import Awaitable, Callable
 from typing import Any, ClassVar
 
+import httpx
 import pytest
 from pipecat.audio.vad.silero import SileroVADAnalyzer
 from pipecat.pipeline.worker import PipelineWorker
@@ -121,6 +122,7 @@ async def test_runs_the_bot_until_the_client_disconnects(
     assert cancelled == [worker]
     [((client, conversation_id), _)] = conversations
     assert str(client.base_url) == 'http://core'
+    assert client.timeout == httpx.Timeout(5.0, read=None)
     assert conversation_id == 'c1'
     [((piped_transport, settings, conversation), _)] = pipelines
     assert piped_transport is transport

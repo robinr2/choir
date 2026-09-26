@@ -5,6 +5,6 @@ import { ProfileService } from './profile.service.js';
 
 @Module({
   providers: [choirConfigProvider, ProfileService, AgentService],
-  exports: [AgentService],
+  exports: [AgentService, choirConfigProvider.provide],
 })
 export class AgentModule {}

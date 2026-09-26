@@ -25,7 +25,7 @@ from voice.conversation_llm import ConversationLLMService, latest_user_words
 
 USER_TURN = '/user-turns'
 WITHDRAWAL = ('/withdrawals', None)
-CONFIRMATION = ('/confirmations', None)
+CONFIRMATION = ('/confirmations', {'text': 'hello choir'})
 
 
 def asked(text: str, *, early: bool = False) -> tuple[str, dict[str, object]]:
@@ -278,6 +278,19 @@ async def test_confirms_nothing_that_did_not_start_early(
         core, user_said('again'), SleepFrame(sleep=0.1), UserStoppedSpeakingFrame()
     )
     assert core.requests == [asked('hello choir'), asked('again')]
+
+
+async def test_answers_a_turn_that_ended_before_its_early_start_as_ended(
+    core: RecordingCore,
+) -> None:
+    await run(
+        core,
+        UserStoppedSpeakingFrame(),
+        user_said('hello choir', speculation=True),
+        SleepFrame(sleep=0.1),
+        UserStoppedSpeakingFrame(),
+    )
+    assert core.requests == [asked('hello choir')]
 
 
 async def test_withdraws_an_early_start_a_later_one_replaces(

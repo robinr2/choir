@@ -20,45 +20,56 @@ function toolCall(
   return { type: 'tool_call' as const, text: '', ...event };
 }
 
+function said(text: string) {
+  return { User: { id: text, content: [{ Text: text }] } };
+}
+
+function answered(text: string) {
+  return { Agent: { content: [{ Text: text }], tool_results: {} } };
+}
+
 function applied(...events: AcpRuntimeEvent[]): TranscriptPart[] {
   return events.reduce<TranscriptPart[]>(withEvent, []);
 }
 
 describe('transcriptOf', () => {
   it('turns user and agent messages into chat messages', () => {
-    const messages = transcriptOf({
-      messages: [
-        {
-          User: {
-            id: 'u1',
-            content: [
-              { Text: 'read ' },
-              { Mention: { uri: 'file:///notes.md', content: '' } },
-              { Text: 'my notes' },
-            ],
+    const messages = transcriptOf(
+      {
+        messages: [
+          {
+            User: {
+              id: 'u1',
+              content: [
+                { Text: 'read ' },
+                { Mention: { uri: 'file:///notes.md', content: '' } },
+                { Text: 'my notes' },
+              ],
+            },
           },
-        },
-        'Resume',
-        {
-          Agent: {
-            content: [
-              { Thinking: { text: 'hmm' } },
-              { ToolUse: toolUse },
-              { Text: 'Done.' },
-            ],
-            tool_results: {
-              'tool-1': {
-                tool_use_id: 'tool-1',
-                tool_name: 'Read',
-                is_error: false,
-                content: { Text: 'hello' },
-                output: { content: 'hello' },
+          'Resume',
+          {
+            Agent: {
+              content: [
+                { Thinking: { text: 'hmm' } },
+                { ToolUse: toolUse },
+                { Text: 'Done.' },
+              ],
+              tool_results: {
+                'tool-1': {
+                  tool_use_id: 'tool-1',
+                  tool_name: 'Read',
+                  is_error: false,
+                  content: { Text: 'hello' },
+                  output: { content: 'hello' },
+                },
               },
             },
           },
-        },
-      ],
-    });
+        ],
+      },
+      new Set(),
+    );
     expect(messages).toEqual([
       {
         id: 'm0',
@@ -84,11 +95,14 @@ describe('transcriptOf', () => {
   });
 
   it('keeps a tool call that has no result yet', () => {
-    const [message] = transcriptOf({
-      messages: [
-        { Agent: { content: [{ ToolUse: toolUse }], tool_results: {} } },
-      ],
-    });
+    const [message] = transcriptOf(
+      {
+        messages: [
+          { Agent: { content: [{ ToolUse: toolUse }], tool_results: {} } },
+        ],
+      },
+      new Set(),
+    );
     expect(message?.parts).toEqual([
       {
         type: 'tool-call',
@@ -98,6 +112,34 @@ describe('transcriptOf', () => {
         result: undefined,
         isError: undefined,
       },
+    ]);
+  });
+
+  it('marks the exchanges that were spoken', () => {
+    const messages = transcriptOf(
+      {
+        messages: [
+          answered('Welcome'),
+          said('typed'),
+          answered('A'),
+          said('spoken'),
+          answered('B'),
+          answered('C'),
+          said('typed again'),
+          answered('D'),
+        ],
+      },
+      new Set(['spoken']),
+    );
+    expect(messages.map(({ voice }) => voice)).toEqual([
+      undefined,
+      undefined,
+      undefined,
+      true,
+      true,
+      true,
+      undefined,
+      undefined,
     ]);
   });
 });

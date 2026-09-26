@@ -15,6 +15,7 @@ export type TranscriptMessage = {
   id: string;
   role: 'user' | 'assistant';
   parts: (TextPart | ToolCallPart)[];
+  voice?: true;
 };
 
 type ThreadPart = Exclude<ThreadMessageLike['content'], string>[number];
@@ -36,6 +37,7 @@ export function threadMessageOf(message: TranscriptMessage): ThreadMessageLike {
     id: message.id,
     role: message.role,
     content: message.parts.map(threadPart),
+    ...(message.voice && { metadata: { modality: 'voice' } }),
   };
 }
 

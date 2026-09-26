@@ -24,7 +24,7 @@ from tests.conftest import RecordingCore
 from voice.conversation_llm import ConversationLLMService
 from voice.eager_end_of_turn import EagerEndOfTurn
 
-CONFIRMATION = ('/confirmations', None)
+CONFIRMATION = ('/confirmations', {'text': 'hello choir'})
 WITHDRAWAL = ('/withdrawals', None)
 
 

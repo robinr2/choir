@@ -13,6 +13,8 @@ import {
 } from '@nestjs/common';
 import { from, map, type Observable, switchMap } from 'rxjs';
 import {
+  type Confirmation,
+  confirmationSchema,
   conversationIdSchema,
   type Interruption,
   interruptionSchema,
@@ -66,8 +68,11 @@ export class ConversationsController {
 
   @Post('confirmations')
   @HttpCode(HttpStatus.NO_CONTENT)
-  confirm(@Param('id', ID) id: string): void {
-    this.conversations.confirm(id);
+  confirm(
+    @Param('id', ID) id: string,
+    @Body({ schema: confirmationSchema }) { text }: Confirmation,
+  ): void {
+    this.conversations.confirm(id, text);
   }
 
   @Post('withdrawals')

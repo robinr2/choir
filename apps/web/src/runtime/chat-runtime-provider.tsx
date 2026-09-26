@@ -3,6 +3,7 @@ import {
   type AppendMessage,
   AssistantRuntimeProvider,
   type RealtimeVoiceAdapter,
+  type ThreadMessage,
   useExternalStoreRuntime,
 } from '@assistant-ui/react';
 import type { CoreConversation } from '@/conversation/core-conversation';
@@ -30,6 +31,8 @@ export function ChatRuntimeProvider({
     isRunning: running,
     convertMessage: threadMessageOf,
     onNew: (message: AppendMessage) => conversation.send(textOf(message)),
+    onVoiceTranscript: (message: ThreadMessage) =>
+      conversation.adopt({ id: message.id, text: textOf(message) }),
     adapters: { voice },
   });
   return (

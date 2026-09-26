@@ -17,6 +17,7 @@ export type TranscriptMessage = {
   id: string;
   role: 'user' | 'assistant';
   parts: TranscriptPart[];
+  voice?: true;
 };
 
 type SessionMessage = AcpSessionRecord['messages'][number];
@@ -24,11 +25,8 @@ type UserMessage = Extract<SessionMessage, { User: unknown }>['User'];
 type AgentMessage = Extract<SessionMessage, { Agent: unknown }>['Agent'];
 type AgentContent = AgentMessage['content'][number];
 
-function userParts({ content }: UserMessage): TranscriptPart[] {
-  const text = content
-    .map((part) => ('Text' in part ? part.Text : ''))
-    .join('');
-  return [{ type: 'text', text }];
+function userText({ content }: UserMessage): string {
+  return content.map((part) => ('Text' in part ? part.Text : '')).join('');
 }
 
 function agentPart(
@@ -51,22 +49,37 @@ function agentPart(
   ];
 }
 
-function messageOf(message: SessionMessage, id: string): TranscriptMessage[] {
+function messageOf(
+  message: SessionMessage,
+  id: string,
+  voice: boolean,
+): TranscriptMessage[] {
   if (message === 'Resume') return [];
+  const spoken = voice ? { voice: true as const } : {};
   if ('User' in message) {
-    return [{ id, role: 'user', parts: userParts(message.User) }];
+    const text = userText(message.User);
+    return [{ id, role: 'user', parts: [{ type: 'text', text }], ...spoken }];
   }
   const { content, tool_results } = message.Agent;
   const parts = content.flatMap((part) => agentPart(part, tool_results));
-  return [{ id, role: 'assistant', parts }];
+  return [{ id, role: 'assistant', parts, ...spoken }];
+}
+
+function promptOf(message: SessionMessage): string | undefined {
+  if (message === 'Resume' || !('User' in message)) return undefined;
+  return userText(message.User);
 }
 
 export function transcriptOf(
   record: Pick<AcpSessionRecord, 'messages'>,
+  voicePrompts: ReadonlySet<string>,
 ): TranscriptMessage[] {
-  return record.messages.flatMap((message, index) =>
-    messageOf(message, `m${index}`),
-  );
+  let voice = false;
+  return record.messages.flatMap((message, index) => {
+    const prompt = promptOf(message);
+    if (prompt !== undefined) voice = voicePrompts.has(prompt);
+    return messageOf(message, `m${index}`, voice);
+  });
 }
 
 function withText(parts: TranscriptPart[], text: string): TranscriptPart[] {

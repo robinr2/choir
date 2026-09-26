@@ -73,21 +73,21 @@ class ConversationLLMService(LLMService):
         await self._finish_reply('')
         await self._withdraw()
         words = latest_user_words(frame.context)
-        self._early_words = words if frame.speculation else ''
+        early = self._speculation_gate.is_speculating
+        self._early_words = words if early else ''
         self._answered_words = words
         await self.push_frame(LLMFullResponseStartFrame())
         if words:
-            async for text in self._conversation.reply_to(
-                words, early=frame.speculation
-            ):
+            async for text in self._conversation.reply_to(words, early=early):
                 await self._push_llm_text(text)
         await self.push_frame(LLMFullResponseEndFrame())
 
     async def _confirm(self) -> None:
-        if self._early_words == '':
+        words = self._early_words
+        if words == '':
             return
         self._early_words = ''
-        await self._conversation.confirm()
+        await self._conversation.confirm(words)
 
     async def _withdraw(self) -> None:
         if self._early_words == '':

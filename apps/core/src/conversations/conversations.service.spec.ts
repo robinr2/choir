@@ -12,6 +12,7 @@ import {
   type ConversationAgent,
   ConversationsService,
 } from './conversations.service.js';
+import type { VoiceTurnsService } from './voice-turns.service.js';
 
 class ScriptedTurn implements AcpRuntimeTurn {
   readonly requestId = 'request-1';
@@ -79,6 +80,12 @@ const agent = {
   }),
 } satisfies ConversationAgent;
 
+let voicePrompts: string[];
+const voiceTurns = {
+  load: vi.fn<VoiceTurnsService['load']>(async () => new Set(voicePrompts)),
+  save: vi.fn<VoiceTurnsService['save']>(async () => undefined),
+};
+
 let conversations: ConversationsService;
 let log: MockInstance<Logger['log']>;
 let logError: MockInstance<Logger['error']>;
@@ -104,7 +111,8 @@ beforeEach(() => {
   saved = [user('hi'), agentSaid('Hello.')];
   turns = [];
   failure = undefined;
-  conversations = new ConversationsService(agent);
+  voicePrompts = [];
+  conversations = new ConversationsService(agent, voiceTurns);
 });
 
 afterEach(() => {
@@ -171,10 +179,10 @@ it('streams the answer and shows the turn while it runs', async () => {
 
 it('lets tool calls through only once an early turn is confirmed', async () => {
   expect(await conversations.toolCallAllowed(ID)).toBe(false);
-  conversations.confirm(ID);
   await conversations.addUserTurn(ID, 'hello', SPOKEN_EARLY);
   const allowed = conversations.toolCallAllowed(ID);
-  conversations.confirm(ID);
+  conversations.confirm(ID, 'hi');
+  conversations.confirm(ID, 'hello');
   expect(await allowed).toBe(true);
   latestTurn().end({ status: 'completed' });
   await reloaded(2);
@@ -264,4 +272,52 @@ it('knows which submitted prompts belong to voice turns', async () => {
       '(The user interrupted you after hearing only: "Once". They continue:) go on',
     ),
   ).toBe(false);
+});
+
+it('marks spoken exchanges while they run and once they are saved', async () => {
+  voicePrompts = ['hi'];
+  await conversations.addUserTurn(ID, 'tell me', SPOKEN);
+  latestTurn().emit({ type: 'text_delta', text: 'Sure.' });
+  await vi.waitFor(async () =>
+    expect((await conversations.messages(ID)).at(-1)?.parts).toHaveLength(1),
+  );
+  expect((await conversations.messages(ID)).map(({ voice }) => voice)).toEqual([
+    true,
+    true,
+    true,
+    true,
+  ]);
+  expect(voiceTurns.load).toHaveBeenCalledExactlyOnceWith(ID);
+  expect(voiceTurns.save).toHaveBeenCalledExactlyOnceWith(
+    ID,
+    new Set(['hi', 'tell me']),
+  );
+  saved = [...saved, user('tell me'), agentSaid('Sure.')];
+  latestTurn().end({ status: 'completed' });
+  await reloaded(2);
+  expect((await conversations.messages(ID)).map(({ voice }) => voice)).toEqual([
+    true,
+    true,
+    true,
+    true,
+  ]);
+  await conversations.addUserTurn(ID, 'typed', TYPED);
+  expect(voiceTurns.save).toHaveBeenCalledOnce();
+  expect(
+    (await conversations.messages(ID)).slice(-2).map(({ voice }) => voice),
+  ).toEqual([undefined, undefined]);
+});
+
+it('keeps a confirmation that arrives before its early turn', async () => {
+  conversations.confirm(ID, 'hello');
+  await conversations.addUserTurn(ID, 'hello', SPOKEN_EARLY);
+  expect(await conversations.toolCallAllowed(ID)).toBe(true);
+  conversations.confirm(ID, 'later');
+  await conversations.addUserTurn(ID, 'other', SPOKEN_EARLY);
+  await conversations.addUserTurn(ID, 'later', SPOKEN_EARLY);
+  const unconfirmed = await Promise.race([
+    conversations.toolCallAllowed(ID),
+    Promise.resolve('pending'),
+  ]);
+  expect(unconfirmed).toBe('pending');
 });

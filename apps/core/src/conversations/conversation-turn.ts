@@ -1,10 +1,7 @@
-import type {
-  AcpRuntimeEvent,
-  AcpRuntimeTurn,
-  AcpRuntimeTurnResult,
-} from 'acpx/runtime';
+import type { AcpRuntimeEvent, AcpRuntimeTurn } from 'acpx/runtime';
 import { ReplaySubject } from 'rxjs';
 import { answerText, type TranscriptPart, withEvent } from './transcript.js';
+import { describeUsage, turnUsage } from './turn-usage.js';
 
 export type TurnKind = {
   early: boolean;
@@ -46,10 +43,11 @@ export class ConversationTurn {
     await this.turn.cancel();
   }
 
-  async run(): Promise<AcpRuntimeTurnResult> {
+  async run(): Promise<string> {
     try {
       for await (const event of this.turn.events) this.follow(event);
-      return await this.turn.result;
+      const result = await this.turn.result;
+      return `${result.status}: ${describeUsage(turnUsage(result))}`;
     } finally {
       this.answer.complete();
       this.confirmation.resolve(false);

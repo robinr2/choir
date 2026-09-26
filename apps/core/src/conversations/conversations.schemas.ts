@@ -10,6 +10,10 @@ export const userTurnSchema = z.object({
 
 export type UserTurn = z.infer<typeof userTurnSchema>;
 
+export const confirmationSchema = z.object({ text: z.string() });
+
+export type Confirmation = z.infer<typeof confirmationSchema>;
+
 export const interruptionSchema = z.object({ heard: z.string() });
 
 export type Interruption = z.infer<typeof interruptionSchema>;

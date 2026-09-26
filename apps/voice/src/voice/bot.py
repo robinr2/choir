@@ -21,6 +21,8 @@ from voice.conversation_llm import ConversationLLMService
 from voice.core_conversation import CoreConversation
 from voice.eager_end_of_turn import EagerEndOfTurn
 
+ANSWER_TIMEOUT = httpx.Timeout(5.0, read=None)
+
 
 def create_pipeline(
     transport: SmallWebRTCTransport,
@@ -56,7 +58,9 @@ async def run_bot(
         webrtc_connection=connection,
         params=TransportParams(audio_in_enabled=True, audio_out_enabled=True),
     )
-    async with httpx.AsyncClient(base_url=settings.core_url) as client:
+    async with httpx.AsyncClient(
+        base_url=settings.core_url, timeout=ANSWER_TIMEOUT
+    ) as client:
         conversation = CoreConversation(client, conversation_id)
         worker = PipelineWorker(create_pipeline(transport, settings, conversation))
 

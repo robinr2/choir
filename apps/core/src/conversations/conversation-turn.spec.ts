@@ -67,7 +67,7 @@ it('streams only the answer text and follows every event', async () => {
     onChange,
   );
   const answer = lastValueFrom(turn.answer.pipe(toArray()));
-  expect(await turn.run()).toEqual({ status: 'completed' });
+  expect(await turn.run()).toBe('completed: no token usage reported');
   expect(await answer).toEqual(['Hello']);
   expect(onChange).toHaveBeenCalledTimes(3);
   expect(turn.parts).toEqual([

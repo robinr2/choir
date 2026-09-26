@@ -321,7 +321,9 @@ const SpokenMessage: FC = () => {
           {role === "user" ? "You said" : "Assistant said"}
         </span>
         <div className="min-w-0 flex-1 wrap-break-word">
-          <MessagePrimitive.Parts components={{ Text: SpokenText }} />
+          <MessagePrimitive.Parts
+            components={{ Text: SpokenText, tools: { Fallback: ToolFallback } }}
+          />
           {isSpeaking && (
             <span
               data-slot="aui_spoken-message-indicator"

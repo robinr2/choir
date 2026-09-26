@@ -32,8 +32,8 @@ class CoreConversation:
             async for data in event_data(response):
                 yield ReplyChunk.model_validate_json(data).text
 
-    async def confirm(self) -> None:
-        await self._post('confirmations')
+    async def confirm(self, text: str) -> None:
+        await self._post('confirmations', {'text': text})
 
     async def withdraw(self) -> None:
         await self._post('withdrawals')
