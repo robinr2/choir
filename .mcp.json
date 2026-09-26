@@ -15,6 +15,10 @@
         "server/test",
         "web/src"
       ]
+    },
+    "shadcn": {
+      "command": "sh",
+      "args": ["-c", "cd web && exec npx shadcn mcp"]
     }
   }
 }
