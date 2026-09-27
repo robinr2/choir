@@ -10,7 +10,7 @@ export default mergeConfig(
       browser: {
         enabled: true,
         headless: true,
-        provider: playwright(),
+        provider: playwright({ actionTimeout: 1000 }),
         instances: [{ browser: 'chromium' }],
       },
       coverage: {
