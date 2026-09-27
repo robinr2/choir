@@ -12,6 +12,7 @@ export default defineConfig({
         extends: true,
         test: {
           name: 'unit',
+          sequence: { groupOrder: 0 },
           include: ['src/**/*.spec.ts'],
         },
       },
@@ -19,6 +20,7 @@ export default defineConfig({
         extends: true,
         test: {
           name: 'e2e',
+          sequence: { groupOrder: 1 },
           include: ['test/**/*.e2e-spec.ts'],
           testTimeout: 60_000,
           hookTimeout: 60_000,
