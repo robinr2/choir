@@ -24,6 +24,7 @@ export default defineConfig({
   testMatch: '**/*.e2e.ts',
   globalTeardown: './e2e/global-teardown.ts',
   timeout: 240_000,
+  workers: 1,
   forbidOnly: !!process.env.CI,
   use: {
     ...devices['Desktop Chrome'],

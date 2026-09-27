@@ -24,7 +24,9 @@ export class WorkspaceClient {
   }
 
   async agentIds(): Promise<string[]> {
-    return (await this.view()).agents.map(({ id }) => id);
+    return (await this.view()).panes.flatMap((pane) =>
+      pane.kind === 'agent' ? [pane.id] : [],
+    );
   }
 
   async firstAgent(): Promise<string> {

@@ -99,7 +99,7 @@ test('turns voice off when core closes the voice agent', async () => {
   await micOf(screen, 'agent 1').click();
   coreShowsWorkspace({
     layout: B,
-    agents: [{ id: B, name: 'agent 2', working: false }],
+    panes: [{ id: B, kind: 'agent', name: 'agent 2', working: false }],
     voiceAgentId: null,
   });
   await vi.waitFor(() => expect(disconnect).toHaveBeenCalledOnce());

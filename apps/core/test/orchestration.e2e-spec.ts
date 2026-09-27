@@ -72,12 +72,18 @@ it('splits panes and adds rows and columns as a click does', async () => {
   await tools.close();
 });
 
-it('lists the agents, which of them is calling and the layout', async () => {
+it('lists the agents, which of them is calling, the other panes and the layout', async () => {
   const { id, tools } = await toolsOfFirstAgent();
   const other = await callForJson<Created>(tools, 'add_pane_at_edge', {
     edge: 'right',
     name: 'writer',
   });
+  const canvas = (
+    await testApp.workspace.send('post', 'edges', { edge: 'left' }).expect(201)
+  ).body.id;
+  await testApp.workspace
+    .send('put', `panes/${canvas}/content`, { kind: 'excalidraw' })
+    .expect(200);
   const conversation = testApp.talkTo(other.id);
   const running = conversation.say('stream-sleep 1000 drafting');
   await conversation.waitForAnswer('drafting');
@@ -86,6 +92,7 @@ it('lists the agents, which of them is calling and the layout', async () => {
       { id, name: 'agent 1', status: 'idle', you: true },
       { id: other.id, name: 'writer', status: 'working', you: false },
     ],
+    otherPanes: [{ id: canvas, kind: 'excalidraw' }],
     layout: (await testApp.workspace.view()).layout,
   });
   await running;
@@ -102,7 +109,7 @@ it('closes agents', async () => {
   ).toEqual({ closed: true });
   expect(await testApp.workspace.agentIds()).toHaveLength(1);
   expect(await call(tools, 'close_agent', { agentId: UNKNOWN })).toEqual({
-    text: expect.stringContaining(`There is no agent ${UNKNOWN}`),
+    text: expect.stringContaining(`There is no pane ${UNKNOWN}`),
     isError: true,
   });
   await tools.close();

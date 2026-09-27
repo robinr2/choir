@@ -6,9 +6,12 @@ import { fakeEventSources, streamOf } from './fake-event-source';
 export const A = '0b6f2c9e-3f5d-4a8e-9c1b-2d7e6f5a4b3c';
 export const B = '7d1e5a2b-9c4f-4e8a-b6d3-1f2a3b4c5d6e';
 
+export const CANVAS_URL = 'about:blank';
+
 export function fakeCore(): void {
   fakeEventSources();
-  vi.spyOn(window, 'fetch').mockImplementation(async () => {
+  vi.spyOn(window, 'fetch').mockImplementation(async (url) => {
+    if (url === '/canvas') return Response.json({ url: CANVAS_URL });
     return new Response(null, { status: 204 });
   });
 }
@@ -34,9 +37,9 @@ export function twoAgents(
       children: [A, B],
       splitPercentages: [50, 50],
     },
-    agents: [
-      { id: A, name: 'agent 1', working: false },
-      { id: B, name: 'agent 2', working: true },
+    panes: [
+      { id: A, kind: 'agent', name: 'agent 1', working: false },
+      { id: B, kind: 'agent', name: 'agent 2', working: true },
     ],
     voiceAgentId,
   };

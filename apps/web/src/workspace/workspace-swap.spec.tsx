@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import App from '@/App';
+import { CoreCanvas } from '@/canvas/core-canvas';
 import {
   A,
   B,
@@ -22,7 +23,9 @@ async function swapWorkspace(screen: Screen) {
   const client = createPipecatClient();
   const stop = workspace.subscribe(() => undefined);
   coreShowsWorkspace(twoAgents());
-  await screen.rerender(<App client={client} workspace={workspace} />);
+  await screen.rerender(
+    <App client={client} workspace={workspace} canvas={new CoreCanvas()} />,
+  );
   stop();
   return { workspace, client };
 }
@@ -54,7 +57,7 @@ test('acts on the workspace it was last given', async () => {
   const data = new DataTransfer();
   pane(screen, 'agent 1')
     .element()
-    .querySelector('[data-slot="agent-pane-title"]')
+    .querySelector('[data-slot="pane-title"]')
     ?.dispatchEvent(dragEvent('dragstart', data));
   pane(screen, 'agent 2').element().dispatchEvent(dragEvent('dragover', data));
   pane(screen, 'agent 2').element().dispatchEvent(dragEvent('drop', data));

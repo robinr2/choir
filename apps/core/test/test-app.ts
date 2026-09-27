@@ -1,11 +1,22 @@
 import { INestApplication } from '@nestjs/common';
 import { App } from 'supertest/types.js';
 import { ConversationClient } from './conversation-client.js';
-import { createApp, createDataDir, removeDataDir } from './create-app.js';
+import {
+  createApp,
+  createDataDir,
+  freeCanvasUrl,
+  removeDataDir,
+} from './create-app.js';
 import { WorkspaceClient } from './workspace-client.js';
 
+type Started = {
+  app: INestApplication<App>;
+  dataDir: string;
+  canvasUrl: string;
+};
+
 export class TestApp {
-  private started?: { app: INestApplication<App>; dataDir: string };
+  private started?: Started;
   private client?: ConversationClient;
 
   static use(): TestApp {
@@ -23,6 +34,10 @@ export class TestApp {
     return this.running().dataDir;
   }
 
+  get canvasUrl(): string {
+    return this.running().canvasUrl;
+  }
+
   get workspace(): WorkspaceClient {
     return new WorkspaceClient(this.app);
   }
@@ -33,10 +48,10 @@ export class TestApp {
   }
 
   async reopen(): Promise<ConversationClient> {
-    const { app, dataDir } = this.running();
+    const { app, dataDir, canvasUrl } = this.running();
     await app.close();
-    const reopened = await createApp(dataDir);
-    this.started = { app: reopened, dataDir };
+    const reopened = await createApp(dataDir, canvasUrl);
+    this.started = { app: reopened, dataDir, canvasUrl };
     return new ConversationClient(reopened, this.conversation.id);
   }
 
@@ -44,15 +59,16 @@ export class TestApp {
     return new ConversationClient(this.app, id);
   }
 
-  private running(): { app: INestApplication<App>; dataDir: string } {
+  private running(): Started {
     if (!this.started) throw new Error('The app has not started');
     return this.started;
   }
 
   private async start(): Promise<void> {
     const dataDir = await createDataDir();
-    const app = await createApp(dataDir);
-    this.started = { app, dataDir };
+    const canvasUrl = await freeCanvasUrl();
+    const app = await createApp(dataDir, canvasUrl);
+    this.started = { app, dataDir, canvasUrl };
     this.client = new ConversationClient(app);
   }
 

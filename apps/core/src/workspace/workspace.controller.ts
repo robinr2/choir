@@ -14,13 +14,15 @@ import {
   Sse,
 } from '@nestjs/common';
 import { map, type Observable } from 'rxjs';
-import { type Agent, agentIdSchema } from '../layout/layout.schemas.js';
+import { type Pane, paneIdSchema } from '../layout/layout.schemas.js';
 import {
   WORKSPACE,
   type Workspace,
   type WorkspaceView,
 } from './workspace.port.js';
 import {
+  type ContentRequest,
+  contentRequestSchema,
   type EdgeRequest,
   edgeRequestSchema,
   type LayoutRequest,
@@ -35,7 +37,9 @@ import {
   voiceRequestSchema,
 } from './workspace.schemas.js';
 
-const ID = { schema: agentIdSchema };
+const ID = { schema: paneIdSchema };
+
+const EMPTY = { kind: 'empty' } as const;
 
 @Controller('workspace')
 export class WorkspaceController {
@@ -53,17 +57,24 @@ export class WorkspaceController {
 
   @Post('splits')
   split(
-    @Body({ schema: splitRequestSchema })
-    { agentId, direction, name }: SplitRequest,
-  ): Promise<Agent> {
-    return this.workspace.split(agentId, direction, name);
+    @Body({ schema: splitRequestSchema }) { paneId, direction }: SplitRequest,
+  ): Promise<Pane> {
+    return this.workspace.split(paneId, direction, EMPTY);
   }
 
   @Post('edges')
   addAtEdge(
-    @Body({ schema: edgeRequestSchema }) { edge, name }: EdgeRequest,
-  ): Promise<Agent> {
-    return this.workspace.addAtEdge(edge, name);
+    @Body({ schema: edgeRequestSchema }) { edge }: EdgeRequest,
+  ): Promise<Pane> {
+    return this.workspace.addAtEdge(edge, EMPTY);
+  }
+
+  @Put('panes/:id/content')
+  open(
+    @Param('id', ID) id: string,
+    @Body({ schema: contentRequestSchema }) { kind }: ContentRequest,
+  ): Promise<Pane> {
+    return this.workspace.open(id, kind);
   }
 
   @Post('swaps')
@@ -82,7 +93,7 @@ export class WorkspaceController {
     return this.workspace.resize(layout);
   }
 
-  @Patch('agents/:id')
+  @Patch('panes/:id')
   @HttpCode(HttpStatus.NO_CONTENT)
   rename(
     @Param('id', ID) id: string,
@@ -91,7 +102,7 @@ export class WorkspaceController {
     return this.workspace.rename(id, name);
   }
 
-  @Delete('agents/:id')
+  @Delete('panes/:id')
   @HttpCode(HttpStatus.NO_CONTENT)
   close(@Param('id', ID) id: string): Promise<void> {
     return this.workspace.close(id);

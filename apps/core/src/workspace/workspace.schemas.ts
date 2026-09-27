@@ -1,30 +1,31 @@
 import { z } from 'zod';
 import {
-  agentIdSchema,
   agentNameSchema,
   edgeSchema,
   layoutSchema,
+  openableKindSchema,
+  paneIdSchema,
   splitKindSchema,
 } from '../layout/layout.schemas.js';
 
 export const splitRequestSchema = z.object({
-  agentId: agentIdSchema,
+  paneId: paneIdSchema,
   direction: splitKindSchema,
-  name: agentNameSchema.optional(),
 });
 
 export type SplitRequest = z.infer<typeof splitRequestSchema>;
 
-export const edgeRequestSchema = z.object({
-  edge: edgeSchema,
-  name: agentNameSchema.optional(),
-});
+export const edgeRequestSchema = z.object({ edge: edgeSchema });
 
 export type EdgeRequest = z.infer<typeof edgeRequestSchema>;
 
+export const contentRequestSchema = z.object({ kind: openableKindSchema });
+
+export type ContentRequest = z.infer<typeof contentRequestSchema>;
+
 export const swapRequestSchema = z.object({
-  first: agentIdSchema,
-  second: agentIdSchema,
+  first: paneIdSchema,
+  second: paneIdSchema,
 });
 
 export type SwapRequest = z.infer<typeof swapRequestSchema>;
@@ -38,7 +39,7 @@ export const renameRequestSchema = z.object({ name: agentNameSchema });
 export type RenameRequest = z.infer<typeof renameRequestSchema>;
 
 export const voiceRequestSchema = z.object({
-  agentId: agentIdSchema.nullable(),
+  agentId: paneIdSchema.nullable(),
 });
 
 export type VoiceRequest = z.infer<typeof voiceRequestSchema>;

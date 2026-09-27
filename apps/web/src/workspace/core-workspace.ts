@@ -3,12 +3,24 @@ import { LiveStore, send } from '@/lib/live-store';
 
 export type Layout = MosaicNode<string> | null;
 
-export type AgentView = { id: string; name: string; working: boolean };
+export type AgentView = {
+  id: string;
+  kind: 'agent';
+  name: string;
+  working: boolean;
+};
+
+export type PaneView =
+  | { id: string; kind: 'empty' }
+  | AgentView
+  | { id: string; kind: 'excalidraw' };
+
+export type OpenableKind = 'agent' | 'excalidraw';
 
 export type WorkspaceView = {
   loaded: boolean;
   layout: Layout;
-  agents: readonly AgentView[];
+  panes: readonly PaneView[];
   voiceAgentId: string | null;
 };
 
@@ -18,22 +30,31 @@ export type SplitKind = 'vertical' | 'horizontal';
 
 const PATH = '/workspace';
 
+export function agentOf(view: WorkspaceView, id: string): AgentView | null {
+  const pane = view.panes.find((candidate) => candidate.id === id);
+  return pane?.kind === 'agent' ? pane : null;
+}
+
 export class CoreWorkspace extends LiveStore<WorkspaceView> {
   constructor() {
     super(`${PATH}/events`, {
       loaded: false,
       layout: null,
-      agents: [],
+      panes: [],
       voiceAgentId: null,
     });
   }
 
-  async split(agentId: string, direction: SplitKind): Promise<void> {
-    await send('POST', `${PATH}/splits`, { agentId, direction });
+  async split(paneId: string, direction: SplitKind): Promise<void> {
+    await send('POST', `${PATH}/splits`, { paneId, direction });
   }
 
   async addAtEdge(edge: Edge): Promise<void> {
     await send('POST', `${PATH}/edges`, { edge });
+  }
+
+  async open(paneId: string, kind: OpenableKind): Promise<void> {
+    await send('PUT', `${PATH}/panes/${paneId}/content`, { kind });
   }
 
   async swap(first: string, second: string): Promise<void> {
@@ -46,11 +67,11 @@ export class CoreWorkspace extends LiveStore<WorkspaceView> {
   }
 
   async rename(id: string, name: string): Promise<void> {
-    await send('PATCH', `${PATH}/agents/${id}`, { name });
+    await send('PATCH', `${PATH}/panes/${id}`, { name });
   }
 
   async close(id: string): Promise<void> {
-    await send('DELETE', `${PATH}/agents/${id}`);
+    await send('DELETE', `${PATH}/panes/${id}`);
   }
 
   async setVoice(agentId: string | null): Promise<void> {

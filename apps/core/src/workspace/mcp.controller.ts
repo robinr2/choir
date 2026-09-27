@@ -9,7 +9,7 @@ import {
 } from '@nestjs/common';
 import { toNodeHandler } from '@modelcontextprotocol/node';
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import { agentIdSchema } from '../layout/layout.schemas.js';
+import { paneIdSchema } from '../layout/layout.schemas.js';
 import { CALLER_HEADER, orchestrationHandler } from './orchestration-tools.js';
 import { WORKSPACE, type Workspace } from './workspace.port.js';
 
@@ -27,7 +27,7 @@ export class McpController {
     @Req() request: IncomingMessage & { body?: unknown },
     @Res() response: ServerResponse,
   ): Promise<void> {
-    if (!agentIdSchema.safeParse(caller).success) {
+    if (!paneIdSchema.safeParse(caller).success) {
       throw new BadRequestException(
         'Name the calling agent in the X-Choir-Agent header',
       );

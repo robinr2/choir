@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { Test } from '@nestjs/testing';
 import { AcpxRuntime, createAcpRuntime } from 'acpx/runtime';
+import { excalidrawMcpPath } from '../canvas/excalidraw.js';
 import { CHOIR_CONFIG, choirConfigFrom } from '../choir/choir-config.js';
 import { ChoirModule } from '../choir/choir.module.js';
 import { findExecutable } from '../choir/executable.js';
@@ -42,7 +43,11 @@ it('configures the agent from the environment', async () => {
 });
 
 it('fails to read a session that was never saved', async () => {
-  const agent = new AgentService({ dataDir, coreUrl: 'http://localhost:3000' });
+  const agent = new AgentService({
+    dataDir,
+    coreUrl: 'http://localhost:3000',
+    canvasUrl: 'http://127.0.0.1:3100',
+  });
   const handle = {
     sessionKey: 'c1',
     backend: 'acpx',
@@ -56,7 +61,11 @@ it('fails to read a session that was never saved', async () => {
 });
 
 it('runs sessions with the profile and the installed Claude Code', async () => {
-  const config = { dataDir, coreUrl: 'http://localhost:3100' };
+  const config = {
+    dataDir,
+    coreUrl: 'http://localhost:3100',
+    canvasUrl: 'http://127.0.0.1:3100',
+  };
   const withClaude = new AgentService({
     ...config,
     claudeExecutable: '/bin/claude',
@@ -87,6 +96,31 @@ it('stops its sessions when the app shuts down', async () => {
   await new AgentService({
     dataDir,
     coreUrl: 'http://localhost:3000',
+    canvasUrl: 'http://127.0.0.1:3100',
   }).onApplicationShutdown();
   expect(shutdown).toHaveBeenCalledOnce();
+});
+
+it('gives every session the Excalidraw MCP server of the canvas', async () => {
+  const agent = new AgentService({
+    dataDir,
+    coreUrl: 'http://localhost:3000',
+    canvasUrl: 'http://127.0.0.1:3200',
+  });
+  const [options] = vi.mocked(createAcpRuntime).mock.calls.at(-1) ?? [];
+  expect(options?.mcpServers).toEqual([
+    {
+      name: 'excalidraw',
+      command: process.execPath,
+      args: [excalidrawMcpPath()],
+      env: [
+        { name: 'EXPRESS_SERVER_URL', value: 'http://127.0.0.1:3200' },
+        { name: 'EXCALIDRAW_NO_AUTOSTART', value: '1' },
+      ],
+    },
+  ]);
+  expect(excalidrawMcpPath()).toMatch(
+    /mcp-excalidraw-server\/dist\/index\.js$/,
+  );
+  await agent.onApplicationShutdown();
 });

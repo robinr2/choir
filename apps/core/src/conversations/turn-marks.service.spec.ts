@@ -8,7 +8,11 @@ let turnMarks: TurnMarksService;
 
 beforeEach(async () => {
   dataDir = await mkdtemp(path.join(tmpdir(), 'choir-marks-'));
-  turnMarks = new TurnMarksService({ dataDir, coreUrl: 'http://core' });
+  turnMarks = new TurnMarksService({
+    dataDir,
+    coreUrl: 'http://core',
+    canvasUrl: 'http://127.0.0.1:3100',
+  });
 });
 
 afterEach(async () => {

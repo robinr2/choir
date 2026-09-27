@@ -23,6 +23,7 @@ async function prepare(): Promise<void> {
   await new ProfileService({
     dataDir,
     coreUrl: 'http://localhost:3000',
+    canvasUrl: 'http://127.0.0.1:3100',
   }).onModuleInit();
 }
 

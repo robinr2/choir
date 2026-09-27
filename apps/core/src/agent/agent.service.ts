@@ -17,9 +17,24 @@ import {
   sessionFolder,
   sessionsDir,
 } from '../choir/choir-config.js';
+import {
+  excalidrawMcpEnvironment,
+  excalidrawMcpPath,
+} from '../canvas/excalidraw.js';
 
 const AGENT = 'claude';
 const BYPASS_PERMISSIONS = 'bypassPermissions';
+
+function excalidrawMcpServer(config: ChoirConfig) {
+  return {
+    name: 'excalidraw',
+    command: process.execPath,
+    args: [excalidrawMcpPath()],
+    env: Object.entries(excalidrawMcpEnvironment(config)).map(
+      ([name, value]) => ({ name, value }),
+    ),
+  };
+}
 
 @Injectable()
 export class AgentService implements OnApplicationShutdown {
@@ -34,6 +49,7 @@ export class AgentService implements OnApplicationShutdown {
       agentRegistry: createAgentRegistry({
         overrides: config.agentCommand && { [AGENT]: config.agentCommand },
       }),
+      mcpServers: [excalidrawMcpServer(config)],
       permissionMode: 'approve-all',
       agentProcessEnv: {
         CLAUDE_CODE_PLUGIN_DIRS: profileDir(config),

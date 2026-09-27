@@ -22,7 +22,11 @@ afterEach(async () => {
 it('logs a message it could not deliver', async () => {
   const logError = vi.spyOn(Logger.prototype, 'error').mockReturnValue();
   const layout = new LayoutService(
-    new LayoutStore({ dataDir, coreUrl: 'http://core' }),
+    new LayoutStore({
+      dataDir,
+      coreUrl: 'http://core',
+      canvasUrl: 'http://127.0.0.1:3100',
+    }),
   );
   await layout.onModuleInit();
   const conversations = {
@@ -37,8 +41,8 @@ it('logs a message it could not deliver', async () => {
     conversations,
     new VoiceService(),
   );
-  const [first] = Object.keys(layout.current.agents);
-  const second = await layout.addAtEdge('right');
+  const [first] = Object.keys(layout.current.panes);
+  const second = await layout.addAtEdge('right', { kind: 'agent' });
   workspace.sendMessage(first, second.id, 'hi');
   await vi.waitFor(() =>
     expect(logError).toHaveBeenCalledExactlyOnceWith(

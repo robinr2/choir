@@ -3,6 +3,7 @@ import { RTVIEvent } from '@pipecat-ai/client-js';
 import { vi } from 'vitest';
 import { render } from 'vitest-browser-react';
 import App from '@/App';
+import { CoreCanvas } from '@/canvas/core-canvas';
 import { createPipecatClient } from '@/voice/create-pipecat-client';
 import { CoreWorkspace } from '@/workspace/core-workspace';
 import { coreShowsWorkspace, twoAgents } from './fake-core';
@@ -13,7 +14,11 @@ export const client = createPipecatClient();
 
 export async function renderApp(view = twoAgents()): Promise<Screen> {
   const screen = await render(
-    <App client={client} workspace={new CoreWorkspace()} />,
+    <App
+      client={client}
+      workspace={new CoreWorkspace()}
+      canvas={new CoreCanvas()}
+    />,
   );
   coreShowsWorkspace(view);
   return screen;
