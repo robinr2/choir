@@ -7,6 +7,6 @@ export class CanvasController {
 
   @Get()
   canvas(): { url: string } {
-    return { url: this.config.canvasUrl };
+    return { url: this.config.canvasPublicUrl };
   }
 }

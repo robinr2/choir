@@ -17,6 +17,7 @@ describe('choirConfigFrom', () => {
       projectDir: undefined,
       coreUrl: 'http://localhost:3000',
       canvasUrl: 'http://127.0.0.1:3100',
+      canvasPublicUrl: 'http://127.0.0.1:3100',
     });
   });
 
@@ -27,12 +28,14 @@ describe('choirConfigFrom', () => {
         CHOIR_PROJECT_DIR: '/project',
         PORT: '3100',
         CHOIR_CANVAS_PORT: '3200',
+        CHOIR_CANVAS_PUBLIC_URL: 'https://choir.example/canvas',
       }),
     ).toEqual({
       dataDir: '/data',
       projectDir: '/project',
       coreUrl: 'http://localhost:3100',
       canvasUrl: 'http://127.0.0.1:3200',
+      canvasPublicUrl: 'https://choir.example/canvas',
     });
   });
 
@@ -49,6 +52,9 @@ describe('choirConfigFrom', () => {
     expect(() => choirConfigFrom({ CHOIR_CANVAS_PORT: '1.5' })).toThrow(
       z.ZodError,
     );
+    expect(() =>
+      choirConfigFrom({ CHOIR_CANVAS_PUBLIC_URL: 'not an address' }),
+    ).toThrow(z.ZodError);
   });
 });
 
@@ -57,6 +63,7 @@ describe('choir folders', () => {
     dataDir: '/data',
     coreUrl: 'http://localhost:3000',
     canvasUrl: 'http://127.0.0.1:3100',
+    canvasPublicUrl: 'http://127.0.0.1:3100',
   };
 
   it('lays out the profile, the default folder, the saved sessions and the canvas', () => {

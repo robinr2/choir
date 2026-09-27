@@ -5,6 +5,7 @@ const config = {
   dataDir: '/data',
   coreUrl: 'http://localhost:3000',
   canvasUrl: 'http://127.0.0.1:3198',
+  canvasPublicUrl: 'http://127.0.0.1:3198',
 };
 
 const server = new CanvasServer(config);

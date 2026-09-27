@@ -9,6 +9,7 @@ const config = {
   dataDir: '/data',
   coreUrl: 'http://localhost:3000',
   canvasUrl: CANVAS_URL,
+  canvasPublicUrl: CANVAS_URL,
 };
 
 async function health(): Promise<unknown> {

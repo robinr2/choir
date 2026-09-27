@@ -12,6 +12,7 @@ beforeEach(async () => {
     dataDir,
     coreUrl: 'http://core',
     canvasUrl: 'http://127.0.0.1:3100',
+    canvasPublicUrl: 'http://127.0.0.1:3100',
   });
 });
 

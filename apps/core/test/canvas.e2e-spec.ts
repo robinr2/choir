@@ -2,6 +2,7 @@ import { readdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import request from 'supertest';
 import { z } from 'zod';
+import { CANVAS_PUBLIC_URL } from './create-app.js';
 import { TestApp } from './test-app.js';
 
 const sceneSchema = z.object({
@@ -49,11 +50,11 @@ async function savedIds(): Promise<string[]> {
   return ids(JSON.parse(saved));
 }
 
-it('tells where the canvas is served', async () => {
+it('tells the browser the public address of the canvas', async () => {
   const response = await request(testApp.app.getHttpServer())
     .get('/canvas')
     .expect(200);
-  expect(response.body).toEqual({ url: testApp.canvasUrl });
+  expect(response.body).toEqual({ url: CANVAS_PUBLIC_URL });
 });
 
 it('saves the canvas as .excalidraw files and loads the last one after a restart', async () => {

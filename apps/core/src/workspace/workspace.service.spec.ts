@@ -26,6 +26,7 @@ it('logs a message it could not deliver', async () => {
       dataDir,
       coreUrl: 'http://core',
       canvasUrl: 'http://127.0.0.1:3100',
+      canvasPublicUrl: 'http://127.0.0.1:3100',
     }),
   );
   await layout.onModuleInit();

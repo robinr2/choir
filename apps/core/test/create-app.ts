@@ -21,6 +21,8 @@ const MOCK_AGENT_COMMAND = [
   '--supports-load-session',
 ];
 
+export const CANVAS_PUBLIC_URL = 'https://choir.example/canvas';
+
 export function createDataDir(): Promise<string> {
   return mkdtemp(path.join(tmpdir(), 'choir-core-'));
 }
@@ -48,6 +50,7 @@ export async function createApp(
     dataDir,
     coreUrl: 'http://localhost:3000',
     canvasUrl,
+    canvasPublicUrl: CANVAS_PUBLIC_URL,
     agentCommand: MOCK_AGENT_COMMAND,
   };
   const moduleFixture = await Test.createTestingModule({
