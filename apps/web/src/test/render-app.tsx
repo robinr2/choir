@@ -24,6 +24,17 @@ export async function renderApp(view = twoAgents()): Promise<Screen> {
   return screen;
 }
 
+export function botSaid(segment: number, spoken: string, rest: string): void {
+  client.emit(RTVIEvent.BotOutput, {
+    text: spoken + rest,
+    aggregated_by: 'sentence',
+    segment_id: segment,
+    will_be_spoken: true,
+    spoken_status: rest ? 'in-progress' : 'completed',
+    spoken_progress: { accumulated_text: spoken, remaining_text: rest },
+  });
+}
+
 export function pane(screen: Screen, name: string) {
   return screen.getByRole('region', { name });
 }
