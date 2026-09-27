@@ -20,6 +20,15 @@ export function coreShowsWorkspace(view: Omit<WorkspaceView, 'loaded'>): void {
   streamOf('/workspace/events')?.receive(view);
 }
 
+export function said(
+  id: string,
+  role: TranscriptMessage['role'],
+  text: string,
+  marks: Partial<TranscriptMessage> = {},
+): TranscriptMessage {
+  return { id, role, parts: [{ type: 'text', text }], ...marks };
+}
+
 export function coreShowsChat(
   agentId: string,
   ...messages: TranscriptMessage[]

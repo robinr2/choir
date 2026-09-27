@@ -1,16 +1,17 @@
 import { RTVIEvent } from '@pipecat-ai/client-js';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
-import type { TranscriptMessage } from './conversation/transcript';
 import {
   A,
   B,
   coreShowsChat,
   coreShowsWorkspace,
   fakeCore,
+  said,
   twoAgents,
 } from './test/fake-core';
 import { requests } from './test/fake-event-source';
 import {
+  botSaid,
   client,
   micOf,
   pane,
@@ -19,15 +20,6 @@ import {
   stubVoice,
 } from './test/render-app';
 
-function said(
-  id: string,
-  role: TranscriptMessage['role'],
-  text: string,
-  marks: Partial<TranscriptMessage> = {},
-): TranscriptMessage {
-  return { id, role, parts: [{ type: 'text', text }], ...marks };
-}
-
 function spokenTextIn(screen: Screen, name: string): string[][] {
   const texts = pane(screen, name)
     .element()
@@ -35,17 +27,6 @@ function spokenTextIn(screen: Screen, name: string): string[][] {
   return [...texts].map((text) =>
     [...text.children].map((part) => part.textContent),
   );
-}
-
-function botSaid(segment: number, spoken: string, rest: string): void {
-  client.emit(RTVIEvent.BotOutput, {
-    text: spoken + rest,
-    aggregated_by: 'sentence',
-    segment_id: segment,
-    will_be_spoken: true,
-    spoken_status: rest ? 'in-progress' : 'completed',
-    spoken_progress: { accumulated_text: spoken, remaining_text: rest },
-  });
 }
 
 async function coreShowsSpokenHello(screen: Screen) {
