@@ -1,12 +1,8 @@
 import { INestApplication } from '@nestjs/common';
 import { App } from 'supertest/types.js';
 import { ConversationClient } from './conversation-client.js';
-import {
-  createApp,
-  createDataDir,
-  freeCanvasUrl,
-  removeDataDir,
-} from './create-app.js';
+import { freeCanvasUrl } from '../src/test/free-canvas-url.js';
+import { createApp, createDataDir, removeDataDir } from './create-app.js';
 import { WorkspaceClient } from './workspace-client.js';
 
 type Started = {

@@ -30,7 +30,7 @@ export default defineConfig({
     ],
     coverage: {
       include: ['src/**/*.ts'],
-      exclude: ['src/**/*.spec.ts', 'src/main.ts'],
+      exclude: ['src/**/*.spec.ts', 'src/main.ts', 'src/test/**'],
       thresholds: {
         lines: 100,
         functions: 100,
