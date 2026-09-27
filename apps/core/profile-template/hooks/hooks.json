@@ -5,7 +5,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "if curl --silent --fail --max-time 10 --output /dev/null --header 'Content-Type: application/json' --data-binary @- \"$CHOIR_CORE_URL/conversations/$CHOIR_CONVERSATION_ID/voice-turns\"; then cat \"${CLAUDE_PLUGIN_ROOT}/default-voice-prompt.md\"; fi",
+            "command": "curl --silent --fail --max-time 10 --header 'Content-Type: application/json' --data-binary @- \"$CHOIR_CORE_URL/conversations/$CHOIR_CONVERSATION_ID/prompt-contexts\"",
             "timeout": 30
           }
         ]

@@ -22,7 +22,11 @@ afterEach(() => {
 test('follows the conversation while anyone listens', () => {
   const first = vi.fn<() => void>();
   const second = vi.fn<() => void>();
-  expect(conversation.getSnapshot()).toEqual({ messages: [], running: false });
+  expect(conversation.getSnapshot()).toEqual({
+    messages: [],
+    loaded: false,
+    running: false,
+  });
   const stopFirst = conversation.subscribe(first);
   const stopSecond = conversation.subscribe(second);
   const [source] = FakeEventSource.opened;
@@ -31,6 +35,7 @@ test('follows the conversation while anyone listens', () => {
   source?.receive({ messages: said });
   expect(conversation.getSnapshot()).toEqual({
     messages: said,
+    loaded: true,
     running: false,
   });
   expect(first).toHaveBeenCalledOnce();
@@ -49,7 +54,11 @@ test('ignores events it cannot read', () => {
   source?.receive(null);
   source?.receive({});
   expect(listener).not.toHaveBeenCalled();
-  expect(conversation.getSnapshot()).toEqual({ messages: [], running: false });
+  expect(conversation.getSnapshot()).toEqual({
+    messages: [],
+    loaded: false,
+    running: false,
+  });
 });
 
 test('sends a typed turn and runs until its answer is complete', async () => {

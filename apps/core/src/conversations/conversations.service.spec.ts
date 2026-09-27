@@ -13,6 +13,7 @@ import {
   ConversationsService,
 } from './conversations.service.js';
 import type { TurnMark } from './transcript.js';
+import type { ProfileService } from '../agent/profile.service.js';
 import type { VoiceService } from '../voice/voice.service.js';
 import type { TurnMarksService } from './turn-marks.service.js';
 
@@ -95,6 +96,15 @@ const voiceChannel = {
   speak: vi.fn<VoiceService['speak']>(),
 };
 
+const profile = {
+  voicePrompt: vi.fn<ProfileService['voicePrompt']>(
+    async () => 'Speak plainly.',
+  ),
+};
+
+const UNFINISHED =
+  "The user's last message was not finished. This message continues it.";
+
 let conversations: ConversationsService;
 let log: MockInstance<Logger['log']>;
 let logError: MockInstance<Logger['error']>;
@@ -122,7 +132,12 @@ beforeEach(() => {
   failure = undefined;
   savedMarks = [];
   voiceAgent = undefined;
-  conversations = new ConversationsService(agent, turnMarks, voiceChannel);
+  conversations = new ConversationsService(
+    agent,
+    turnMarks,
+    voiceChannel,
+    profile,
+  );
 });
 
 afterEach(() => {
@@ -208,11 +223,13 @@ it('withdraws an early turn and sends only the rest of what the user says', asyn
   expect(await allowed).toBe(false);
   await conversations.addUserTurn(ID, 'hello choir', TYPED);
   await conversations.addUserTurn(ID, 'thanks', TYPED);
-  expect(prompts()).toEqual([
-    'hello',
-    '(The user was not finished and continues:) choir',
-    'thanks',
-  ]);
+  expect(prompts()).toEqual(['hello', 'choir', 'thanks']);
+  expect(turnMarks.save).toHaveBeenLastCalledWith(
+    ID,
+    new Map([['hello', { voice: true, aloud: true, heard: '' }]]),
+  );
+  expect(await conversations.promptContext(ID, 'choir')).toBe(UNFINISHED);
+  expect(await conversations.promptContext(ID, 'thanks')).toBe('');
 });
 
 it('withdraws nothing once the turn did not start early', async () => {
@@ -226,13 +243,40 @@ it('withdraws nothing once the turn did not start early', async () => {
 it('cancels an interrupted turn and tells what the user heard', async () => {
   await conversations.interrupt(ID, 'nothing');
   await conversations.addUserTurn(ID, 'tell me a story', TYPED);
+  expect(await conversations.promptContext(ID, 'tell me a story')).toBe(
+    'The user interrupted your last answer after hearing only: "nothing".',
+  );
   await conversations.interrupt(ID, 'Once upon');
   expect(latestTurn().cancel).toHaveBeenCalledOnce();
   await conversations.addUserTurn(ID, 'a shorter one', TYPED);
-  expect(prompts()).toEqual([
-    '(The user interrupted you after hearing only: "nothing". They continue:) tell me a story',
-    '(The user interrupted you after hearing only: "Once upon". They continue:) a shorter one',
-  ]);
+  expect(prompts()).toEqual(['tell me a story', 'a shorter one']);
+  expect(await conversations.promptContext(ID, 'a shorter one')).toBe(
+    'The user interrupted your last answer after hearing only: "Once upon".',
+  );
+  expect(turnMarks.save).not.toHaveBeenCalled();
+});
+
+it('remembers how much of a spoken reply the user heard', async () => {
+  await conversations.addUserTurn(ID, 'tell me a story', SPOKEN);
+  const story = latestTurn();
+  story.emit({ type: 'text_delta', text: 'Once upon a time.' });
+  story.end({ status: 'completed' });
+  saved = [...saved, user('tell me a story'), agentSaid('Once upon a time.')];
+  await reloaded(2);
+  await conversations.interrupt(ID, 'Once upon');
+  expect(turnMarks.save).toHaveBeenLastCalledWith(
+    ID,
+    new Map([
+      ['tell me a story', { voice: true, aloud: true, heard: 'Once upon' }],
+    ]),
+  );
+  expect((await conversations.messages(ID)).at(-1)).toEqual({
+    id: 'm3',
+    role: 'assistant',
+    parts: [{ type: 'text', text: 'Once upon a time.' }],
+    spoken: true,
+    heard: 'Once upon',
+  });
 });
 
 it('keeps showing a newer turn when an older one finishes', async () => {
@@ -261,27 +305,21 @@ it('logs a turn the agent could not finish', async () => {
   expect(log).not.toHaveBeenCalled();
 });
 
-it('knows which submitted prompts belong to voice turns', async () => {
+it('adds the voice rules and the continuation note to the prompt of a turn', async () => {
   await conversations.interrupt(ID, 'Once');
   await conversations.addUserTurn(ID, 'go on', SPOKEN);
   const spoken = latestTurn();
   await conversations.addUserTurn(ID, 'typed', TYPED);
-  expect(
-    conversations.isVoiceTurn(
-      ID,
-      ' (The user interrupted you after hearing only: "Once". They continue:) go on\n',
-    ),
-  ).toBe(true);
-  expect(conversations.isVoiceTurn(ID, 'go on')).toBe(false);
-  expect(conversations.isVoiceTurn(ID, 'typed')).toBe(false);
+  await conversations.addUserTurn(ID, 'aloud', SPOKEN);
+  expect(await conversations.promptContext(ID, ' go on\n')).toBe(
+    'Speak plainly.\n\nThe user interrupted your last answer after hearing only: "Once".',
+  );
+  expect(await conversations.promptContext(ID, 'aloud')).toBe('Speak plainly.');
+  expect(await conversations.promptContext(ID, 'typed')).toBe('');
+  expect(await conversations.promptContext(ID, 'unknown')).toBe('');
   spoken.end({ status: 'completed' });
   await reloaded(2);
-  expect(
-    conversations.isVoiceTurn(
-      ID,
-      '(The user interrupted you after hearing only: "Once". They continue:) go on',
-    ),
-  ).toBe(false);
+  expect(await conversations.promptContext(ID, 'go on')).toBe('');
 });
 
 it('marks spoken exchanges while they run and once they are saved', async () => {
@@ -291,12 +329,9 @@ it('marks spoken exchanges while they run and once they are saved', async () => 
   await vi.waitFor(async () =>
     expect((await conversations.messages(ID)).at(-1)?.parts).toHaveLength(1),
   );
-  expect((await conversations.messages(ID)).map(({ voice }) => voice)).toEqual([
-    true,
-    true,
-    true,
-    true,
-  ]);
+  expect(
+    (await conversations.messages(ID)).map(({ spoken }) => spoken),
+  ).toEqual([undefined, true, undefined, true]);
   expect(turnMarks.load).toHaveBeenCalledExactlyOnceWith(ID);
   expect(turnMarks.save).toHaveBeenCalledExactlyOnceWith(
     ID,
@@ -309,16 +344,13 @@ it('marks spoken exchanges while they run and once they are saved', async () => 
   saved = [...saved, user('tell me'), agentSaid('Sure.')];
   latestTurn().end({ status: 'completed' });
   await reloaded(2);
-  expect((await conversations.messages(ID)).map(({ voice }) => voice)).toEqual([
-    true,
-    true,
-    true,
-    true,
-  ]);
+  expect(
+    (await conversations.messages(ID)).map(({ spoken }) => spoken),
+  ).toEqual([undefined, true, undefined, true]);
   await conversations.addUserTurn(ID, 'typed', TYPED);
   expect(turnMarks.save).toHaveBeenCalledOnce();
   expect(
-    (await conversations.messages(ID)).slice(-2).map(({ voice }) => voice),
+    (await conversations.messages(ID)).slice(-2).map(({ spoken }) => spoken),
   ).toEqual([undefined, undefined]);
 });
 

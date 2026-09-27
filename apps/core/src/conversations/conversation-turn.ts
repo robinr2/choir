@@ -15,6 +15,7 @@ export type TurnKind = {
 
 export type TurnRequest = {
   prompt: string;
+  note?: string;
   words: string;
   early: boolean;
   mark: TurnMark;

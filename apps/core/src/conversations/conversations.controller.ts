@@ -5,7 +5,6 @@ import {
   HttpCode,
   HttpStatus,
   type MessageEvent,
-  NotFoundException,
   Param,
   Post,
   RequestMethod,
@@ -90,15 +89,23 @@ export class ConversationsController {
     return this.conversations.interrupt(id, heard);
   }
 
-  @Post('voice-turns')
-  @HttpCode(HttpStatus.NO_CONTENT)
-  findVoiceTurn(
+  @Post('prompt-contexts')
+  @HttpCode(HttpStatus.OK)
+  async promptContext(
     @Param('id', ID) id: string,
     @Body({ schema: submittedPromptSchema }) { prompt }: SubmittedPrompt,
-  ): void {
-    if (!this.conversations.isVoiceTurn(id, prompt)) {
-      throw new NotFoundException('The prompt is not from a voice turn');
-    }
+  ): Promise<object> {
+    const additionalContext = await this.conversations.promptContext(
+      id,
+      prompt,
+    );
+    if (!additionalContext) return {};
+    return {
+      hookSpecificOutput: {
+        hookEventName: 'UserPromptSubmit',
+        additionalContext,
+      },
+    };
   }
 
   @Post('tool-calls')

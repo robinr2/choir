@@ -12,6 +12,7 @@ const marksSchema = z.record(
     aloud: z.literal(true).optional(),
     from: z.object({ id: z.string(), name: z.string() }).optional(),
     text: z.string().optional(),
+    heard: z.string().optional(),
   }),
 );
 

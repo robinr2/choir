@@ -55,7 +55,20 @@ test('follows the agent it was last given', async () => {
     id: 'm0',
     role: 'user',
     parts: [{ type: 'text', text: 'hi' }],
-    voice: true,
   });
   await expect.element(composer).toHaveValue('');
+  coreShowsChat(
+    B,
+    { id: 'm0', role: 'user', parts: [{ type: 'text', text: 'hi' }] },
+    { id: 'm1', role: 'user', parts: [{ type: 'text', text: 'again' }] },
+    {
+      id: 'm2',
+      role: 'assistant',
+      parts: [{ type: 'text', text: 'Hello.' }],
+      spoken: true,
+    },
+  );
+  await expect
+    .element(screen.getByText('Hello.'))
+    .toHaveClass('text-muted-foreground');
 });

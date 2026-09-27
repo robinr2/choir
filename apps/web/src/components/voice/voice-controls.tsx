@@ -1,6 +1,6 @@
 import { useCallback } from 'react';
 import { usePipecatClientTransportState } from '@pipecat-ai/client-react';
-import { MicIcon } from 'lucide-react';
+import { AudioLinesIcon } from 'lucide-react';
 import { TooltipIconButton } from '@/components/assistant-ui/elements/tooltip-icon-button';
 import { AudioVisualizerBar } from '@/components/pipecat/audio-visualizer-bar';
 import { UserAudioControl } from '@/components/pipecat/user-audio-control';
@@ -42,7 +42,7 @@ export function VoiceControls() {
         aria-pressed={isOn}
         onClick={toggle}
       >
-        <MicIcon className="size-4" />
+        <AudioLinesIcon className="size-4" />
       </TooltipIconButton>
     </>
   );

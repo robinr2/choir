@@ -3,6 +3,7 @@ import type { TranscriptMessage } from './transcript';
 
 export type ConversationSnapshot = {
   messages: readonly TranscriptMessage[];
+  loaded: boolean;
   running: boolean;
 };
 
@@ -12,7 +13,11 @@ export class CoreConversation extends LiveStore<ConversationSnapshot> {
   readonly id: string;
 
   constructor(id: string) {
-    super(`/conversations/${id}/events`, { messages: [], running: false });
+    super(`/conversations/${id}/events`, {
+      messages: [],
+      loaded: false,
+      running: false,
+    });
     this.id = id;
   }
 
@@ -31,6 +36,6 @@ export class CoreConversation extends LiveStore<ConversationSnapshot> {
   }
 
   protected receive(data: Partial<ConversationEvent> | null): void {
-    if (data?.messages) this.update({ messages: data.messages });
+    if (data?.messages) this.update({ messages: data.messages, loaded: true });
   }
 }

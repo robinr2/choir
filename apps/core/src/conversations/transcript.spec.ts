@@ -115,7 +115,7 @@ describe('transcriptOf', () => {
     ]);
   });
 
-  it('marks the exchanges that were spoken', () => {
+  it('marks the replies that were spoken and how much of them was heard', () => {
     const messages = transcriptOf(
       {
         messages: [
@@ -127,22 +127,34 @@ describe('transcriptOf', () => {
           answered('C'),
           said('typed again'),
           answered('D'),
+          said('cut off'),
+          answered('E'),
         ],
       },
       new Map([
         ['spoken', { voice: true, aloud: true }],
         ['typed again', { aloud: true }],
+        ['cut off', { voice: true, aloud: true, heard: '' }],
       ]),
     );
-    expect(messages.map(({ voice, spoken }) => [voice, spoken])).toEqual([
-      [undefined, undefined],
-      [undefined, undefined],
-      [undefined, undefined],
-      [true, undefined],
-      [true, undefined],
-      [true, undefined],
-      [undefined, undefined],
-      [undefined, true],
+    expect(
+      messages.map((message) => [
+        message.spoken,
+        message.heard,
+        'heard' in message,
+        'voice' in message,
+      ]),
+    ).toEqual([
+      [undefined, undefined, false, false],
+      [undefined, undefined, false, false],
+      [undefined, undefined, false, false],
+      [undefined, undefined, false, false],
+      [true, undefined, false, false],
+      [true, undefined, false, false],
+      [undefined, undefined, false, false],
+      [true, undefined, false, false],
+      [undefined, undefined, false, false],
+      [true, '', true, false],
     ]);
   });
 

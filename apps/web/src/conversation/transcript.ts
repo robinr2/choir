@@ -17,10 +17,12 @@ export type TranscriptMessage = {
   id: string;
   role: 'user' | 'assistant';
   parts: (TextPart | ToolCallPart)[];
-  voice?: true;
   spoken?: true;
+  heard?: string;
   from?: Sender;
 };
+
+export type ShownMessage = TranscriptMessage & { spokenUpTo?: number };
 
 type ThreadPart = Exclude<ThreadMessageLike['content'], string>[number];
 
@@ -39,6 +41,35 @@ export function senderIn(custom: Record<string, unknown>): Sender {
   return isSender(custom.from) ? custom.from : NO_SENDER;
 }
 
+export function isSpokenIn(custom: Record<string, unknown>): boolean {
+  return typeof custom.spokenUpTo === 'number';
+}
+
+function isText(part: { type: string; text?: string }): part is TextPart {
+  return part.type === 'text';
+}
+
+export function textBefore(
+  parts: readonly { type: string; text?: string }[],
+  query: object | null,
+): number {
+  const index = query !== null && 'index' in query ? Number(query.index) : 0;
+  return parts
+    .slice(0, index)
+    .filter(isText)
+    .reduce((length, { text }) => length + text.length, 0);
+}
+
+export function userTurnsIn(messages: readonly TranscriptMessage[]): number {
+  return messages.filter(({ role }) => role === 'user').length;
+}
+
+export function spokenTextsOf({ parts }: TranscriptMessage): string[] {
+  return parts.flatMap((part) =>
+    part.type === 'text' && part.text.trim() ? [part.text] : [],
+  );
+}
+
 function threadPart(part: TextPart | ToolCallPart): ThreadPart {
   if (part.type === 'text') return part;
   return {
@@ -51,15 +82,16 @@ function threadPart(part: TextPart | ToolCallPart): ThreadPart {
   };
 }
 
-export function threadMessageOf(message: TranscriptMessage): ThreadMessageLike {
+export function threadMessageOf(message: ShownMessage): ThreadMessageLike {
   return {
     id: message.id,
     role: message.role,
     content: message.parts.map(threadPart),
     metadata: {
-      ...(message.voice && { modality: 'voice' }),
       custom: {
-        ...(message.spoken && { spoken: true }),
+        ...(message.spokenUpTo !== undefined && {
+          spokenUpTo: message.spokenUpTo,
+        }),
         ...(message.from && { from: message.from }),
       },
     },

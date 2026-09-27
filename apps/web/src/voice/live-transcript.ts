@@ -1,10 +1,6 @@
-import type { TranscriptMessage } from '@/conversation/transcript';
+import { type TranscriptMessage, userTurnsIn } from '@/conversation/transcript';
 
 export type Transcript = { text: string; final: boolean };
-
-function userTurnsIn(messages: readonly TranscriptMessage[]): number {
-  return messages.filter(({ role }) => role === 'user').length;
-}
 
 export class LiveTranscript {
   readonly #show: (text: string) => void;

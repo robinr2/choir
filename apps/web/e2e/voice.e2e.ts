@@ -42,7 +42,7 @@ async function askForANewAgentByVoice(page: Page): Promise<Locator> {
   await first.getByRole('button', { name: 'Voice' }).click();
   await expect(
     first
-      .locator('[data-slot="aui_spoken-message-root"][data-role="user"]')
+      .locator('[data-slot="aui_user-message-root"]')
       .filter({ hasText: REQUEST })
       .first(),
   ).toBeVisible({ timeout: 90_000 });
@@ -73,4 +73,7 @@ test('starts a new agent by voice and hears back from it by name', async ({
   await expect
     .poll(() => receivedAudioEnergy(page), { timeout: 60_000 })
     .toBeGreaterThan(0.01);
+  await expect(
+    first.locator('[data-slot="spoken-text"] > span:first-child').first(),
+  ).not.toBeEmpty({ timeout: 60_000 });
 });

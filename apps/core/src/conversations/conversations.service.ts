@@ -4,9 +4,11 @@ import type {
   AcpRuntimeTurn,
   AcpSessionRecord,
 } from 'acpx/runtime';
-import { BehaviorSubject, from, type Observable, switchMap } from 'rxjs';
+import { from, type Observable, switchMap } from 'rxjs';
 import { AgentService } from '../agent/agent.service.js';
+import { ProfileService } from '../agent/profile.service.js';
 import { VoiceService } from '../voice/voice.service.js';
+import { type Conversation, newConversation } from './conversation.js';
 import {
   ConversationTurn,
   type TurnKind,
@@ -17,10 +19,8 @@ import {
   type Sender,
   type TranscriptMessage,
   transcriptOf,
-  type TurnMark,
 } from './transcript.js';
-import { fromAgent } from './turn-framing.js';
-import { TurnGate } from './turn-gate.js';
+import { contextFor, fromAgent } from './turn-framing.js';
 import { TurnMarksService } from './turn-marks.service.js';
 import { WorkingAgents } from './working-agents.js';
 
@@ -29,16 +29,6 @@ export type ConversationAgent = {
   record(handle: AcpRuntimeHandle): Promise<Pick<AcpSessionRecord, 'messages'>>;
   startTurn(handle: AcpRuntimeHandle, text: string): AcpRuntimeTurn;
   close(handle: AcpRuntimeHandle): Promise<void>;
-};
-
-type Conversation = {
-  id: string;
-  snapshot: BehaviorSubject<TranscriptMessage[]>;
-  record: Pick<AcpSessionRecord, 'messages'>;
-  marks: Map<string, TurnMark>;
-  unfinished: Set<ConversationTurn>;
-  gate: TurnGate;
-  opened?: Promise<AcpRuntimeHandle>;
 };
 
 @Injectable()
@@ -53,6 +43,8 @@ export class ConversationsService {
     private readonly turnMarks: Pick<TurnMarksService, 'load' | 'save'>,
     @Inject(VoiceService)
     private readonly voice: Pick<VoiceService, 'isActive' | 'speak'>,
+    @Inject(ProfileService)
+    private readonly profile: Pick<ProfileService, 'voicePrompt'>,
   ) {}
 
   get workingChanges(): Observable<ReadonlySet<string>> {
@@ -79,10 +71,10 @@ export class ConversationsService {
   ): Promise<Observable<string>> {
     const conversation = this.conversation(id);
     const handle = await this.handle(conversation);
-    const prompt = conversation.gate.frame(words);
+    const framed = conversation.gate.frame(words);
     const aloud = voice || this.voice.isActive(id);
     const mark = { ...(voice && { voice }), ...(aloud && { aloud }) } as const;
-    return this.start(conversation, handle, { prompt, words, early, mark });
+    return this.start(conversation, handle, { ...framed, words, early, mark });
   }
 
   async sendMessage(id: string, text: string, sender: Sender): Promise<void> {
@@ -99,19 +91,22 @@ export class ConversationsService {
     this.conversation(id).gate.confirm(words);
   }
 
-  withdraw(id: string): Promise<void> {
-    return this.conversation(id).gate.withdraw();
+  async withdraw(id: string): Promise<void> {
+    const conversation = this.conversation(id);
+    const turn = await conversation.gate.withdraw();
+    await this.markHeard(conversation, turn, '');
   }
 
-  interrupt(id: string, heard: string): Promise<void> {
-    return this.conversation(id).gate.interrupt(heard);
+  async interrupt(id: string, heard: string): Promise<void> {
+    const conversation = this.conversation(id);
+    const turn = await conversation.gate.interrupt(heard);
+    await this.markHeard(conversation, turn, heard);
   }
 
-  isVoiceTurn(id: string, prompt: string): boolean {
-    const { unfinished } = this.conversation(id);
-    return [...unfinished].some(
-      ({ request }) => request.mark.aloud && request.prompt === prompt.trim(),
-    );
+  async promptContext(id: string, prompt: string): Promise<string> {
+    const { gate } = this.conversation(id);
+    const rules = await this.profile.voicePrompt();
+    return contextFor(gate.unfinished, prompt, rules);
   }
 
   toolCallAllowed(id: string): Promise<boolean> {
@@ -131,14 +126,7 @@ export class ConversationsService {
   private conversation(id: string): Conversation {
     const existing = this.conversations.get(id);
     if (existing) return existing;
-    const conversation: Conversation = {
-      id,
-      snapshot: new BehaviorSubject<TranscriptMessage[]>([]),
-      record: { messages: [] },
-      marks: new Map(),
-      unfinished: new Set(),
-      gate: new TurnGate(),
-    };
+    const conversation = newConversation(id);
     this.conversations.set(id, conversation);
     return conversation;
   }
@@ -182,13 +170,23 @@ export class ConversationsService {
     turn: ConversationTurn,
   ): Promise<void> {
     conversation.gate.admit(turn);
-    conversation.unfinished.add(turn);
     this.working.follow(conversation.id, turn.settled);
-    void turn.settled.then(() => conversation.unfinished.delete(turn));
     const { prompt, mark } = turn.request;
     if (Object.keys(mark).length === 0) return;
     conversation.marks.set(prompt, mark);
     await this.turnMarks.save(conversation.id, conversation.marks);
+  }
+
+  private async markHeard(
+    conversation: Conversation,
+    turn: ConversationTurn | undefined,
+    heard: string,
+  ): Promise<void> {
+    if (!turn?.request.mark.aloud) return;
+    const { prompt, mark } = turn.request;
+    conversation.marks.set(prompt, { ...mark, heard });
+    await this.turnMarks.save(conversation.id, conversation.marks);
+    this.publish(conversation);
   }
 
   private async reload(

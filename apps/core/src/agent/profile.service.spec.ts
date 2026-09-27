@@ -19,13 +19,17 @@ function profileFile(...parts: string[]): string {
   return path.join(dataDir, 'profiles', 'default', ...parts);
 }
 
-async function prepare(): Promise<void> {
-  await new ProfileService({
+function profile(): ProfileService {
+  return new ProfileService({
     dataDir,
     coreUrl: 'http://localhost:3000',
     canvasUrl: 'http://127.0.0.1:3100',
     canvasPublicUrl: 'http://127.0.0.1:3100',
-  }).onModuleInit();
+  });
+}
+
+async function prepare(): Promise<void> {
+  await profile().onModuleInit();
 }
 
 beforeEach(async () => {
@@ -67,6 +71,12 @@ it('keeps a profile the user has changed', async () => {
     'my prompt',
   );
   expect(await readFile(profileFile('hooks', 'hooks.json'), 'utf8')).toBe('{}');
+});
+
+it('reads the voice prompt the profile holds', async () => {
+  await prepare();
+  await writeFile(profileFile('default-voice-prompt.md'), 'speak plainly');
+  expect(await profile().voicePrompt()).toBe('speak plainly');
 });
 
 it('fails when the profile cannot be written', async () => {
