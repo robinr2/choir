@@ -13,6 +13,7 @@ Do all work based on the documentation of the tools the current task involves. O
 - just: https://just.systems/man/en/
 - Excalidraw: https://docs.excalidraw.com/
 - mcp_excalidraw: https://github.com/yctimlin/mcp_excalidraw
+- Prisma ORM 8: https://www.prisma.io/docs/llms/orm.txt
 
 ## Development
 

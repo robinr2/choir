@@ -1,6 +1,15 @@
 {
-  "path": ["src", "test"],
-  "reporters": ["ai"],
+  "path": [
+    "src",
+    "test"
+  ],
+  "reporters": [
+    "ai"
+  ],
   "threshold": 1,
-  "noTips": true
+  "noTips": true,
+  "ignore": [
+    "**/prisma/contract.d.ts",
+    "**/prisma/contract.json"
+  ]
 }

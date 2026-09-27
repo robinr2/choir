@@ -12,5 +12,9 @@
   "entry": [
     "src/main.ts!",
     ".dependency-cruiser-stability.cjs"
+  ],
+  "ignore": [
+    ".claude/skills/**",
+    "src/prisma/contract.prisma"
   ]
 }

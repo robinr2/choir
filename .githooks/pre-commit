@@ -13,6 +13,10 @@ npx depcruise src test --config .dependency-cruiser-stability.cjs
 npx tsc --noEmit -p tsconfig.json
 npm run --silent test:cov
 npx nestjs-doctor . --staged --blocking error
+npx prisma contract format -q
+npx prisma contract emit -q
+git diff --exit-code -- src/prisma
+npx prisma migration check -q
 cd ../web
 npx prettier --check "src/**/*.{ts,tsx}"
 npm run --silent lint
