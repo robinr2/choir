@@ -92,6 +92,9 @@ const listAgents: Tool = (server, workspace, callerId) => {
 
 const TOOLS = [splitPane, addPaneAtEdge, sendMessage, closeAgent, listAgents];
 
+const INSTRUCTIONS =
+  'The agents of this workspace are the panes the user sees, each running its own session. When the user asks for a new agent, start it in a new pane with split_pane or add_pane_at_edge, and reach it with send_message.';
+
 export const CALLER_HEADER = 'x-choir-agent';
 
 export function callerOf(request: Request | undefined): string {
@@ -99,7 +102,10 @@ export function callerOf(request: Request | undefined): string {
 }
 
 function orchestrationServer(workspace: Workspace, callerId: string) {
-  const server = new McpServer({ name: 'choir', version: '1.0.0' });
+  const server = new McpServer(
+    { name: 'choir', version: '1.0.0' },
+    { instructions: INSTRUCTIONS },
+  );
   for (const register of TOOLS) register(server, workspace, callerId);
   return server;
 }

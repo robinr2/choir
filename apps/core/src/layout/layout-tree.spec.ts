@@ -131,6 +131,7 @@ describe('sameLeaves', () => {
       sameLeaves(row(['a', 'b'], [50, 50]), row(['b', 'a'], [10, 90])),
     ).toBe(true);
     expect(sameLeaves(row(['a', 'b'], [50, 50]), 'a')).toBe(false);
+    expect(sameLeaves('a', row(['a', 'b'], [50, 50]))).toBe(false);
     expect(
       sameLeaves(row(['a', 'b'], [50, 50]), row(['a', 'c'], [50, 50])),
     ).toBe(false);

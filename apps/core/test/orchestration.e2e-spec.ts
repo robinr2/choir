@@ -30,6 +30,9 @@ it('gives every agent the orchestration tools', async () => {
     name: 'choir',
     version: '1.0.0',
   });
+  expect(tools.getInstructions()).toMatch(
+    /new agent.*split_pane or add_pane_at_edge/,
+  );
   await tools.close();
 });
 
