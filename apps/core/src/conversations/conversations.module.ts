@@ -1,12 +1,14 @@
 import { Module } from '@nestjs/common';
 import { AgentModule } from '../agent/agent.module.js';
+import { VoiceModule } from '../voice/voice.module.js';
 import { ConversationsController } from './conversations.controller.js';
 import { ConversationsService } from './conversations.service.js';
-import { VoiceTurnsService } from './voice-turns.service.js';
+import { TurnMarksService } from './turn-marks.service.js';
 
 @Module({
-  imports: [AgentModule],
+  imports: [AgentModule, VoiceModule],
   controllers: [ConversationsController],
-  providers: [ConversationsService, VoiceTurnsService],
+  providers: [ConversationsService, TurnMarksService],
+  exports: [ConversationsService, VoiceModule],
 })
 export class ConversationsModule {}

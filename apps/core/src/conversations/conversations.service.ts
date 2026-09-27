@@ -6,40 +6,58 @@ import type {
 } from 'acpx/runtime';
 import { BehaviorSubject, from, type Observable, switchMap } from 'rxjs';
 import { AgentService } from '../agent/agent.service.js';
-import { ConversationTurn, type TurnKind } from './conversation-turn.js';
-import { type TranscriptMessage, transcriptOf } from './transcript.js';
-import { type Continuation, framed } from './turn-framing.js';
-import { VoiceTurnsService } from './voice-turns.service.js';
+import { VoiceService } from '../voice/voice.service.js';
+import {
+  ConversationTurn,
+  type TurnKind,
+  type TurnRequest,
+} from './conversation-turn.js';
+import {
+  liveMessages,
+  type Sender,
+  type TranscriptMessage,
+  transcriptOf,
+  type TurnMark,
+} from './transcript.js';
+import { fromAgent } from './turn-framing.js';
+import { TurnGate } from './turn-gate.js';
+import { TurnMarksService } from './turn-marks.service.js';
+import { WorkingAgents } from './working-agents.js';
 
 export type ConversationAgent = {
   open(conversationId: string): Promise<AcpRuntimeHandle>;
   record(handle: AcpRuntimeHandle): Promise<Pick<AcpSessionRecord, 'messages'>>;
   startTurn(handle: AcpRuntimeHandle, text: string): AcpRuntimeTurn;
+  close(handle: AcpRuntimeHandle): Promise<void>;
 };
 
 type Conversation = {
   id: string;
   snapshot: BehaviorSubject<TranscriptMessage[]>;
-  history: TranscriptMessage[];
-  nextIndex: number;
-  opened?: Promise<AcpRuntimeHandle>;
-  current?: ConversationTurn;
+  record: Pick<AcpSessionRecord, 'messages'>;
+  marks: Map<string, TurnMark>;
   unfinished: Set<ConversationTurn>;
-  voicePrompts: Set<string>;
-  continuation?: Continuation;
-  confirmedWords?: string;
+  gate: TurnGate;
+  opened?: Promise<AcpRuntimeHandle>;
 };
 
 @Injectable()
 export class ConversationsService {
   private readonly logger = new Logger(ConversationsService.name);
   private readonly conversations = new Map<string, Conversation>();
+  private readonly working = new WorkingAgents();
 
   constructor(
     @Inject(AgentService) private readonly agent: ConversationAgent,
-    @Inject(VoiceTurnsService)
-    private readonly voiceTurns: Pick<VoiceTurnsService, 'load' | 'save'>,
+    @Inject(TurnMarksService)
+    private readonly turnMarks: Pick<TurnMarksService, 'load' | 'save'>,
+    @Inject(VoiceService)
+    private readonly voice: Pick<VoiceService, 'isActive' | 'speak'>,
   ) {}
+
+  get workingChanges(): Observable<ReadonlySet<string>> {
+    return this.working.changes;
+  }
 
   async messages(id: string): Promise<TranscriptMessage[]> {
     const conversation = this.conversation(id);
@@ -57,59 +75,57 @@ export class ConversationsService {
   async addUserTurn(
     id: string,
     words: string,
-    kind: TurnKind,
+    { early, voice }: TurnKind,
   ): Promise<Observable<string>> {
     const conversation = this.conversation(id);
     const handle = await this.handle(conversation);
-    const prompt = framed(conversation.continuation, words);
-    conversation.continuation = undefined;
-    const turn = new ConversationTurn(
-      this.agent.startTurn(handle, prompt),
-      { prompt, words, ...kind },
-      () => this.publish(conversation),
-    );
-    await this.track(conversation, turn);
-    this.publish(conversation);
-    void this.finish(conversation, handle, turn).catch((error: unknown) => {
-      this.logger.error(`Conversation ${id} turn failed: ${String(error)}`);
-    });
-    return turn.answer.asObservable();
+    const prompt = conversation.gate.frame(words);
+    const aloud = voice || this.voice.isActive(id);
+    const mark = { ...(voice && { voice }), ...(aloud && { aloud }) } as const;
+    return this.start(conversation, handle, { prompt, words, early, mark });
+  }
+
+  async sendMessage(id: string, text: string, sender: Sender): Promise<void> {
+    const conversation = this.conversation(id);
+    const handle = await this.handle(conversation);
+    const aloud = this.voice.isActive(id);
+    const mark = { from: sender, text, ...(aloud && { aloud }) } as const;
+    const prompt = fromAgent(sender, text);
+    const request = { prompt, words: prompt, early: false, mark };
+    await this.start(conversation, handle, request);
   }
 
   confirm(id: string, words: string): void {
-    const conversation = this.conversation(id);
-    const turn = conversation.current;
-    if (turn?.request.words === words) turn.confirm();
-    else conversation.confirmedWords = words;
+    this.conversation(id).gate.confirm(words);
   }
 
-  async withdraw(id: string): Promise<void> {
-    const conversation = this.conversation(id);
-    const turn = conversation.current;
-    if (!turn?.request.early) return;
-    conversation.continuation = {
-      kind: 'withdrawn',
-      words: turn.request.words,
-    };
-    await turn.cancel();
+  withdraw(id: string): Promise<void> {
+    return this.conversation(id).gate.withdraw();
   }
 
-  async interrupt(id: string, heard: string): Promise<void> {
-    const conversation = this.conversation(id);
-    conversation.continuation = { kind: 'interrupted', heard };
-    await conversation.current?.cancel();
+  interrupt(id: string, heard: string): Promise<void> {
+    return this.conversation(id).gate.interrupt(heard);
   }
 
   isVoiceTurn(id: string, prompt: string): boolean {
     const { unfinished } = this.conversation(id);
     return [...unfinished].some(
-      ({ request }) => request.voice && request.prompt === prompt.trim(),
+      ({ request }) => request.mark.aloud && request.prompt === prompt.trim(),
     );
   }
 
   toolCallAllowed(id: string): Promise<boolean> {
-    const turn = this.conversation(id).current;
-    return turn?.confirmed ?? Promise.resolve(false);
+    return this.conversation(id).gate.toolCallAllowed();
+  }
+
+  async close(id: string): Promise<void> {
+    const conversation = this.conversations.get(id);
+    if (!conversation) return;
+    this.conversations.delete(id);
+    this.working.forget(id);
+    conversation.snapshot.complete();
+    const handle = await conversation.opened;
+    if (handle) await this.agent.close(handle);
   }
 
   private conversation(id: string): Conversation {
@@ -118,10 +134,10 @@ export class ConversationsService {
     const conversation: Conversation = {
       id,
       snapshot: new BehaviorSubject<TranscriptMessage[]>([]),
-      history: [],
-      nextIndex: 0,
+      record: { messages: [] },
+      marks: new Map(),
       unfinished: new Set(),
-      voicePrompts: new Set(),
+      gate: new TurnGate(),
     };
     this.conversations.set(id, conversation);
     return conversation;
@@ -134,58 +150,62 @@ export class ConversationsService {
 
   private async open(conversation: Conversation): Promise<AcpRuntimeHandle> {
     const handle = await this.agent.open(conversation.id);
-    conversation.voicePrompts = await this.voiceTurns.load(conversation.id);
+    conversation.marks = await this.turnMarks.load(conversation.id);
     await this.reload(conversation, handle);
     return handle;
   }
 
-  private async reload(
+  private async start(
     conversation: Conversation,
     handle: AcpRuntimeHandle,
-  ): Promise<void> {
-    const record = await this.agent.record(handle);
-    conversation.history = transcriptOf(record, conversation.voicePrompts);
-    conversation.nextIndex = record.messages.length;
+    request: TurnRequest,
+  ): Promise<Observable<string>> {
+    const turn = new ConversationTurn(
+      this.agent.startTurn(handle, request.prompt),
+      request,
+      () => this.publish(conversation),
+    );
+    await this.track(conversation, turn);
     this.publish(conversation);
-  }
-
-  private publish(conversation: Conversation): void {
-    conversation.snapshot.next([
-      ...conversation.history,
-      ...this.live(conversation),
-    ]);
-  }
-
-  private live({ current, nextIndex }: Conversation): TranscriptMessage[] {
-    if (!current) return [];
-    const voice = current.request.voice ? { voice: true as const } : {};
-    return [
-      {
-        id: `m${nextIndex}`,
-        role: 'user',
-        parts: [{ type: 'text', text: current.request.prompt }],
-        ...voice,
-      },
-      {
-        id: `m${nextIndex + 1}`,
-        role: 'assistant',
-        parts: current.parts,
-        ...voice,
-      },
-    ];
+    void this.finish(conversation, handle, turn).catch((error: unknown) => {
+      this.logger.error(
+        `Conversation ${conversation.id} turn failed: ${String(error)}`,
+      );
+    });
+    const { voice, aloud } = request.mark;
+    if (aloud && !voice) this.voice.speak(conversation.id, turn.answer);
+    return turn.answer.asObservable();
   }
 
   private async track(
     conversation: Conversation,
     turn: ConversationTurn,
   ): Promise<void> {
-    conversation.current = turn;
+    conversation.gate.admit(turn);
     conversation.unfinished.add(turn);
-    if (conversation.confirmedWords === turn.request.words) turn.confirm();
-    conversation.confirmedWords = undefined;
-    if (!turn.request.voice) return;
-    conversation.voicePrompts.add(turn.request.prompt);
-    await this.voiceTurns.save(conversation.id, conversation.voicePrompts);
+    this.working.follow(conversation.id, turn.settled);
+    void turn.settled.then(() => conversation.unfinished.delete(turn));
+    const { prompt, mark } = turn.request;
+    if (Object.keys(mark).length === 0) return;
+    conversation.marks.set(prompt, mark);
+    await this.turnMarks.save(conversation.id, conversation.marks);
+  }
+
+  private async reload(
+    conversation: Conversation,
+    handle: AcpRuntimeHandle,
+  ): Promise<void> {
+    conversation.record = await this.agent.record(handle);
+    this.publish(conversation);
+  }
+
+  private publish({ snapshot, record, marks, gate }: Conversation): void {
+    const { current } = gate;
+    const index = record.messages.length;
+    const live = current
+      ? liveMessages(current.request, current.parts, index)
+      : [];
+    snapshot.next([...transcriptOf(record, marks), ...live]);
   }
 
   private async finish(
@@ -193,11 +213,9 @@ export class ConversationsService {
     handle: AcpRuntimeHandle,
     turn: ConversationTurn,
   ): Promise<void> {
-    const summary = await turn.run().finally(() => {
-      conversation.unfinished.delete(turn);
-    });
+    const summary = await turn.run();
     this.logger.log(`Conversation ${conversation.id} turn ${summary}`);
-    if (conversation.current === turn) conversation.current = undefined;
+    conversation.gate.release(turn);
     await this.reload(conversation, handle);
   }
 }

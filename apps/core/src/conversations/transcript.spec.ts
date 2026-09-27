@@ -68,7 +68,7 @@ describe('transcriptOf', () => {
           },
         ],
       },
-      new Set(),
+      new Map(),
     );
     expect(messages).toEqual([
       {
@@ -101,7 +101,7 @@ describe('transcriptOf', () => {
           { Agent: { content: [{ ToolUse: toolUse }], tool_results: {} } },
         ],
       },
-      new Set(),
+      new Map(),
     );
     expect(message?.parts).toEqual([
       {
@@ -129,17 +129,36 @@ describe('transcriptOf', () => {
           answered('D'),
         ],
       },
-      new Set(['spoken']),
+      new Map([
+        ['spoken', { voice: true, aloud: true }],
+        ['typed again', { aloud: true }],
+      ]),
     );
-    expect(messages.map(({ voice }) => voice)).toEqual([
-      undefined,
-      undefined,
-      undefined,
-      true,
-      true,
-      true,
-      undefined,
-      undefined,
+    expect(messages.map(({ voice, spoken }) => [voice, spoken])).toEqual([
+      [undefined, undefined],
+      [undefined, undefined],
+      [undefined, undefined],
+      [true, undefined],
+      [true, undefined],
+      [true, undefined],
+      [undefined, undefined],
+      [undefined, true],
+    ]);
+  });
+
+  it('shows a message from another agent as that agent wrote it', () => {
+    const from = { id: 'a2', name: 'helper' };
+    const messages = transcriptOf(
+      { messages: [said('(framed) hi'), answered('Hello.')] },
+      new Map([['(framed) hi', { from, text: 'hi' }]]),
+    );
+    expect(messages).toEqual([
+      { id: 'm0', role: 'user', parts: [{ type: 'text', text: 'hi' }], from },
+      {
+        id: 'm1',
+        role: 'assistant',
+        parts: [{ type: 'text', text: 'Hello.' }],
+      },
     ]);
   });
 });

@@ -25,6 +25,7 @@ import {
 import { TooltipIconButton } from "@/components/assistant-ui/elements/tooltip-icon-button";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { AgentMessage, SpokenMark } from "@/components/agents/agent-message";
 import { VoiceControls } from "@/components/voice/voice-controls";
 import { cn } from "@/lib/utils";
 import {
@@ -252,9 +253,13 @@ const ThreadMessage: FC = () => {
   const role = useAuiState((s) => s.message.role);
   const isEditing = useAuiState((s) => s.message.composer.isEditing);
   const isSpoken = useAuiState((s) => s.message.metadata.modality === "voice");
+  const isFromAgent = useAuiState(
+    (s) => s.message.metadata.custom.from !== undefined,
+  );
 
   if (isEditing) return <EditComposer />;
   if (isSpoken) return <SpokenMessage />;
+  if (isFromAgent) return <AgentMessage />;
   if (role === "user") return <UserMessage />;
   return <AssistantMessageComponent />;
 };
@@ -571,6 +576,7 @@ const AssistantMessage: FC = () => {
         data-slot="aui_assistant-message-footer"
         className={cn("ms-2 flex items-center", ACTION_BAR_HEIGHT)}
       >
+        <SpokenMark />
         <BranchPicker />
         <AssistantActionBar />
       </div>

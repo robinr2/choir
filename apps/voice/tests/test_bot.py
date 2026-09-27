@@ -113,17 +113,16 @@ async def test_runs_the_bot_until_the_client_disconnects(
         cancelled.append(worker)
 
     monkeypatch.setattr(PipelineWorker, 'cancel', cancel)
-    await bot.run_bot(SmallWebRTCConnection(), SETTINGS, 'c1')
+    await bot.run_bot(SmallWebRTCConnection(), SETTINGS)
     options, worker = DisconnectingRunner.runs[-1]
     transport = RecordingTransport.created[-1]
     assert options == {'handle_sigint': False}
     assert transport.params.audio_in_enabled
     assert transport.params.audio_out_enabled
     assert cancelled == [worker]
-    [((client, conversation_id), _)] = conversations
+    [((client,), _)] = conversations
     assert str(client.base_url) == 'http://core'
     assert client.timeout == httpx.Timeout(5.0, read=None)
-    assert conversation_id == 'c1'
     [((piped_transport, settings, conversation), _)] = pipelines
     assert piped_transport is transport
     assert settings is SETTINGS

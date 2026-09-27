@@ -1,6 +1,5 @@
 from collections.abc import Awaitable, Callable
 from typing import Annotated
-from uuid import UUID
 
 from fastapi import APIRouter, BackgroundTasks, Depends
 from pipecat.transports.smallwebrtc.connection import SmallWebRTCConnection
@@ -17,11 +16,9 @@ router = APIRouter(prefix='/api/offer', tags=['webrtc'])
 BotStarter = Callable[[SmallWebRTCConnection], Awaitable[None]]
 
 
-def bot_starter(
-    conversation_id: UUID, background_tasks: BackgroundTasks, settings: SettingsDep
-) -> BotStarter:
+def bot_starter(background_tasks: BackgroundTasks, settings: SettingsDep) -> BotStarter:
     async def start_bot(connection: SmallWebRTCConnection) -> None:
-        background_tasks.add_task(run_bot, connection, settings, str(conversation_id))
+        background_tasks.add_task(run_bot, connection, settings)
 
     return start_bot
 

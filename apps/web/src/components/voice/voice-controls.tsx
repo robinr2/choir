@@ -1,12 +1,10 @@
-import {
-  useAuiState,
-  useVoiceControls,
-  useVoiceState,
-} from '@assistant-ui/react';
+import { useCallback } from 'react';
+import { usePipecatClientTransportState } from '@pipecat-ai/client-react';
 import { MicIcon } from 'lucide-react';
 import { TooltipIconButton } from '@/components/assistant-ui/elements/tooltip-icon-button';
 import { AudioVisualizerBar } from '@/components/pipecat/audio-visualizer-bar';
 import { UserAudioControl } from '@/components/pipecat/user-audio-control';
+import { useAgentId, useWorkspace } from '@/workspace/workspace-context';
 
 function VoiceActivity() {
   return (
@@ -22,35 +20,30 @@ function VoiceActivity() {
   );
 }
 
-function VoiceToggle() {
-  const status = useVoiceState()?.status.type;
-  const isThreadRunning = useAuiState((s) => s.thread.isRunning);
-  const { connect, disconnect } = useVoiceControls();
-  const isOn = status === 'starting' || status === 'running';
-
-  return (
-    <TooltipIconButton
-      tooltip="Voice"
-      side="bottom"
-      type="button"
-      size="icon"
-      className="aria-pressed:bg-secondary aria-pressed:text-secondary-foreground size-7 rounded-full"
-      aria-pressed={isOn}
-      disabled={isThreadRunning && !isOn}
-      onClick={isOn ? disconnect : connect}
-    >
-      <MicIcon className="size-4" />
-    </TooltipIconButton>
-  );
-}
-
 export function VoiceControls() {
-  const isRunning = useVoiceState()?.status.type === 'running';
+  const agentId = useAgentId();
+  const { voice, view } = useWorkspace();
+  const isReady = usePipecatClientTransportState() === 'ready';
+  const isOn = view.voiceAgentId === agentId;
+  const toggle = useCallback(
+    () => void voice.toggle(agentId),
+    [voice, agentId],
+  );
 
   return (
     <>
-      {isRunning && <VoiceActivity />}
-      <VoiceToggle />
+      {isOn && isReady && <VoiceActivity />}
+      <TooltipIconButton
+        tooltip="Voice"
+        side="bottom"
+        type="button"
+        size="icon"
+        className="aria-pressed:bg-active/15 aria-pressed:text-active size-7 rounded-full"
+        aria-pressed={isOn}
+        onClick={toggle}
+      >
+        <MicIcon className="size-4" />
+      </TooltipIconButton>
     </>
   );
 }

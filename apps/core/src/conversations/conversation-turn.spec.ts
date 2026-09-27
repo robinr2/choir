@@ -25,7 +25,12 @@ function turnOf(
 ) {
   return new ConversationTurn(
     agent,
-    { prompt: 'hello choir', words: 'hello choir', early, voice: true },
+    {
+      prompt: 'hello choir',
+      words: 'hello choir',
+      early,
+      mark: { voice: true },
+    },
     onChange,
   );
 }
@@ -80,6 +85,7 @@ it('streams only the answer text and follows every event', async () => {
     { type: 'text', text: 'Hello' },
   ]);
   expect(await turn.confirmed).toBe(false);
+  expect(await turn.settled).toEqual({ status: 'completed' });
 });
 
 it('ends the answer and refuses tool calls when the agent turn fails', async () => {

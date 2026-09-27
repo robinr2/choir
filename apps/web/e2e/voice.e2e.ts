@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 
 declare global {
   interface Window {
@@ -6,7 +6,8 @@ declare global {
   }
 }
 
-const SENTENCE = /quick brown fox jumps over the lazy dog/i;
+const REQUEST = /new agent.*hello to me/i;
+const HELLO = /hello/i;
 
 function recordPeerConnections(): void {
   const Native = window.RTCPeerConnection;
@@ -31,28 +32,45 @@ function receivedAudioEnergy(page: Page): Promise<number> {
   });
 }
 
-function spokenMessage(page: Page, role: 'user' | 'assistant') {
-  return page.locator(
-    `[data-slot="aui_spoken-message-root"][data-role="${role}"]`,
-  );
+function agentMessages(pane: Locator): Locator {
+  return pane.locator('[data-slot="agent-message-root"]');
 }
 
-test('answers a spoken sentence with Claude Code, out loud and with a tool call', async ({
+async function askForANewAgentByVoice(page: Page): Promise<Locator> {
+  await page.goto('/');
+  const first = page.getByRole('region', { name: 'agent 1' });
+  await first.getByRole('button', { name: 'Voice' }).click();
+  await expect(
+    first
+      .locator('[data-slot="aui_spoken-message-root"][data-role="user"]')
+      .filter({ hasText: REQUEST })
+      .first(),
+  ).toBeVisible({ timeout: 90_000 });
+  await first.getByRole('button', { name: /mute microphone/i }).click();
+  return first;
+}
+
+async function newAgentPane(page: Page): Promise<[Locator, string]> {
+  await expect(page.locator('section[data-voice]')).toHaveCount(2, {
+    timeout: 120_000,
+  });
+  const pane = page.locator('section[data-voice="false"]');
+  return [pane, (await pane.getAttribute('aria-label')) ?? ''];
+}
+
+test('starts a new agent by voice and hears back from it by name', async ({
   page,
 }) => {
   await page.addInitScript(recordPeerConnections);
-  await page.goto('/');
-
-  await page.getByRole('button', { name: 'Voice' }).click();
-
+  const first = await askForANewAgentByVoice(page);
+  const [second, name] = await newAgentPane(page);
+  await expect(agentMessages(second).first()).toContainText('agent 1', {
+    timeout: 120_000,
+  });
   await expect(
-    spokenMessage(page, 'user').filter({ hasText: SENTENCE }).first(),
-  ).toBeVisible({ timeout: 90_000 });
-  const answer = spokenMessage(page, 'assistant').last();
-  await expect(answer).toContainText('Used tool:', { timeout: 120_000 });
-  await expect(answer).toContainText(/words/i, { timeout: 120_000 });
+    agentMessages(first).filter({ hasText: name }).first(),
+  ).toContainText(HELLO, { timeout: 180_000 });
   await expect
     .poll(() => receivedAudioEnergy(page), { timeout: 60_000 })
     .toBeGreaterThan(0.01);
-  await expect(page.locator('audio')).toHaveJSProperty('paused', false);
 });

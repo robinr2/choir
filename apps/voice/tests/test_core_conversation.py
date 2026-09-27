@@ -2,6 +2,49 @@ import httpx
 import pytest
 
 from tests.conftest import RecordingCore
+from voice.core_conversation import AgentChanged, CoreConversation, Reply, ReplyEnd
+
+
+async def test_asks_core_nothing_while_pointed_at_no_agent(
+    core: RecordingCore,
+) -> None:
+    conversation = core.conversation(None)
+    assert [chunk async for chunk in conversation.reply_to('hi', early=False)] == []
+    await conversation.confirm('hi')
+    await conversation.withdraw()
+    await conversation.interrupt('hi')
+    assert core.requests == []
+
+
+async def test_talks_to_no_agent_until_core_names_one(core: RecordingCore) -> None:
+    conversation = CoreConversation(
+        httpx.AsyncClient(
+            transport=httpx.MockTransport(core.handle), base_url='http://core'
+        )
+    )
+    await conversation.confirm('hi')
+    assert core.requests == []
+
+
+async def test_follows_the_voice_events_of_core(core: RecordingCore) -> None:
+    core.voice_events = [
+        {'type': 'agent', 'agentId': 'c2'},
+        {'type': 'reply', 'text': 'Hi'},
+        {'type': 'reply-end'},
+    ]
+    events = [event async for event in core.conversation().events()]
+    assert events == [
+        AgentChanged.model_validate({'type': 'agent', 'agentId': 'c2'}),
+        Reply(type='reply', text='Hi'),
+        ReplyEnd(type='reply-end'),
+    ]
+    assert core.requests == []
+
+
+async def test_fails_when_core_refuses_the_voice_events(core: RecordingCore) -> None:
+    core.status = httpx.codes.BAD_REQUEST
+    with pytest.raises(httpx.HTTPStatusError):
+        [event async for event in core.conversation().events()]
 
 
 async def test_streams_the_reply_to_the_user_turn(core: RecordingCore) -> None:

@@ -13,11 +13,22 @@ type ToolCallPart = {
 
 export type TranscriptPart = TextPart | ToolCallPart;
 
+export type Sender = { id: string; name: string };
+
+export type TurnMark = {
+  voice?: true;
+  aloud?: true;
+  from?: Sender;
+  text?: string;
+};
+
 export type TranscriptMessage = {
   id: string;
   role: 'user' | 'assistant';
   parts: TranscriptPart[];
   voice?: true;
+  spoken?: true;
+  from?: Sender;
 };
 
 type SessionMessage = AcpSessionRecord['messages'][number];
@@ -49,20 +60,48 @@ function agentPart(
   ];
 }
 
+function userMarks(mark: TurnMark): Partial<TranscriptMessage> {
+  return {
+    ...(mark.voice && { voice: true }),
+    ...(mark.from && { from: mark.from }),
+  };
+}
+
+function replyMarks(mark: TurnMark): Partial<TranscriptMessage> {
+  if (mark.voice) return { voice: true };
+  return mark.aloud ? { spoken: true } : {};
+}
+
 function messageOf(
   message: SessionMessage,
   id: string,
-  voice: boolean,
+  mark: TurnMark,
 ): TranscriptMessage[] {
   if (message === 'Resume') return [];
-  const spoken = voice ? { voice: true as const } : {};
   if ('User' in message) {
-    const text = userText(message.User);
-    return [{ id, role: 'user', parts: [{ type: 'text', text }], ...spoken }];
+    const text = mark.text ?? userText(message.User);
+    const parts = [{ type: 'text' as const, text }];
+    return [{ id, role: 'user', parts, ...userMarks(mark) }];
   }
   const { content, tool_results } = message.Agent;
   const parts = content.flatMap((part) => agentPart(part, tool_results));
-  return [{ id, role: 'assistant', parts, ...spoken }];
+  return [{ id, role: 'assistant', parts, ...replyMarks(mark) }];
+}
+
+export function liveMessages(
+  { prompt, mark }: { prompt: string; mark: TurnMark },
+  parts: TranscriptPart[],
+  index: number,
+): TranscriptMessage[] {
+  return [
+    {
+      id: `m${index}`,
+      role: 'user',
+      parts: [{ type: 'text', text: mark.text ?? prompt }],
+      ...userMarks(mark),
+    },
+    { id: `m${index + 1}`, role: 'assistant', parts, ...replyMarks(mark) },
+  ];
 }
 
 function promptOf(message: SessionMessage): string | undefined {
@@ -72,13 +111,13 @@ function promptOf(message: SessionMessage): string | undefined {
 
 export function transcriptOf(
   record: Pick<AcpSessionRecord, 'messages'>,
-  voicePrompts: ReadonlySet<string>,
+  marks: ReadonlyMap<string, TurnMark>,
 ): TranscriptMessage[] {
-  let voice = false;
+  let mark: TurnMark = {};
   return record.messages.flatMap((message, index) => {
     const prompt = promptOf(message);
-    if (prompt !== undefined) voice = voicePrompts.has(prompt);
-    return messageOf(message, `m${index}`, voice);
+    if (prompt !== undefined) mark = marks.get(prompt) ?? {};
+    return messageOf(message, `m${index}`, mark);
   });
 }
 
