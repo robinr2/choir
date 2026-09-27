@@ -4,6 +4,7 @@ type PartWord = Word & { part: number };
 
 const WORD = /\S+/g;
 const LOOKAHEAD = 8;
+const SAME_WORD = new Intl.Collator(undefined, { sensitivity: 'base' });
 
 function keyOf(word: string): string {
   return word.replaceAll(/[^\p{L}\p{N}]/gu, '');
@@ -19,12 +20,11 @@ function wordsIn(text: string): Word[] {
 }
 
 function lastSpoken(words: readonly PartWord[], spoken: readonly Word[]) {
-  const collator = new Intl.Collator(undefined, { sensitivity: 'base' });
   let next = 0;
   for (const { key } of spoken) {
     const found = words
       .slice(next, next + LOOKAHEAD)
-      .findIndex((word) => collator.compare(word.key, key) === 0);
+      .findIndex((word) => SAME_WORD.compare(word.key, key) === 0);
     next += found + 1;
   }
   return words[next - 1];

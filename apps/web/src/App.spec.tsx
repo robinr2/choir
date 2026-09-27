@@ -48,6 +48,18 @@ function botSaid(segment: number, spoken: string, rest: string): void {
   });
 }
 
+async function coreShowsSpokenHello(screen: Screen) {
+  const history = [
+    said('m0', 'user', 'hi'),
+    said('m1', 'assistant', 'Hello.', { spoken: true }),
+  ];
+  coreShowsChat(A, ...history);
+  await expect
+    .element(pane(screen, 'agent 1').getByText('Hello.'))
+    .toBeVisible();
+  return history;
+}
+
 function muteButtonIn(screen: Screen, name: string) {
   return pane(screen, name).getByRole('button', { name: /mute microphone/i });
 }
@@ -234,14 +246,7 @@ test('shows messages from agents with their name, and spoken exchanges like type
 test('follows the spoken replies to turns after voice is turned on', async () => {
   stubVoice();
   const screen = await renderApp();
-  const history = [
-    said('m0', 'user', 'hi'),
-    said('m1', 'assistant', 'Hello.', { spoken: true }),
-  ];
-  coreShowsChat(A, ...history);
-  await expect
-    .element(pane(screen, 'agent 1').getByText('Hello.'))
-    .toBeVisible();
+  const history = await coreShowsSpokenHello(screen);
   coreShowsWorkspace(twoAgents(A));
   await expect
     .element(pane(screen, 'agent 1'))
@@ -263,14 +268,7 @@ test('follows the spoken replies to turns after voice is turned on', async () =>
 test('turns the words of a spoken reply white as they are spoken', async () => {
   stubVoice();
   const screen = await renderApp(twoAgents(A));
-  const history = [
-    said('m0', 'user', 'hi'),
-    said('m1', 'assistant', 'Hello.', { spoken: true }),
-  ];
-  coreShowsChat(A, ...history);
-  await expect
-    .element(pane(screen, 'agent 1').getByText('Hello.'))
-    .toBeVisible();
+  const history = await coreShowsSpokenHello(screen);
   botSaid(1, 'Hello.', '');
   const story = said('m3', 'assistant', 'Once upon a time. The end.', {
     spoken: true,
