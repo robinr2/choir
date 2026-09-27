@@ -2,6 +2,8 @@ import { expect, test, type Locator, type Page } from '@playwright/test';
 
 const MAGENTA = '#ff00ff';
 
+const MAGENTA_PIXEL = 0xffff00ff;
+
 const DRAW = `Use the create_element tool of the excalidraw MCP server to draw one rectangle at x 100, y 100 with width 300, height 200, backgroundColor ${MAGENTA}, strokeColor ${MAGENTA} and fillStyle solid. Do nothing else.`;
 
 async function openInNewPane(
@@ -15,37 +17,44 @@ async function openInNewPane(
   await expect(empty).toHaveCount(0);
 }
 
-function magentaPixels(canvas: Locator): Promise<number> {
-  return canvas.evaluate((element: HTMLCanvasElement) => {
-    const context = element.getContext('2d');
-    if (!context) return 0;
-    const { data } = context.getImageData(0, 0, element.width, element.height);
-    let count = 0;
-    for (let index = 0; index < data.length; index += 4) {
-      const [red, green, blue] = data.subarray(index, index + 3);
-      if (red > 240 && green < 20 && blue > 240) count += 1;
-    }
-    return count;
-  });
+async function openCanvasAndAgent(page: Page) {
+  await page.setViewportSize({ width: 1600, height: 1000 });
+  await page.goto('/');
+  await openInNewPane(
+    page,
+    page.locator('section[data-kind]').first(),
+    'Excalidraw',
+  );
+  const canvasPane = page.getByRole('region', { name: 'Excalidraw' });
+  await openInNewPane(page, canvasPane, 'Agent');
+  const scene = canvasPane
+    .frameLocator('iframe[title="Excalidraw canvas"]')
+    .locator('canvas.excalidraw__canvas.static');
+  await expect(scene).toBeVisible({ timeout: 30_000 });
+  const drawer = page.locator('section[data-kind="agent"]').last();
+  return { canvasPane, drawer, scene };
+}
+
+function magentaPixels(scene: Locator): Promise<number> {
+  return scene.evaluate((element: HTMLCanvasElement, pixel: number) => {
+    const { width, height } = element;
+    const image = element.getContext('2d')?.getImageData(0, 0, width, height);
+    const pixels = new Uint32Array(image?.data.buffer ?? new ArrayBuffer(0));
+    return pixels.filter((value) => value === pixel).length;
+  }, MAGENTA_PIXEL);
+}
+
+async function ask(agent: Locator, text: string): Promise<void> {
+  await agent.getByRole('textbox').fill(text);
+  await agent.getByRole('textbox').press('Enter');
 }
 
 test('draws the shape an agent creates through the Excalidraw MCP server in the canvas pane', async ({
   page,
 }) => {
-  await page.setViewportSize({ width: 1600, height: 1000 });
-  await page.goto('/');
-  const first = page.locator('section[data-kind]').first();
-  await openInNewPane(page, first, 'Excalidraw');
-  const canvasPane = page.getByRole('region', { name: 'Excalidraw' });
-  await openInNewPane(page, canvasPane, 'Agent');
-  const drawer = page.locator('section[data-kind="agent"]').last();
-  const scene = canvasPane
-    .frameLocator('iframe[title="Excalidraw canvas"]')
-    .locator('canvas.excalidraw__canvas.static');
-  await expect(scene).toBeVisible({ timeout: 30_000 });
+  const { canvasPane, drawer, scene } = await openCanvasAndAgent(page);
   expect(await magentaPixels(scene)).toBe(0);
-  await drawer.getByRole('textbox').fill(DRAW);
-  await drawer.getByRole('textbox').press('Enter');
+  await ask(drawer, DRAW);
   await expect
     .poll(() => magentaPixels(scene), { timeout: 180_000 })
     .toBeGreaterThan(1000);
