@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { type PointerEvent, useCallback, useState } from 'react';
 import { PlusIcon } from 'lucide-react';
 import { Mosaic } from 'react-mosaic-component';
 import 'react-mosaic-component/react-mosaic-component.css';
@@ -47,9 +47,30 @@ function renderTile(id: string) {
   return <Pane id={id} />;
 }
 
-export function PanesView() {
+function isSplit(target: EventTarget): target is Element {
+  return target instanceof Element && target.classList.contains('mosaic-split');
+}
+
+function useSplitDrag() {
+  const [dragging, setDragging] = useState(false);
+  const onPointerDown = (event: PointerEvent<HTMLDivElement>) => {
+    const split = event.nativeEvent.composedPath().find(isSplit);
+    if (!split) return;
+    split.setPointerCapture(event.pointerId);
+    setDragging(true);
+  };
+  const onLostPointerCapture = () => setDragging(false);
+  return {
+    'data-dragging': dragging,
+    onPointerDown,
+    onLostPointerCapture,
+  };
+}
+
+function Tiles() {
   const { workspace, view } = useWorkspace();
   const [resizing, setResizing] = useState<Layout>();
+  const splitDrag = useSplitDrag();
 
   const release = useCallback(
     (layout: Layout) => {
@@ -60,19 +81,28 @@ export function PanesView() {
   );
 
   return (
+    <div
+      className="relative min-h-0 min-w-0 data-[dragging=true]:[&_iframe]:pointer-events-none"
+      {...splitDrag}
+    >
+      <Mosaic<string>
+        className="choir-mosaic"
+        value={resizing ?? view.layout}
+        onChange={setResizing}
+        onRelease={release}
+        renderTile={renderTile}
+        zeroStateView={NO_PANES}
+      />
+    </div>
+  );
+}
+
+export function PanesView() {
+  return (
     <div className="grid h-full grid-cols-[auto_1fr_auto] grid-rows-[auto_1fr_auto] gap-1 p-1">
       <EdgeBar edge="top" />
       <EdgeBar edge="left" />
-      <div className="relative min-h-0 min-w-0">
-        <Mosaic<string>
-          className="choir-mosaic"
-          value={resizing ?? view.layout}
-          onChange={setResizing}
-          onRelease={release}
-          renderTile={renderTile}
-          zeroStateView={NO_PANES}
-        />
-      </div>
+      <Tiles />
       <EdgeBar edge="right" />
       <EdgeBar edge="bottom" />
     </div>

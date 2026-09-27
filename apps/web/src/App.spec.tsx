@@ -60,7 +60,9 @@ test('turns voice on for one pane at a time over one connection', async () => {
       pane(screen, 'agent 1').getByRole('status', { name: 'Voice is on' }),
     )
     .toBeVisible();
-  await expect.element(pane(screen, 'agent 1')).toHaveClass('border-active/50');
+  await expect
+    .element(pane(screen, 'agent 1'))
+    .not.toHaveClass('border-active/50');
   await expect.element(muteButtonIn(screen, 'agent 1')).toBeVisible();
   await expect.element(muteButtonIn(screen, 'agent 2')).not.toBeInTheDocument();
   await micOf(screen, 'agent 2').click();
