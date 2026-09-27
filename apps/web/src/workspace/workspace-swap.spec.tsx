@@ -16,13 +16,16 @@ import {
   type Screen,
 } from '@/test/render-app';
 import { createPipecatClient } from '@/voice/create-pipecat-client';
-import { CoreWorkspace } from './core-workspace';
+import { CoreWorkspace, type WorkspaceView } from './core-workspace';
 
-async function swapWorkspace(screen: Screen) {
+async function swapWorkspace(
+  screen: Screen,
+  view: Omit<WorkspaceView, 'loaded'> = twoAgents(),
+) {
   const workspace = new CoreWorkspace();
   const client = createPipecatClient();
   const stop = workspace.subscribe(() => undefined);
-  coreShowsWorkspace(twoAgents());
+  coreShowsWorkspace(view);
   await screen.rerender(
     <App client={client} workspace={workspace} canvas={new CoreCanvas()} />,
   );
@@ -92,4 +95,19 @@ test('talks through the client and workspace it was last given', async () => {
   expect(setVoice).toHaveBeenCalledWith(B);
   coreShowsWorkspace(twoAgents(null));
   await vi.waitFor(() => expect(disconnect).toHaveBeenCalledOnce());
+});
+
+test('opens panes in the workspace it was last given', async () => {
+  const withEmptyPane: Omit<WorkspaceView, 'loaded'> = {
+    ...twoAgents(),
+    panes: [
+      { id: A, kind: 'agent', name: 'agent 1', working: false },
+      { id: B, kind: 'empty' },
+    ],
+  };
+  const screen = await renderApp(withEmptyPane);
+  const { workspace } = await swapWorkspace(screen, withEmptyPane);
+  const open = vi.spyOn(workspace, 'open');
+  await pane(screen, 'New pane').getByRole('button', { name: 'Agent' }).click();
+  await vi.waitFor(() => expect(open).toHaveBeenCalledWith(B, 'agent'));
 });
