@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
-import { userEvent } from 'vitest/browser';
+import { page, userEvent } from 'vitest/browser';
 import {
   A,
   B,
@@ -258,4 +258,54 @@ test('resizes panes and tells core once the split is released', async () => {
   expect(left.width).toBeLessThan(right.width);
   coreShowsWorkspace({ ...twoAgents(), layout: A });
   await expect.element(pane(screen, 'agent 2')).not.toBeInTheDocument();
+});
+
+function agentAndCanvas() {
+  return {
+    ...twoAgents(),
+    panes: [
+      { id: A, kind: 'agent' as const, name: 'agent 1', working: false },
+      { id: B, kind: 'excalidraw' as const },
+    ],
+  };
+}
+
+function pointer(type: string) {
+  return new PointerEvent(type, { bubbles: true, pointerId: 1 });
+}
+
+test('keeps resizing while the pointer is over the Excalidraw canvas', async () => {
+  const screen = await renderApp(agentAndCanvas());
+  const canvas = screen.getByTitle('Excalidraw canvas');
+  await expect.element(canvas).toBeVisible();
+  const split = page.elementLocator(
+    document.querySelector('.mosaic-split') ?? document.body,
+  );
+  await userEvent.dragAndDrop(split, canvas);
+  await expect.element(canvas).toHaveStyle({ pointerEvents: 'auto' });
+  await vi.waitFor(() =>
+    expect(requestsWith('PUT')).toEqual([
+      [
+        '/workspace/layout',
+        'PUT',
+        { layout: expect.objectContaining({ children: [A, B] }) },
+      ],
+    ]),
+  );
+  const left = pane(screen, 'agent 1').element().getBoundingClientRect();
+  const right = pane(screen, 'Excalidraw').element().getBoundingClientRect();
+  expect(left.width).toBeGreaterThan(right.width);
+});
+
+test('keeps the canvas from taking the pointer only while a split is dragged', async () => {
+  const screen = await renderApp(agentAndCanvas());
+  const canvas = screen.getByTitle('Excalidraw canvas');
+  await expect.element(canvas).toBeVisible();
+  const split = document.querySelector('.mosaic-split');
+  pane(screen, 'agent 1').element().dispatchEvent(pointer('pointerdown'));
+  await expect.element(canvas).toHaveStyle({ pointerEvents: 'auto' });
+  split?.dispatchEvent(pointer('pointerdown'));
+  await expect.element(canvas).toHaveStyle({ pointerEvents: 'none' });
+  split?.dispatchEvent(pointer('lostpointercapture'));
+  await expect.element(canvas).toHaveStyle({ pointerEvents: 'auto' });
 });

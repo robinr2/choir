@@ -26,7 +26,7 @@ function PaneFrame({ pane, isVoice }: PaneProps) {
         data-kind={pane.kind}
         data-voice={pane.kind === 'agent' ? isVoice : undefined}
         data-drop-target={drop.isTarget}
-        className={paneClass(isVoice, drop.isTarget)}
+        className={paneClass(drop.isTarget)}
       >
         <PaneTitleBar pane={pane} isVoice={isVoice} />
         <div className="min-h-0 flex-1">
