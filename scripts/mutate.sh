@@ -2,6 +2,35 @@
 set -euo pipefail
 cd "$(git rev-parse --show-toplevel)"
 
+in_scope() {
+  local app="$1" file="$2"
+  if [ "$app" = voice ]; then
+    [[ "$file" == src/voice/*.py ]]
+  else
+    node -e '
+      const path = require("node:path");
+      const [app, file] = process.argv.slice(1);
+      const globs = require(`./apps/${app}/stryker.config.json`).mutate;
+      const matches = (glob) => path.matchesGlob(file, glob);
+      const included = globs.filter((glob) => !glob.startsWith("!")).some(matches);
+      const excluded = globs.filter((glob) => glob.startsWith("!")).some((glob) => matches(glob.slice(1)));
+      process.exit(included && !excluded ? 0 : 1);
+    ' "$app" "$file"
+  fi
+}
+
+if [ "$#" -eq 0 ]; then
+  while IFS= read -r file; do
+    case "$file" in
+      apps/core/* | apps/web/* | apps/voice/*)
+        app="${file#apps/}"
+        app="${app%%/*}"
+        if in_scope "$app" "${file#apps/"$app"/}"; then set -- "$@" "$file"; fi ;;
+    esac
+  done < <(git diff --cached --name-only --diff-filter=d)
+  [ "$#" -gt 0 ] || { echo "No staged files to mutation-test"; exit 0; }
+fi
+
 core=() web=() voice=()
 for target in "$@"; do
   target="${target%/}"
