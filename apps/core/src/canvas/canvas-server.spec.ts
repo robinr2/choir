@@ -69,6 +69,9 @@ it('fails when another canvas server holds its port', async () => {
     await expect(new CanvasServer(config).start()).rejects.toThrow(
       `The Excalidraw canvas server for ${CANVAS_URL} exited with code 1 before it answered`,
     );
+    const polls = vi.spyOn(globalThis, 'fetch');
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    expect(polls).not.toHaveBeenCalled();
   } finally {
     other.kill();
     await once(other, 'exit');
