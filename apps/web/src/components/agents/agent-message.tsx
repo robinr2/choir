@@ -1,5 +1,5 @@
 import { MessagePrimitive, useAuiState } from '@assistant-ui/react';
-import { BotIcon, Volume2Icon } from 'lucide-react';
+import { BotIcon } from 'lucide-react';
 import { senderIn } from '@/conversation/transcript';
 import { agentOf } from '@/workspace/core-workspace';
 import { useWorkspace } from '@/workspace/workspace-context';
@@ -24,19 +24,5 @@ export function AgentMessage() {
         <MessagePrimitive.Parts />
       </div>
     </MessagePrimitive.Root>
-  );
-}
-
-export function SpokenMark() {
-  const spoken = useAuiState((s) => s.message.metadata.custom.spoken === true);
-  if (!spoken) return null;
-  return (
-    <span
-      title="Spoken aloud"
-      className="text-muted-foreground me-2 inline-flex items-center"
-    >
-      <Volume2Icon className="size-3.5" aria-hidden />
-      <span className="sr-only">Spoken aloud</span>
-    </span>
   );
 }

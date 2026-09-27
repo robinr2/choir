@@ -7,19 +7,16 @@ from pipecat.processors.aggregators.llm_response_universal import (
     LLMContextAggregatorPair,
     LLMUserAggregatorParams,
 )
-from pipecat.processors.audio.vad_processor import VADProcessor
 from pipecat.services.xai.stt import XAISTTService
 from pipecat.services.xai.tts import XAITTSService
 from pipecat.transports.base_transport import TransportParams
 from pipecat.transports.smallwebrtc.connection import SmallWebRTCConnection
 from pipecat.transports.smallwebrtc.transport import SmallWebRTCTransport
-from pipecat.turns.user_turn_strategies import EagerUserTurnStrategies
 from pipecat.workers.runner import WorkerRunner
 
 from voice.config import Settings
 from voice.conversation_llm import ConversationLLMService
 from voice.core_conversation import CoreConversation
-from voice.eager_end_of_turn import EagerEndOfTurn
 
 ANSWER_TIMEOUT = httpx.Timeout(5.0, read=None)
 
@@ -32,16 +29,12 @@ def create_pipeline(
     xai_api_key = settings.xai_api_key.get_secret_value()
     user_aggregator, assistant_aggregator = LLMContextAggregatorPair(
         LLMContext(),
-        user_params=LLMUserAggregatorParams(
-            user_turn_strategies=EagerUserTurnStrategies()
-        ),
+        user_params=LLMUserAggregatorParams(vad_analyzer=SileroVADAnalyzer()),
     )
     return Pipeline(
         [
             transport.input(),
-            VADProcessor(vad_analyzer=SileroVADAnalyzer()),
             XAISTTService(api_key=xai_api_key),
-            EagerEndOfTurn(),
             user_aggregator,
             ConversationLLMService(conversation),
             XAITTSService(api_key=xai_api_key),

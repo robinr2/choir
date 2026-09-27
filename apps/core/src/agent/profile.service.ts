@@ -1,4 +1,4 @@
-import { constants, copyFile, cp, mkdir } from 'node:fs/promises';
+import { constants, copyFile, cp, mkdir, readFile } from 'node:fs/promises';
 import { Inject, Injectable, type OnModuleInit } from '@nestjs/common';
 import {
   CHOIR_CONFIG,
@@ -30,5 +30,9 @@ export class ProfileService implements OnModuleInit {
       constants.COPYFILE_EXCL,
     ).catch(keepExisting);
     await mkdir(defaultFolder(this.config), { recursive: true });
+  }
+
+  voicePrompt(): Promise<string> {
+    return readFile(profileVoicePrompt(this.config), 'utf8');
   }
 }

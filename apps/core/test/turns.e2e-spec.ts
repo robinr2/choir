@@ -1,3 +1,5 @@
+import { readFile } from 'node:fs/promises';
+import path from 'node:path';
 import { TestApp } from './test-app.js';
 
 const DENIED = {
@@ -9,7 +11,25 @@ const DENIED = {
   },
 };
 
+const HOOK_INPUT = { session_id: 's1', hook_event_name: 'UserPromptSubmit' };
+
 const testApp = TestApp.use();
+
+function promptContext(additionalContext: string) {
+  return {
+    hookSpecificOutput: {
+      hookEventName: 'UserPromptSubmit',
+      additionalContext,
+    },
+  };
+}
+
+async function contextOf(prompt: string): Promise<unknown> {
+  const response = await testApp.conversation
+    .post('prompt-contexts', { ...HOOK_INPUT, prompt })
+    .expect(200);
+  return response.body;
+}
 
 async function toolCallDecision(): Promise<unknown> {
   const response = await testApp.conversation
@@ -47,10 +67,19 @@ it('cancels a withdrawn early start and sends only the rest of the turn', async 
   await conversation.post('withdrawals').expect(204);
   expect(await decision).toEqual(DENIED);
   await running;
-  await conversation.say('stream-sleep 20000 hello choir');
+  const rest = conversation.say(
+    'stream-sleep 20000 hello stream-sleep 1000 choir',
+  );
+  await conversation.waitForAnswer('choir');
+  expect(await contextOf('stream-sleep 1000 choir')).toEqual(
+    promptContext(
+      "The user's last message was not finished. This message continues it.",
+    ),
+  );
+  await rest;
   expect(await conversation.userTexts()).toEqual([
     'stream-sleep 20000 hello',
-    '(The user was not finished and continues:) choir',
+    'stream-sleep 1000 choir',
   ]);
 });
 
@@ -60,14 +89,21 @@ it('cancels an interrupted turn and tells the agent what the user heard', async 
   await conversation.waitForAnswer('Once upon a time');
   await conversation.post('interruptions', { heard: 'Once upon' }).expect(204);
   await running;
-  await conversation.say('echo shorter please');
+  const shorter = conversation.say('stream-sleep 1000 shorter please');
+  await conversation.waitForAnswer('shorter please');
+  expect(await contextOf('stream-sleep 1000 shorter please')).toEqual(
+    promptContext(
+      'The user interrupted your last answer after hearing only: "Once upon".',
+    ),
+  );
+  await shorter;
   expect(await conversation.userTexts()).toEqual([
     'stream-sleep 20000 Once upon a time',
-    '(The user interrupted you after hearing only: "Once upon". They continue:) echo shorter please',
+    'stream-sleep 1000 shorter please',
   ]);
 });
 
-it('tells the prompt hook which turns were spoken', async () => {
+it('gives the prompt hook the voice rules for turns that are spoken', async () => {
   const { conversation } = testApp;
   const running = Promise.resolve(
     conversation.post('user-turns', {
@@ -77,24 +113,29 @@ it('tells the prompt hook which turns were spoken', async () => {
   );
   await conversation.waitForAnswer('spoken');
   const typed = conversation.say('stream-sleep 1000 typed');
-  const hookInput = { session_id: 's1', hook_event_name: 'UserPromptSubmit' };
-  await conversation
-    .post('voice-turns', { ...hookInput, prompt: 'stream-sleep 1000 spoken' })
-    .expect(204);
-  const notSpoken = await conversation
-    .post('voice-turns', { ...hookInput, prompt: 'stream-sleep 1000 typed' })
-    .expect(404);
-  expect(notSpoken.body.message).toBe('The prompt is not from a voice turn');
-  await conversation.post('voice-turns', hookInput).expect(400);
+  const rules = await readFile(
+    path.join(
+      testApp.dataDir,
+      'profiles',
+      'default',
+      'default-voice-prompt.md',
+    ),
+    'utf8',
+  );
+  expect(await contextOf('stream-sleep 1000 spoken')).toEqual(
+    promptContext(rules),
+  );
+  expect(await contextOf('stream-sleep 1000 typed')).toEqual({});
+  await conversation.post('prompt-contexts', HOOK_INPUT).expect(400);
   await running;
   await typed;
   const reopened = await testApp.reopen();
-  const marks = (await reopened.messages()).map(({ role, voice }) => [
+  const marks = (await reopened.messages()).map(({ role, spoken }) => [
     role,
-    voice,
+    spoken,
   ]);
   expect(marks).toEqual([
-    ['user', true],
+    ['user', undefined],
     ['assistant', true],
     ['user', undefined],
     ['assistant', undefined],

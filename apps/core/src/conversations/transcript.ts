@@ -20,14 +20,15 @@ export type TurnMark = {
   aloud?: true;
   from?: Sender;
   text?: string;
+  heard?: string;
 };
 
 export type TranscriptMessage = {
   id: string;
   role: 'user' | 'assistant';
   parts: TranscriptPart[];
-  voice?: true;
   spoken?: true;
+  heard?: string;
   from?: Sender;
 };
 
@@ -61,15 +62,13 @@ function agentPart(
 }
 
 function userMarks(mark: TurnMark): Partial<TranscriptMessage> {
-  return {
-    ...(mark.voice && { voice: true }),
-    ...(mark.from && { from: mark.from }),
-  };
+  return mark.from ? { from: mark.from } : {};
 }
 
 function replyMarks(mark: TurnMark): Partial<TranscriptMessage> {
-  if (mark.voice) return { voice: true };
-  return mark.aloud ? { spoken: true } : {};
+  if (!mark.aloud) return {};
+  const { heard } = mark;
+  return { spoken: true, ...(heard !== undefined && { heard }) };
 }
 
 function messageOf(

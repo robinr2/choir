@@ -25,8 +25,10 @@ import {
 import { TooltipIconButton } from "@/components/assistant-ui/elements/tooltip-icon-button";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { AgentMessage, SpokenMark } from "@/components/agents/agent-message";
+import { AgentMessage } from "@/components/agents/agent-message";
+import { SpokenText } from "@/components/voice/spoken-text";
 import { VoiceControls } from "@/components/voice/voice-controls";
+import { isSpokenIn } from "@/conversation/transcript";
 import { cn } from "@/lib/utils";
 import {
   ActionBarMorePrimitive,
@@ -42,14 +44,12 @@ import {
   ThreadPrimitive,
   type FileMessagePartComponent,
   type ImageMessagePartComponent,
-  type TextMessagePartComponent,
   type ToolCallMessagePartComponent,
   useAuiState,
 } from "@assistant-ui/react";
 import {
   ArrowDownIcon,
   ArrowUpIcon,
-  AudioLinesIcon,
   CheckIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
@@ -58,7 +58,6 @@ import {
   MicIcon,
   MoreHorizontalIcon,
   PencilIcon,
-  PhoneIcon,
   RefreshCwIcon,
   SquareIcon,
   ThumbsDownIcon,
@@ -252,114 +251,14 @@ const ThreadMessage: FC = () => {
     useContext(ThreadComponentsContext);
   const role = useAuiState((s) => s.message.role);
   const isEditing = useAuiState((s) => s.message.composer.isEditing);
-  const isSpoken = useAuiState((s) => s.message.metadata.modality === "voice");
   const isFromAgent = useAuiState(
     (s) => s.message.metadata.custom.from !== undefined,
   );
 
   if (isEditing) return <EditComposer />;
-  if (isSpoken) return <SpokenMessage />;
   if (isFromAgent) return <AgentMessage />;
   if (role === "user") return <UserMessage />;
   return <AssistantMessageComponent />;
-};
-
-type VoiceRunPosition = "single" | "start" | "middle" | "end";
-
-const useVoiceRunPosition = (): VoiceRunPosition =>
-  useAuiState((s) => {
-    const before =
-      s.thread.messages[s.message.index - 1]?.metadata.modality === "voice";
-    const after =
-      s.thread.messages[s.message.index + 1]?.metadata.modality === "voice";
-    if (before) return after ? "middle" : "end";
-    return after ? "start" : "single";
-  });
-
-const SpokenText: TextMessagePartComponent = ({ text }) => (
-  <p className="aui-spoken-message-text m-0">{text}</p>
-);
-
-const SpokenMessage: FC = () => {
-  const role = useAuiState((s) => s.message.role);
-  const position = useVoiceRunPosition();
-  const isSpeaking = useAuiState(
-    (s) =>
-      s.message.role === "assistant" && s.message.status?.type === "running",
-  );
-  const opensExchange = position === "start" || position === "single";
-
-  return (
-    <MessagePrimitive.Root
-      data-slot="aui_spoken-message-root"
-      data-role={role}
-      data-voice-run={position}
-      className={cn(
-        "aui-spoken-message bg-muted/40 mx-2 px-3 py-1.5 [contain-intrinsic-size:auto_48px] [content-visibility:auto]",
-        position === "single" && "rounded-xl py-2",
-        position === "start" && "rounded-t-xl pt-2",
-        position === "middle" && "-mt-6",
-        position === "end" && "-mt-6 rounded-b-xl pb-2",
-      )}
-    >
-      {opensExchange && (
-        <div
-          data-slot="aui_spoken-exchange-header"
-          className="text-muted-foreground mb-1.5 flex items-center gap-1.5 text-xs"
-        >
-          <PhoneIcon className="size-3" aria-hidden />
-          <span>Voice conversation</span>
-        </div>
-      )}
-      <div
-        data-slot="aui_spoken-message-content"
-        className="text-foreground flex items-start gap-2 text-sm leading-relaxed"
-      >
-        <span className="text-muted-foreground mt-1 shrink-0" aria-hidden>
-          {role === "user" ? (
-            <MicIcon className="size-3.5" />
-          ) : (
-            <AudioLinesIcon className="size-3.5" />
-          )}
-        </span>
-        <span className="sr-only">
-          {role === "user" ? "You said" : "Assistant said"}
-        </span>
-        <div className="min-w-0 flex-1 wrap-break-word">
-          <MessagePrimitive.Parts
-            components={{ Text: SpokenText, tools: { Fallback: ToolFallback } }}
-          />
-          {isSpeaking && (
-            <span
-              data-slot="aui_spoken-message-indicator"
-              role="status"
-              className="text-muted-foreground ms-1 animate-pulse font-sans"
-              aria-label="Assistant is speaking"
-            >
-              ●
-            </span>
-          )}
-        </div>
-        <SpokenActionBar />
-      </div>
-    </MessagePrimitive.Root>
-  );
-};
-
-const SpokenActionBar: FC = () => {
-  return (
-    <ActionBarPrimitive.Root
-      hideWhenRunning
-      autohide="always"
-      className="aui-spoken-action-bar text-muted-foreground flex shrink-0 gap-1"
-    >
-      <ActionBarPrimitive.Copy render={<TooltipIconButton tooltip="Copy" className="size-6" />}><AuiIf condition={(s) => s.message.isCopied}>
-                      <CheckIcon className="animate-in zoom-in-50 fade-in duration-200 ease-out" />
-                    </AuiIf><AuiIf condition={(s) => !s.message.isCopied}>
-                      <CopyIcon className="animate-in zoom-in-75 fade-in duration-150" />
-                    </AuiIf></ActionBarPrimitive.Copy>
-    </ActionBarPrimitive.Root>
-  );
 };
 
 const ThreadScrollToBottom: FC = () => {
@@ -481,6 +380,9 @@ const AssistantMessage: FC = () => {
     TaskGroup: TaskGroupComponent,
   } = useContext(ThreadComponentsContext);
   const groupBy = TaskGroupComponent ? taskAwareGroupBy : messageGroupBy;
+  const isSpoken = useAuiState(
+    (s) => isSpokenIn(s.message.metadata.custom),
+  );
 
   const ACTION_BAR_PT = "pt-1.5";
   // Keep the action bar inside the contained root's paint box, then cancel its reserved space in flow.
@@ -535,7 +437,11 @@ const AssistantMessage: FC = () => {
                 );
               }
               case "text":
-                return <MarkdownText />;
+                return isSpoken ? (
+                  <SpokenText text={part.text} />
+                ) : (
+                  <MarkdownText />
+                );
               case "reasoning":
                 return <Reasoning {...part} />;
               case "tool-call":
@@ -576,7 +482,6 @@ const AssistantMessage: FC = () => {
         data-slot="aui_assistant-message-footer"
         className={cn("ms-2 flex items-center", ACTION_BAR_HEIGHT)}
       >
-        <SpokenMark />
         <BranchPicker />
         <AssistantActionBar />
       </div>

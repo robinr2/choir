@@ -41,24 +41,28 @@ it('makes a typed turn to the voice agent a voice turn and speaks its reply', as
   try {
     const running = conversation.say('stream-sleep 1000 typed aloud');
     await conversation.waitForAnswer('typed aloud');
-    await conversation
-      .post('voice-turns', {
+    const context = await conversation
+      .post('prompt-contexts', {
         ...HOOK_INPUT,
         prompt: 'stream-sleep 1000 typed aloud',
       })
-      .expect(204);
+      .expect(200);
+    expect(context.body.hookSpecificOutput.additionalContext).toContain(
+      'You are Claude, talking with the user out loud.',
+    );
     await events.until('data: {"type":"reply","text":"typed aloud"}\n\n');
     await running;
     await events.until('data: {"type":"reply-end"}\n\n');
   } finally {
     events.close();
   }
-  const marks = (await conversation.messages()).map(
-    ({ role, voice, spoken }) => [role, voice, spoken],
-  );
+  const marks = (await conversation.messages()).map(({ role, spoken }) => [
+    role,
+    spoken,
+  ]);
   expect(marks).toEqual([
-    ['user', undefined, undefined],
-    ['assistant', undefined, true],
+    ['user', undefined],
+    ['assistant', true],
   ]);
 });
 
@@ -98,9 +102,13 @@ it('neither marks nor speaks turns while voice is off', async () => {
   const conversation = testApp.talkTo(id);
   const running = conversation.say('stream-sleep 1000 quietly');
   await conversation.waitForAnswer('quietly');
-  await conversation
-    .post('voice-turns', { ...HOOK_INPUT, prompt: 'stream-sleep 1000 quietly' })
-    .expect(404);
+  const context = await conversation
+    .post('prompt-contexts', {
+      ...HOOK_INPUT,
+      prompt: 'stream-sleep 1000 quietly',
+    })
+    .expect(200);
+  expect(context.body).toEqual({});
   await running;
   expect((await conversation.messages()).map(({ spoken }) => spoken)).toEqual([
     undefined,

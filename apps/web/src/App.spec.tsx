@@ -28,6 +28,26 @@ function said(
   return { id, role, parts: [{ type: 'text', text }], ...marks };
 }
 
+function spokenTextIn(screen: Screen, name: string): string[][] {
+  const texts = pane(screen, name)
+    .element()
+    .querySelectorAll('[data-slot="spoken-text"]');
+  return [...texts].map((text) =>
+    [...text.children].map((part) => part.textContent),
+  );
+}
+
+function botSaid(segment: number, spoken: string, rest: string): void {
+  client.emit(RTVIEvent.BotOutput, {
+    text: spoken + rest,
+    aggregated_by: 'sentence',
+    segment_id: segment,
+    will_be_spoken: true,
+    spoken_status: rest ? 'in-progress' : 'completed',
+    spoken_progress: { accumulated_text: spoken, remaining_text: rest },
+  });
+}
+
 function muteButtonIn(screen: Screen, name: string) {
   return pane(screen, name).getByRole('button', { name: /mute microphone/i });
 }
@@ -122,7 +142,7 @@ test('fills the voice pane composer with what the user says until the turn is se
   await expect
     .element(pane(screen, 'agent 2').getByRole('textbox'))
     .toHaveValue('');
-  coreShowsChat(A, said('m0', 'user', 'hello', { voice: true }));
+  coreShowsChat(A, said('m0', 'user', 'hello'));
   await expect.element(composer).toHaveValue('');
 });
 
@@ -165,34 +185,116 @@ test('shows the whole session of an agent with its tool calls', async () => {
   await expect.element(chat.getByText('You need milk.')).toBeVisible();
 });
 
-test('shows messages from agents with their name, and marks spoken replies', async () => {
+test('shows messages from agents with their name, and spoken exchanges like typed ones', async () => {
   const screen = await renderApp();
   coreShowsChat(
     A,
-    said('m0', 'user', 'say hello', { voice: true }),
-    said('m1', 'assistant', 'Asking.', { voice: true }),
+    said('m0', 'user', 'say hello'),
+    said('m1', 'assistant', 'Asking.', { spoken: true }),
     said('m2', 'user', 'typed'),
-    said('m3', 'assistant', 'Typed back.', { spoken: true }),
-    said('m6', 'assistant', 'Written only.'),
-    said('m4', 'user', 'Hello!', { from: { id: B, name: 'old name' } }),
-    said('m5', 'user', 'Bye!', { from: { id: 'gone', name: 'closed agent' } }),
+    said('m3', 'assistant', 'Written only.'),
+    said('m4', 'user', 'tell me'),
+    {
+      id: 'm5',
+      role: 'assistant',
+      parts: [
+        { type: 'text', text: 'Let me look.' },
+        { type: 'tool-call', toolCallId: 't1', toolName: 'Read', args: {} },
+        { type: 'text', text: 'Cut off here.' },
+      ],
+      spoken: true,
+      heard: 'Let me look. Cut',
+    },
+    said('m6', 'user', 'Hello!', { from: { id: B, name: 'old name' } }),
+    said('m7', 'user', 'Bye!', { from: { id: 'gone', name: 'closed agent' } }),
   );
   const chat = pane(screen, 'agent 1');
-  await expect.element(chat.getByText('Voice conversation')).toBeVisible();
   await expect.element(chat.getByText('Hello!')).toBeVisible();
   await expect
     .element(chat.getByText('agent 2', { exact: true }))
     .toBeVisible();
   await expect.element(chat.getByText('closed agent')).toBeVisible();
-  await expect.element(chat.getByText('Spoken aloud')).toBeInTheDocument();
-  expect(chat.getByText('Spoken aloud').elements()).toHaveLength(1);
-  const replies = [
-    ...document.querySelectorAll('[data-slot="aui_assistant-message-root"]'),
-  ];
+  await expect.element(chat.getByText('say hello')).toBeVisible();
+  await expect.element(chat.getByText('Written only.')).toBeVisible();
+  expect(chat.getByText('Voice conversation').elements()).toHaveLength(0);
+  expect(chat.getByText('Spoken aloud').elements()).toHaveLength(0);
+  expect(spokenTextIn(screen, 'agent 1')).toEqual([
+    ['Asking.', ''],
+    ['Let me look.', ''],
+    ['Cut', ' off here.'],
+  ]);
   expect(
-    replies.map((reply) => reply.textContent?.includes('Spoken aloud')),
-  ).toEqual([true, false]);
+    document.querySelectorAll('[data-slot="aui_assistant-message-root"]'),
+  ).toHaveLength(3);
   expect(
     document.querySelectorAll('[data-slot="agent-message-root"]'),
   ).toHaveLength(2);
+});
+
+test('follows the spoken replies to turns after voice is turned on', async () => {
+  stubVoice();
+  const screen = await renderApp();
+  const history = [
+    said('m0', 'user', 'hi'),
+    said('m1', 'assistant', 'Hello.', { spoken: true }),
+  ];
+  coreShowsChat(A, ...history);
+  await expect
+    .element(pane(screen, 'agent 1').getByText('Hello.'))
+    .toBeVisible();
+  coreShowsWorkspace(twoAgents(A));
+  await expect
+    .element(pane(screen, 'agent 1'))
+    .toHaveAttribute('data-voice', 'true');
+  coreShowsChat(
+    A,
+    ...history,
+    said('m2', 'user', 'again'),
+    said('m3', 'assistant', 'Hello again.', { spoken: true }),
+  );
+  await vi.waitFor(() =>
+    expect(spokenTextIn(screen, 'agent 1')).toEqual([
+      ['Hello.', ''],
+      ['', 'Hello again.'],
+    ]),
+  );
+});
+
+test('turns the words of a spoken reply white as they are spoken', async () => {
+  stubVoice();
+  const screen = await renderApp(twoAgents(A));
+  const history = [
+    said('m0', 'user', 'hi'),
+    said('m1', 'assistant', 'Hello.', { spoken: true }),
+  ];
+  coreShowsChat(A, ...history);
+  await expect
+    .element(pane(screen, 'agent 1').getByText('Hello.'))
+    .toBeVisible();
+  botSaid(1, 'Hello.', '');
+  const story = said('m3', 'assistant', 'Once upon a time. The end.', {
+    spoken: true,
+  });
+  coreShowsChat(A, ...history, said('m2', 'user', 'tell me'), story);
+  await vi.waitFor(() =>
+    expect(spokenTextIn(screen, 'agent 1')).toEqual([
+      ['Hello.', ''],
+      ['', 'Once upon a time. The end.'],
+    ]),
+  );
+  botSaid(2, 'Once upon', ' a time.');
+  await vi.waitFor(() =>
+    expect(spokenTextIn(screen, 'agent 1')[1]).toEqual([
+      'Once upon',
+      ' a time. The end.',
+    ]),
+  );
+  botSaid(2, 'Once upon a time.', '');
+  botSaid(3, 'The', ' end.');
+  await vi.waitFor(() =>
+    expect(spokenTextIn(screen, 'agent 1')[1]).toEqual([
+      'Once upon a time. The',
+      ' end.',
+    ]),
+  );
 });
