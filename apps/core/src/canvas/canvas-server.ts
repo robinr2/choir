@@ -8,6 +8,8 @@ import { canvasServerPath } from './excalidraw.js';
 
 const POLL_MS = 100;
 
+type Exit = { code?: number | null };
+
 const healthSchema = z.object({
   service: z.literal('mcp-excalidraw-canvas'),
   pid: z.number(),
@@ -26,15 +28,11 @@ export class CanvasServer {
       stdio: 'inherit',
     });
     this.child = child;
-    const started = new AbortController();
-    try {
-      await Promise.race([
-        this.answering(child, started.signal),
-        this.failing(child, started.signal),
-      ]);
-    } finally {
-      started.abort();
-    }
+    const exit: Exit = {};
+    child.once('exit', (code) => {
+      exit.code = code;
+    });
+    await this.answering(child, exit);
   }
 
   async contents(): Promise<string> {
@@ -57,13 +55,15 @@ export class CanvasServer {
     await exited;
   }
 
-  private async answering(
-    child: ChildProcess,
-    signal: AbortSignal,
-  ): Promise<void> {
+  private async answering(child: ChildProcess, exit: Exit): Promise<void> {
     if (await this.answers(child)) return;
-    await sleep(POLL_MS, undefined, { signal });
-    return this.answering(child, signal);
+    if (exit.code !== undefined) {
+      throw new Error(
+        `The Excalidraw canvas server for ${this.config.canvasUrl} exited with code ${exit.code} before it answered`,
+      );
+    }
+    await sleep(POLL_MS);
+    return this.answering(child, exit);
   }
 
   private answers({ pid }: ChildProcess): Promise<boolean> {
@@ -73,15 +73,5 @@ export class CanvasServer {
         (health) => healthSchema.safeParse(health).data?.pid === pid,
         () => false,
       );
-  }
-
-  private async failing(
-    child: ChildProcess,
-    signal: AbortSignal,
-  ): Promise<void> {
-    const [code] = await once(child, 'exit', { signal });
-    throw new Error(
-      `The Excalidraw canvas server for ${this.config.canvasUrl} exited with code ${code} before it answered`,
-    );
   }
 }
