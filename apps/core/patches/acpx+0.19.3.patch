@@ -1,0 +1,13 @@
+diff --git a/node_modules/acpx/dist/queue-owner-runtime-Dhr4gxNE.js b/node_modules/acpx/dist/queue-owner-runtime-Dhr4gxNE.js
+index 2dd9e75..d7845e8 100644
+--- a/node_modules/acpx/dist/queue-owner-runtime-Dhr4gxNE.js
++++ b/node_modules/acpx/dist/queue-owner-runtime-Dhr4gxNE.js
+@@ -6456,7 +6456,7 @@ function spawnQueueOwnerProcess(options, queueOwnerArgs) {
+ }
+ //#endregion
+ //#region src/runtime/engine/prompt-turn.ts
+-const SESSION_REPLY_IDLE_MS = 1e3;
++const SESSION_REPLY_IDLE_MS = Number(process.env.ACPX_SESSION_REPLY_IDLE_MS ?? 1e3);
+ const SESSION_REPLY_DRAIN_TIMEOUT_MS = 5e3;
+ function responseMetaField(meta) {
+ 	return meta === void 0 ? {} : { _meta: meta };

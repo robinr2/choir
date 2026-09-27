@@ -20,6 +20,7 @@ export default defineConfig({
         test: {
           name: 'e2e',
           include: ['test/**/*.e2e-spec.ts'],
+          env: { ACPX_SESSION_REPLY_IDLE_MS: '50' },
           testTimeout: 60_000,
           hookTimeout: 60_000,
           restoreMocks: true,
