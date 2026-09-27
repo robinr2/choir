@@ -93,7 +93,7 @@ const listAgents: Tool = (server, workspace, callerId) => {
 const TOOLS = [splitPane, addPaneAtEdge, sendMessage, closeAgent, listAgents];
 
 const INSTRUCTIONS =
-  'The agents of this workspace are the panes the user sees, each running its own session. When the user asks for a new agent, start it in a new pane with split_pane or add_pane_at_edge, and reach it with send_message.';
+  'The agents of this workspace are the panes the user sees, each running its own session. When the user asks for a new agent, start it in a new pane with split_pane or add_pane_at_edge, and reach other agents only with the send_message and list_agents tools of this server.';
 
 export const CALLER_HEADER = 'x-choir-agent';
 

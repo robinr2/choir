@@ -119,7 +119,7 @@ it('delivers a message into the chat of another agent, from the sender', async (
       text: 'echo hello',
     }),
   ).toEqual({ sent: true });
-  const prompt = `(A message from the agent "agent 1", ID ${id}. Answer it with your send_message tool. It sees nothing else you write.)\n\necho hello`;
+  const prompt = `(A message from the agent "agent 1", ID ${id}. Answer it with the send_message tool of the choir MCP server. It sees nothing else you write.)\n\necho hello`;
   const conversation = testApp.talkTo(other.id);
   await conversation.waitForAnswer(`unrecognized prompt: ${prompt}`);
   const from = { id, name: 'agent 1' };

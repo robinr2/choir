@@ -6,7 +6,7 @@ declare global {
   }
 }
 
-const REQUEST = /new agent/i;
+const REQUEST = /new agent.*hello to me/i;
 const HELLO = /hello/i;
 
 function recordPeerConnections(): void {

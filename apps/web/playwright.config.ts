@@ -22,7 +22,7 @@ function server(recipe: string, url: string) {
 export default defineConfig({
   testDir: 'e2e',
   testMatch: '**/*.e2e.ts',
-  globalSetup: './e2e/global-setup.ts',
+  globalTeardown: './e2e/global-teardown.ts',
   timeout: 240_000,
   forbidOnly: !!process.env.CI,
   use: {

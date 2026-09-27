@@ -22,5 +22,5 @@ export function framed(
 }
 
 export function fromAgent(sender: Sender, text: string): string {
-  return `(A message from the agent "${sender.name}", ID ${sender.id}. Answer it with your send_message tool. It sees nothing else you write.)\n\n${text}`;
+  return `(A message from the agent "${sender.name}", ID ${sender.id}. Answer it with the send_message tool of the choir MCP server. It sees nothing else you write.)\n\n${text}`;
 }
