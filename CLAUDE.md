@@ -11,6 +11,8 @@ Do all work based on the documentation of the tools the current task involves. O
 - Pipecat React SDK: https://docs.pipecat.ai/api-reference/client/react/overview.md
 - FastAPI: https://fastapi.tiangolo.com/
 - just: https://just.systems/man/en/
+- Excalidraw: https://docs.excalidraw.com/
+- mcp_excalidraw: https://github.com/yctimlin/mcp_excalidraw
 
 ## Development
 

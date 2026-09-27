@@ -5,7 +5,7 @@ import 'react-mosaic-component/react-mosaic-component.css';
 import { cn } from '@/lib/utils';
 import type { Edge, Layout } from '@/workspace/core-workspace';
 import { useWorkspace } from '@/workspace/workspace-context';
-import { AgentPane } from './agent-pane';
+import { Pane } from './pane';
 
 const EDGE_LABELS: Record<Edge, string> = {
   top: 'Add a row at the top',
@@ -37,17 +37,17 @@ function EdgeBar({ edge }: Readonly<{ edge: Edge }>) {
   );
 }
 
-const NO_AGENTS = (
+const NO_PANES = (
   <div className="text-muted-foreground flex h-full items-center justify-center text-sm">
-    No agents. Add one from an edge.
+    No panes. Add one from an edge.
   </div>
 );
 
 function renderTile(id: string) {
-  return <AgentPane id={id} />;
+  return <Pane id={id} />;
 }
 
-export function AgentsView() {
+export function PanesView() {
   const { workspace, view } = useWorkspace();
   const [resizing, setResizing] = useState<Layout>();
 
@@ -70,7 +70,7 @@ export function AgentsView() {
           onChange={setResizing}
           onRelease={release}
           renderTile={renderTile}
-          zeroStateView={NO_AGENTS}
+          zeroStateView={NO_PANES}
         />
       </div>
       <EdgeBar edge="right" />

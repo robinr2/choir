@@ -3,6 +3,7 @@ import { PipecatClientProvider } from '@pipecat-ai/client-react';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { render } from 'vitest-browser-react';
 import { A, B, coreShowsChat, fakeCore } from '@/test/fake-core';
+import { CoreCanvas } from '@/canvas/core-canvas';
 import { streamOf } from '@/test/fake-event-source';
 import { client } from '@/test/render-app';
 import { VoiceSession } from '@/voice/voice-session';
@@ -11,7 +12,11 @@ import { WorkspaceContext } from '@/workspace/workspace-context';
 import { AgentChat } from './agent-chat';
 
 const workspace = new CoreWorkspace();
-const context = { workspace, voice: new VoiceSession(client, workspace) };
+const context = {
+  workspace,
+  voice: new VoiceSession(client, workspace),
+  canvas: new CoreCanvas(),
+};
 
 function chatOf(agentId: string) {
   return (

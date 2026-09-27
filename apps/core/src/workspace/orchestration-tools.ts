@@ -1,7 +1,8 @@
 import { createMcpHandler, McpServer } from '@modelcontextprotocol/server';
 import { z } from 'zod';
+import { CHOIR } from '../choir/choir-config.js';
 import {
-  agentIdSchema,
+  paneIdSchema,
   agentNameSchema,
   edgeSchema,
   splitKindSchema,
@@ -22,12 +23,17 @@ const splitPane: Tool = (server, workspace, callerId) => {
         "Split an agent's pane in half and start a new, empty agent in the new half: vertical puts it to the right, horizontal below. Splits your own pane unless agentId names another. Returns the new agent's ID and name.",
       inputSchema: z.object({
         direction: splitKindSchema,
-        agentId: agentIdSchema.optional(),
+        agentId: paneIdSchema.optional(),
         name: agentNameSchema.optional(),
       }),
     },
     async ({ direction, agentId, name }) =>
-      reply(await workspace.split(agentId ?? callerId, direction, name)),
+      reply(
+        await workspace.split(agentId ?? callerId, direction, {
+          kind: 'agent',
+          name,
+        }),
+      ),
   );
 };
 
@@ -42,7 +48,8 @@ const addPaneAtEdge: Tool = (server, workspace) => {
         name: agentNameSchema.optional(),
       }),
     },
-    async ({ edge, name }) => reply(await workspace.addAtEdge(edge, name)),
+    async ({ edge, name }) =>
+      reply(await workspace.addAtEdge(edge, { kind: 'agent', name })),
   );
 };
 
@@ -53,7 +60,7 @@ const sendMessage: Tool = (server, workspace, callerId) => {
       description:
         "Send a text message to another agent. It shows in that agent's chat as a message from you and returns at once, without waiting for an answer. The agent answers, if it does, by sending you a message.",
       inputSchema: z.object({
-        agentId: agentIdSchema,
+        agentId: paneIdSchema,
         text: z.string().trim().min(1),
       }),
     },
@@ -69,7 +76,7 @@ const closeAgent: Tool = (server, workspace) => {
     'close_agent',
     {
       description: "Close an agent's pane and end its session.",
-      inputSchema: z.object({ agentId: agentIdSchema }),
+      inputSchema: z.object({ agentId: paneIdSchema }),
     },
     async ({ agentId }) => {
       await workspace.close(agentId);
@@ -83,7 +90,7 @@ const listAgents: Tool = (server, workspace, callerId) => {
     'list_agents',
     {
       description:
-        'List every agent with its name, ID and whether it is working or idle, mark which one is you, and give the pane layout.',
+        'List every agent with its name, ID and whether it is working or idle, mark which one is you, list the panes that hold no agent, such as the Excalidraw canvas, and give the pane layout.',
       inputSchema: z.object({}),
     },
     async () => reply(await workspace.list(callerId)),
@@ -93,7 +100,7 @@ const listAgents: Tool = (server, workspace, callerId) => {
 const TOOLS = [splitPane, addPaneAtEdge, sendMessage, closeAgent, listAgents];
 
 const INSTRUCTIONS =
-  'The agents of this workspace are the panes the user sees, each running its own session. When the user asks for a new agent, start it in a new pane with split_pane or add_pane_at_edge, and reach other agents only with the send_message and list_agents tools of this server.';
+  'The agents of this workspace are the panes the user sees, each running its own session. When the user asks for a new agent, start it in a new pane with split_pane or add_pane_at_edge, and reach other agents only with the send_message and list_agents tools of this server. The excalidraw tools draw on the one canvas all agents share, which the user sees in the Excalidraw pane; screenshots, image exports and Mermaid diagrams work only while that pane is open.';
 
 export const CALLER_HEADER = 'x-choir-agent';
 
@@ -102,10 +109,7 @@ export function callerOf(request: Request | undefined): string {
 }
 
 function orchestrationServer(workspace: Workspace, callerId: string) {
-  const server = new McpServer(
-    { name: 'choir', version: '1.0.0' },
-    { instructions: INSTRUCTIONS },
-  );
+  const server = new McpServer(CHOIR, { instructions: INSTRUCTIONS });
   for (const register of TOOLS) register(server, workspace, callerId);
   return server;
 }

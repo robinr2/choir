@@ -96,23 +96,23 @@ test('draws the plus bars along the outer edges', async () => {
     .toHaveClass('border-dashed');
 });
 
-test('says so when there are no agents', async () => {
+test('says so when there are no panes', async () => {
   const screen = await renderApp({
     layout: null,
-    agents: [],
+    panes: [],
     voiceAgentId: null,
   });
   await expect
-    .element(screen.getByText('No agents. Add one from an edge.'))
+    .element(screen.getByText('No panes. Add one from an edge.'))
     .toBeVisible();
 });
 
-test('shows nothing for a pane whose agent it does not know', async () => {
-  const screen = await renderApp({ ...twoAgents(), agents: [] });
+test('shows nothing for a pane it does not know', async () => {
+  const screen = await renderApp({ ...twoAgents(), panes: [] });
   await expect.element(pane(screen, 'agent 1')).not.toBeInTheDocument();
 });
 
-test('adds agents from the outer edges and by splitting a pane', async () => {
+test('adds empty panes from the outer edges and by splitting a pane', async () => {
   const screen = await renderApp();
   await screen.getByRole('button', { name: 'Add a row at the top' }).click();
   await screen.getByRole('button', { name: 'Add a row at the bottom' }).click();
@@ -134,8 +134,8 @@ test('adds agents from the outer edges and by splitting a pane', async () => {
       ['/workspace/edges', 'POST', { edge: 'bottom' }],
       ['/workspace/edges', 'POST', { edge: 'left' }],
       ['/workspace/edges', 'POST', { edge: 'right' }],
-      ['/workspace/splits', 'POST', { agentId: A, direction: 'vertical' }],
-      ['/workspace/splits', 'POST', { agentId: B, direction: 'horizontal' }],
+      ['/workspace/splits', 'POST', { paneId: A, direction: 'vertical' }],
+      ['/workspace/splits', 'POST', { paneId: B, direction: 'horizontal' }],
     ]),
   );
 });
@@ -145,7 +145,7 @@ test('closes a pane', async () => {
   await pane(screen, 'agent 2').getByRole('button', { name: 'Close' }).click();
   await vi.waitFor(() =>
     expect(requestsWith('DELETE')).toEqual([
-      [`/workspace/agents/${B}`, 'DELETE', undefined],
+      [`/workspace/panes/${B}`, 'DELETE', undefined],
     ]),
   );
 });
@@ -172,7 +172,7 @@ test('renames a pane by clicking its name', async () => {
   await screen.getByRole('button', { name: 'agent 1' }).click();
   await userEvent.keyboard('{Enter}');
   expect(requestsWith('PATCH')).toEqual([
-    [`/workspace/agents/${A}`, 'PATCH', { name: 'planner' }],
+    [`/workspace/panes/${A}`, 'PATCH', { name: 'planner' }],
   ]);
 });
 
@@ -180,7 +180,7 @@ test('swaps two panes when one is dropped on the other', async () => {
   const screen = await renderApp();
   const title = pane(screen, 'agent 1')
     .element()
-    .querySelector('[data-slot="agent-pane-title"]');
+    .querySelector('[data-slot="pane-title"]');
   const source = pane(screen, 'agent 1').element();
   const target = pane(screen, 'agent 2').element();
   const data = new DataTransfer();
@@ -207,11 +207,11 @@ test('swaps two panes when one is dropped on the other', async () => {
   expect(escaped).toEqual(['dragover']);
 });
 
-test('highlights a pane only while an agent is dragged over it', async () => {
+test('highlights a pane only while another pane is dragged over it', async () => {
   const screen = await renderApp();
   const target = pane(screen, 'agent 2').element();
   const data = new DataTransfer();
-  data.setData('application/x-choir-agent', A);
+  data.setData('application/x-choir-pane', A);
   target.dispatchEvent(dragEvent('dragover', data));
   await expect
     .element(pane(screen, 'agent 2'))

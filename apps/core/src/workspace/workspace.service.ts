@@ -9,15 +9,40 @@ import { ConversationsService } from '../conversations/conversations.service.js'
 import { LayoutService } from '../layout/layout.service.js';
 import { VoiceService } from '../voice/voice.service.js';
 import {
-  type Agent,
   type AgentListing,
   type Edge,
   type LayoutNode,
+  type NewPane,
+  type OpenableKind,
+  type Pane,
+  type PaneContent,
+  type PaneView,
   type SplitKind,
   WORKSPACE,
   type Workspace,
   type WorkspaceView,
 } from './workspace.port.js';
+
+function paneView(
+  id: string,
+  content: PaneContent,
+  working: ReadonlySet<string>,
+): PaneView {
+  if (content.kind !== 'agent') return { id, ...content };
+  return { id, ...content, working: working.has(id) };
+}
+
+function listedAgent(
+  { id, name, working }: Extract<PaneView, { kind: 'agent' }>,
+  callerId: string,
+): AgentListing['agents'][number] {
+  return {
+    id,
+    name,
+    status: working ? 'working' : 'idle',
+    you: id === callerId,
+  };
+}
 
 @Injectable()
 export class WorkspaceService implements Workspace {
@@ -39,13 +64,11 @@ export class WorkspaceService implements Workspace {
       this.conversations.workingChanges,
       this.voice.changes,
     ]).pipe(
-      map(([{ layout, agents }, working, voiceAgentId]) => ({
+      map(([{ layout, panes }, working, voiceAgentId]) => ({
         layout,
-        agents: Object.entries(agents).map(([id, { name }]) => ({
-          id,
-          name,
-          working: working.has(id),
-        })),
+        panes: Object.entries(panes).map(([id, content]) =>
+          paneView(id, content, working),
+        ),
         voiceAgentId,
       })),
     );
@@ -55,12 +78,16 @@ export class WorkspaceService implements Workspace {
     return firstValueFrom(this.changes);
   }
 
-  split(id: string, kind: SplitKind, name?: string): Promise<Agent> {
-    return this.layout.split(id, kind, name);
+  split(id: string, kind: SplitKind, pane: NewPane): Promise<Pane> {
+    return this.layout.split(id, kind, pane);
   }
 
-  addAtEdge(edge: Edge, name?: string): Promise<Agent> {
-    return this.layout.addAtEdge(edge, name);
+  addAtEdge(edge: Edge, pane: NewPane): Promise<Pane> {
+    return this.layout.addAtEdge(edge, pane);
+  }
+
+  open(id: string, kind: OpenableKind): Promise<Pane> {
+    return this.layout.open(id, kind);
   }
 
   swap(first: string, second: string): Promise<void> {
@@ -100,14 +127,14 @@ export class WorkspaceService implements Workspace {
   }
 
   async list(callerId: string): Promise<AgentListing> {
-    const { layout, agents } = await this.view();
+    const { layout, panes } = await this.view();
     return {
-      agents: agents.map(({ id, name, working }) => ({
-        id,
-        name,
-        status: working ? 'working' : 'idle',
-        you: id === callerId,
-      })),
+      agents: panes.flatMap((pane) =>
+        pane.kind === 'agent' ? [listedAgent(pane, callerId)] : [],
+      ),
+      otherPanes: panes.flatMap((pane) =>
+        pane.kind === 'agent' ? [] : [pane],
+      ),
       layout,
     };
   }

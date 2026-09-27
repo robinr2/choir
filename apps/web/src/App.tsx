@@ -5,7 +5,8 @@ import {
   PipecatClientProvider,
 } from '@pipecat-ai/client-react';
 import { LayoutGridIcon } from 'lucide-react';
-import { AgentsView } from '@/agents/agents-view';
+import type { CoreCanvas } from '@/canvas/core-canvas';
+import { PanesView } from '@/panes/panes-view';
 import { VoiceSession } from '@/voice/voice-session';
 import type { CoreWorkspace } from '@/workspace/core-workspace';
 import { WorkspaceContext } from '@/workspace/workspace-context';
@@ -30,15 +31,21 @@ function Sidebar() {
   );
 }
 
-function App({
-  client,
-  workspace,
-}: Readonly<{ client: PipecatClient; workspace: CoreWorkspace }>) {
+type AppProps = {
+  client: PipecatClient;
+  workspace: CoreWorkspace;
+  canvas: CoreCanvas;
+};
+
+function App({ client, workspace, canvas }: Readonly<AppProps>) {
   const voice = useMemo(
     () => new VoiceSession(client, workspace),
     [client, workspace],
   );
-  const context = useMemo(() => ({ workspace, voice }), [workspace, voice]);
+  const context = useMemo(
+    () => ({ workspace, voice, canvas }),
+    [workspace, voice, canvas],
+  );
   useEffect(() => voice.follow(), [voice]);
 
   return (
@@ -47,7 +54,7 @@ function App({
         <div className="flex h-dvh">
           <Sidebar />
           <main className="min-w-0 flex-1">
-            <AgentsView />
+            <PanesView />
           </main>
         </div>
       </WorkspaceContext>

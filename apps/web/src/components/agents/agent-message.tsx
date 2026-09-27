@@ -1,13 +1,13 @@
 import { MessagePrimitive, useAuiState } from '@assistant-ui/react';
 import { BotIcon, Volume2Icon } from 'lucide-react';
 import { senderIn } from '@/conversation/transcript';
+import { agentOf } from '@/workspace/core-workspace';
 import { useWorkspace } from '@/workspace/workspace-context';
 
 export function AgentMessage() {
   const sender = useAuiState((s) => senderIn(s.message.metadata.custom));
   const { view } = useWorkspace();
-  const current = view.agents.find(({ id }) => id === sender.id);
-  const name = current?.name ?? sender.name;
+  const name = agentOf(view, sender.id)?.name ?? sender.name;
 
   return (
     <MessagePrimitive.Root

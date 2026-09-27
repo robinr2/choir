@@ -3,7 +3,13 @@ import type { CoreWorkspace, WorkspaceView } from './core-workspace';
 
 type Voice = { toggle(agentId: string): Promise<void> };
 
-export type Workspace = { workspace: CoreWorkspace; voice: Voice };
+type Canvas = { url(): Promise<string> };
+
+export type Workspace = {
+  workspace: CoreWorkspace;
+  voice: Voice;
+  canvas: Canvas;
+};
 
 export const WorkspaceContext = createContext<Workspace | null>(null);
 

@@ -5,11 +5,11 @@ import {
   fakeEventSources,
   requests,
 } from '@/test/fake-event-source';
-import { CoreWorkspace, type WorkspaceView } from './core-workspace';
+import { agentOf, CoreWorkspace, type WorkspaceView } from './core-workspace';
 
 const view: Omit<WorkspaceView, 'loaded'> = {
   layout: A,
-  agents: [{ id: A, name: 'agent 1', working: false }],
+  panes: [{ id: A, kind: 'agent', name: 'agent 1', working: false }],
   voiceAgentId: null,
 };
 
@@ -30,7 +30,7 @@ test('follows the workspace core streams', () => {
   expect(workspace.getSnapshot()).toEqual({
     loaded: false,
     layout: null,
-    agents: [],
+    panes: [],
     voiceAgentId: null,
   });
   const listener = vi.fn<() => void>();
@@ -47,15 +47,17 @@ test('asks core to change the layout', async () => {
   const workspace = new CoreWorkspace();
   await workspace.split(A, 'vertical');
   await workspace.addAtEdge('top');
+  await workspace.open(B, 'excalidraw');
   await workspace.swap(A, B);
   await workspace.rename(A, 'planner');
   await workspace.close(B);
   expect(requests()).toEqual([
-    ['/workspace/splits', 'POST', { agentId: A, direction: 'vertical' }],
+    ['/workspace/splits', 'POST', { paneId: A, direction: 'vertical' }],
     ['/workspace/edges', 'POST', { edge: 'top' }],
+    [`/workspace/panes/${B}/content`, 'PUT', { kind: 'excalidraw' }],
     ['/workspace/swaps', 'POST', { first: A, second: B }],
-    [`/workspace/agents/${A}`, 'PATCH', { name: 'planner' }],
-    [`/workspace/agents/${B}`, 'DELETE', undefined],
+    [`/workspace/panes/${A}`, 'PATCH', { name: 'planner' }],
+    [`/workspace/panes/${B}`, 'DELETE', undefined],
   ]);
   expect(vi.mocked(window.fetch).mock.calls[0]?.[1]?.headers).toEqual({
     'Content-Type': 'application/json',
@@ -87,6 +89,18 @@ test('fails when core refuses a change', async () => {
     new Response(null, { status: 404 }),
   );
   await expect(new CoreWorkspace().close(A)).rejects.toThrow(
-    `DELETE /workspace/agents/${A} replied with status 404`,
+    `DELETE /workspace/panes/${A} replied with status 404`,
   );
+});
+
+test('finds only agents by their ID', () => {
+  const agent = { id: A, kind: 'agent' as const, name: 'a', working: false };
+  const both = {
+    ...view,
+    loaded: true,
+    panes: [agent, { id: B, kind: 'excalidraw' as const }],
+  };
+  expect(agentOf(both, A)).toBe(agent);
+  expect(agentOf(both, B)).toBeNull();
+  expect(agentOf(both, 'nobody')).toBeNull();
 });
