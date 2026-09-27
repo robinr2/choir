@@ -1,11 +1,14 @@
 import { CanvasServer } from './canvas-server.js';
 import { ExcalidrawScene } from './excalidraw-scene.js';
+import { freeCanvasUrl } from '../test/free-canvas-url.js';
+
+const canvasUrl = await freeCanvasUrl();
 
 const config = {
   dataDir: '/data',
   coreUrl: 'http://localhost:3000',
-  canvasUrl: 'http://127.0.0.1:3198',
-  canvasPublicUrl: 'http://127.0.0.1:3198',
+  canvasUrl,
+  canvasPublicUrl: canvasUrl,
 };
 
 const server = new CanvasServer(config);

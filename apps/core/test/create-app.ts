@@ -1,5 +1,4 @@
 import { mkdtemp, rm } from 'node:fs/promises';
-import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -29,17 +28,6 @@ export function createDataDir(): Promise<string> {
 
 export function removeDataDir(dataDir: string): Promise<void> {
   return rm(dataDir, { recursive: true, force: true });
-}
-
-export function freeCanvasUrl(): Promise<string> {
-  const server = createServer();
-  return new Promise((resolve) => {
-    server.listen(0, '127.0.0.1', () => {
-      const address = server.address();
-      const port = typeof address === 'object' && address?.port;
-      server.close(() => resolve(`http://127.0.0.1:${port}`));
-    });
-  });
 }
 
 export async function createApp(

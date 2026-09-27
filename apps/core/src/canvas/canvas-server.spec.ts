@@ -2,8 +2,9 @@ import { spawn } from 'node:child_process';
 import { once } from 'node:events';
 import { CanvasServer } from './canvas-server.js';
 import { canvasServerPath } from './excalidraw.js';
+import { freeCanvasUrl } from '../test/free-canvas-url.js';
 
-const CANVAS_URL = 'http://127.0.0.1:3197';
+const CANVAS_URL = await freeCanvasUrl();
 
 const config = {
   dataDir: '/data',
@@ -59,7 +60,7 @@ it('has nothing to stop before it started', async () => {
 
 it('fails when another canvas server holds its port', async () => {
   const other = spawn(process.execPath, [canvasServerPath()], {
-    env: { ...process.env, HOST: '127.0.0.1', PORT: '3197' },
+    env: { ...process.env, HOST: '127.0.0.1', PORT: new URL(CANVAS_URL).port },
     stdio: 'ignore',
   });
   try {
