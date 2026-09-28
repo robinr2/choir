@@ -161,6 +161,9 @@ test('sorts by a date field and brings the order of the user back unchanged', as
   await expect
     .element(inbox.getByRole('img', { name: 'Drag to reorder' }).first())
     .toBeVisible();
+  await expect
+    .element(inbox.getByRole('img', { name: 'ascending' }))
+    .not.toBeInTheDocument();
   await inbox.getByRole('button', { name: 'Sort' }).first().click();
   await expect
     .element(screen.getByRole('menuitemradio', { name: 'Ascending' }))
