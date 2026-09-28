@@ -11,6 +11,13 @@ module.exports = {
   ],
   options: {
     ...options,
-    exclude: { path: ['\\.(e2e-)?spec\\.tsx?$', '^test/', '^src/test/'] },
+    exclude: {
+      path: [
+        '\\.(e2e-)?spec\\.tsx?$',
+        '^test/',
+        '^src/test/',
+        '^src/prisma/contract\\.d\\.ts$',
+      ],
+    },
   },
 };

@@ -1,4 +1,4 @@
-import { constants, copyFile, cp, mkdir, readFile } from 'node:fs/promises';
+import { readFile } from 'node:fs/promises';
 import { Inject, Injectable, type OnModuleInit } from '@nestjs/common';
 import {
   CHOIR_CONFIG,
@@ -9,27 +9,22 @@ import {
   profileDir,
   profileVoicePrompt,
 } from '../choir/choir-config.js';
-
-function keepExisting(error: NodeJS.ErrnoException): void {
-  if (error.code !== 'EEXIST') throw error;
-}
+import { installProfile } from './profile-install.js';
 
 @Injectable()
 export class ProfileService implements OnModuleInit {
   constructor(@Inject(CHOIR_CONFIG) private readonly config: ChoirConfig) {}
 
-  async onModuleInit(): Promise<void> {
-    await cp(PROFILE_TEMPLATE, profileDir(this.config), {
-      recursive: true,
-      force: false,
-      errorOnExist: false,
+  onModuleInit(): Promise<void> {
+    return installProfile({
+      template: PROFILE_TEMPLATE,
+      dir: profileDir(this.config),
+      editable: {
+        from: DEFAULT_VOICE_PROMPT,
+        to: profileVoicePrompt(this.config),
+      },
+      folder: defaultFolder(this.config),
     });
-    await copyFile(
-      DEFAULT_VOICE_PROMPT,
-      profileVoicePrompt(this.config),
-      constants.COPYFILE_EXCL,
-    ).catch(keepExisting);
-    await mkdir(defaultFolder(this.config), { recursive: true });
   }
 
   voicePrompt(): Promise<string> {

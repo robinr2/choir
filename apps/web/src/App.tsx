@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useReducer } from 'react';
 import type { PipecatClient } from '@pipecat-ai/client-js';
 import {
   PipecatClientAudio,
@@ -6,12 +6,21 @@ import {
 } from '@pipecat-ai/client-react';
 import { LayoutGridIcon } from 'lucide-react';
 import type { CoreCanvas } from '@/canvas/core-canvas';
+import type { CoreInbox } from '@/inbox/core-inbox';
+import { InboxButton } from '@/inbox/inbox-button';
+import { InboxContext } from '@/inbox/inbox-context';
+import { InboxPanel } from '@/inbox/inbox-panel';
+import { NotificationList } from '@/inbox/notification-list';
+import { TodoList } from '@/inbox/todo-list';
 import { PanesView } from '@/panes/panes-view';
 import { VoiceSession } from '@/voice/voice-session';
 import type { CoreWorkspace } from '@/workspace/core-workspace';
 import { WorkspaceContext } from '@/workspace/workspace-context';
 
-function Sidebar() {
+function Sidebar({
+  inboxOpen,
+  toggleInbox,
+}: Readonly<{ inboxOpen: boolean; toggleInbox: () => void }>) {
   return (
     <nav
       aria-label="Views"
@@ -27,17 +36,29 @@ function Sidebar() {
         <LayoutGridIcon className="size-4" aria-hidden />
         <span className="sr-only">Agents</span>
       </a>
+      <InboxButton open={inboxOpen} onToggle={toggleInbox} />
     </nav>
   );
 }
+
+const INBOX_LISTS = {
+  todos: <TodoList />,
+  notifications: <NotificationList />,
+};
 
 type AppProps = {
   client: PipecatClient;
   workspace: CoreWorkspace;
   canvas: CoreCanvas;
+  inbox: CoreInbox;
 };
 
-function App({ client, workspace, canvas }: Readonly<AppProps>) {
+function flip(open: boolean): boolean {
+  return !open;
+}
+
+function App({ client, workspace, canvas, inbox }: Readonly<AppProps>) {
+  const [inboxOpen, toggleInbox] = useReducer(flip, false);
   const voice = useMemo(
     () => new VoiceSession(client, workspace),
     [client, workspace],
@@ -51,12 +72,15 @@ function App({ client, workspace, canvas }: Readonly<AppProps>) {
   return (
     <PipecatClientProvider client={client}>
       <WorkspaceContext value={context}>
-        <div className="flex h-dvh">
-          <Sidebar />
-          <main className="min-w-0 flex-1">
-            <PanesView />
-          </main>
-        </div>
+        <InboxContext value={inbox}>
+          <div className="flex h-dvh">
+            <Sidebar inboxOpen={inboxOpen} toggleInbox={toggleInbox} />
+            <main className="min-w-0 flex-1">
+              <PanesView />
+            </main>
+            {inboxOpen && <InboxPanel lists={INBOX_LISTS} />}
+          </div>
+        </InboxContext>
       </WorkspaceContext>
       <PipecatClientAudio />
     </PipecatClientProvider>

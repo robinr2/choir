@@ -25,6 +25,8 @@ function profile(): ProfileService {
     coreUrl: 'http://localhost:3000',
     canvasUrl: 'http://127.0.0.1:3100',
     canvasPublicUrl: 'http://127.0.0.1:3100',
+    databaseUrl: 'postgresql://localhost/choir',
+    claudeDir: '/claude',
   });
 }
 

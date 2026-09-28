@@ -3,6 +3,7 @@
     "module": "nodenext",
     "moduleResolution": "nodenext",
     "resolvePackageJsonExports": true,
+    "resolveJsonModule": true,
     "esModuleInterop": true,
     "isolatedModules": true,
     "declaration": true,
@@ -11,6 +12,7 @@
     "experimentalDecorators": true,
     "allowSyntheticDefaultImports": true,
     "target": "ES2024",
+    "lib": ["ES2024", "ESNext.Temporal", "DOM"],
     "sourceMap": true,
     "outDir": "./dist",
     "rootDir": ".",
@@ -19,5 +21,6 @@
     "strict": true,
     "strictPropertyInitialization": false,
     "types": ["vitest/globals", "node"]
-  }
+  },
+  "exclude": ["node_modules", "dist", "migrations"]
 }

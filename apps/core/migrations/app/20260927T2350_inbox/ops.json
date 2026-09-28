@@ -1,0 +1,622 @@
+[
+  {
+    "id": "schema.public",
+    "label": "Create schema \"public\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres"
+    },
+    "precheck": [],
+    "execute": [
+      {
+        "description": "Create schema \"public\"",
+        "sql": "CREATE SCHEMA IF NOT EXISTS \"public\"",
+        "params": []
+      }
+    ],
+    "postcheck": []
+  },
+  {
+    "id": "table.Attachment",
+    "label": "Create table \"Attachment\"",
+    "summary": "Creates table \"Attachment\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "table",
+        "name": "Attachment"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"Attachment\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"Attachment\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"Attachment\"",
+        "sql": "CREATE TABLE \"public\".\"Attachment\" (\n  \"content\" bytea NOT NULL,\n  \"filename\" text NOT NULL,\n  \"id\" uuid NOT NULL,\n  \"index\" int4 NOT NULL,\n  \"mediaType\" text NOT NULL,\n  \"notificationId\" uuid NOT NULL,\n  PRIMARY KEY (\"id\")\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"Attachment\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"Attachment\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "table.Notification",
+    "label": "Create table \"Notification\"",
+    "summary": "Creates table \"Notification\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "table",
+        "name": "Notification"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"Notification\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"Notification\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"Notification\"",
+        "sql": "CREATE TABLE \"public\".\"Notification\" (\n  \"archivedAt\" timestamptz,\n  \"eventId\" text NOT NULL,\n  \"id\" uuid NOT NULL,\n  \"link\" text,\n  \"position\" float8 NOT NULL,\n  \"receivedAt\" timestamptz DEFAULT (now()) NOT NULL,\n  \"sentAt\" timestamptz NOT NULL,\n  \"source\" text NOT NULL,\n  \"text\" text NOT NULL,\n  \"title\" text NOT NULL,\n  PRIMARY KEY (\"id\")\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"Notification\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"Notification\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "table.QueueItem",
+    "label": "Create table \"QueueItem\"",
+    "summary": "Creates table \"QueueItem\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "table",
+        "name": "QueueItem"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"QueueItem\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"QueueItem\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"QueueItem\"",
+        "sql": "CREATE TABLE \"public\".\"QueueItem\" (\n  \"attempts\" int4 DEFAULT 0 NOT NULL,\n  \"doneAt\" timestamptz,\n  \"dueAt\" timestamptz DEFAULT (now()) NOT NULL,\n  \"lastError\" text,\n  \"notificationId\" uuid NOT NULL,\n  PRIMARY KEY (\"notificationId\")\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"QueueItem\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"QueueItem\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "table.Todo",
+    "label": "Create table \"Todo\"",
+    "summary": "Creates table \"Todo\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "table",
+        "name": "Todo"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"Todo\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"Todo\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"Todo\"",
+        "sql": "CREATE TABLE \"public\".\"Todo\" (\n  \"archivedAt\" timestamptz,\n  \"createdAt\" timestamptz DEFAULT (now()) NOT NULL,\n  \"description\" text NOT NULL,\n  \"dueAt\" timestamptz,\n  \"id\" uuid NOT NULL,\n  \"position\" float8 NOT NULL,\n  \"title\" text NOT NULL,\n  \"updatedAt\" timestamptz DEFAULT (now()) NOT NULL,\n  PRIMARY KEY (\"id\")\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"Todo\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"Todo\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "table.TodoNotification",
+    "label": "Create table \"TodoNotification\"",
+    "summary": "Creates table \"TodoNotification\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "table",
+        "name": "TodoNotification"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"TodoNotification\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"TodoNotification\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"TodoNotification\"",
+        "sql": "CREATE TABLE \"public\".\"TodoNotification\" (\n  \"linkedAt\" timestamptz DEFAULT (now()) NOT NULL,\n  \"notificationId\" uuid NOT NULL,\n  \"todoId\" uuid NOT NULL,\n  PRIMARY KEY (\"todoId\", \"notificationId\")\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"TodoNotification\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"TodoNotification\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "unique.Attachment.Attachment_notificationId_index_key",
+    "label": "Add unique constraint on \"Attachment\" (notificationId, index)",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "unique",
+        "name": "Attachment_notificationId_index_key",
+        "table": "Attachment"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure constraint \"Attachment_notificationId_index_key\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "Attachment_notificationId_index_key",
+          "public",
+          "\"public\".\"Attachment\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add unique constraint \"Attachment_notificationId_index_key\"",
+        "sql": "ALTER TABLE \"public\".\"Attachment\" ADD CONSTRAINT \"Attachment_notificationId_index_key\" UNIQUE (\"notificationId\", \"index\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify constraint \"Attachment_notificationId_index_key\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "Attachment_notificationId_index_key",
+          "public",
+          "\"public\".\"Attachment\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "unique.Notification.Notification_source_eventId_key",
+    "label": "Add unique constraint on \"Notification\" (source, eventId)",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "unique",
+        "name": "Notification_source_eventId_key",
+        "table": "Notification"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure constraint \"Notification_source_eventId_key\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "Notification_source_eventId_key",
+          "public",
+          "\"public\".\"Notification\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add unique constraint \"Notification_source_eventId_key\"",
+        "sql": "ALTER TABLE \"public\".\"Notification\" ADD CONSTRAINT \"Notification_source_eventId_key\" UNIQUE (\"source\", \"eventId\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify constraint \"Notification_source_eventId_key\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "Notification_source_eventId_key",
+          "public",
+          "\"public\".\"Notification\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.Attachment.Attachment_notificationId_idx_adfe2654",
+    "label": "Create index \"Attachment_notificationId_idx_adfe2654\" on \"Attachment\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "Attachment_notificationId_idx_adfe2654",
+        "table": "Attachment"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"Attachment_notificationId_idx_adfe2654\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"Attachment_notificationId_idx_adfe2654\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"Attachment_notificationId_idx_adfe2654\"",
+        "sql": "CREATE INDEX \"Attachment_notificationId_idx_adfe2654\" ON \"public\".\"Attachment\" (\"notificationId\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"Attachment_notificationId_idx_adfe2654\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"Attachment_notificationId_idx_adfe2654\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.QueueItem.QueueItem_dueAt_idx_08d8815e",
+    "label": "Create index \"QueueItem_dueAt_idx_08d8815e\" on \"QueueItem\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "QueueItem_dueAt_idx_08d8815e",
+        "table": "QueueItem"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"QueueItem_dueAt_idx_08d8815e\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"QueueItem_dueAt_idx_08d8815e\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"QueueItem_dueAt_idx_08d8815e\"",
+        "sql": "CREATE INDEX \"QueueItem_dueAt_idx_08d8815e\" ON \"public\".\"QueueItem\" (\"dueAt\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"QueueItem_dueAt_idx_08d8815e\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"QueueItem_dueAt_idx_08d8815e\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.TodoNotification.TodoNotification_notificationId_idx_adfe2654",
+    "label": "Create index \"TodoNotification_notificationId_idx_adfe2654\" on \"TodoNotification\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "TodoNotification_notificationId_idx_adfe2654",
+        "table": "TodoNotification"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"TodoNotification_notificationId_idx_adfe2654\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"TodoNotification_notificationId_idx_adfe2654\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"TodoNotification_notificationId_idx_adfe2654\"",
+        "sql": "CREATE INDEX \"TodoNotification_notificationId_idx_adfe2654\" ON \"public\".\"TodoNotification\" (\"notificationId\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"TodoNotification_notificationId_idx_adfe2654\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"TodoNotification_notificationId_idx_adfe2654\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.TodoNotification.TodoNotification_todoId_idx_6e8c4480",
+    "label": "Create index \"TodoNotification_todoId_idx_6e8c4480\" on \"TodoNotification\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "TodoNotification_todoId_idx_6e8c4480",
+        "table": "TodoNotification"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"TodoNotification_todoId_idx_6e8c4480\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"TodoNotification_todoId_idx_6e8c4480\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"TodoNotification_todoId_idx_6e8c4480\"",
+        "sql": "CREATE INDEX \"TodoNotification_todoId_idx_6e8c4480\" ON \"public\".\"TodoNotification\" (\"todoId\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"TodoNotification_todoId_idx_6e8c4480\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"TodoNotification_todoId_idx_6e8c4480\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.Attachment.Attachment_notificationId_fkey",
+    "label": "Add foreign key \"Attachment_notificationId_fkey\" on \"Attachment\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "foreignKey",
+        "name": "Attachment_notificationId_fkey",
+        "table": "Attachment"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"Attachment_notificationId_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "Attachment_notificationId_fkey",
+          "public",
+          "\"public\".\"Attachment\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"Attachment_notificationId_fkey\"",
+        "sql": "ALTER TABLE \"public\".\"Attachment\"\nADD CONSTRAINT \"Attachment_notificationId_fkey\"\nFOREIGN KEY (\"notificationId\")\nREFERENCES \"public\".\"Notification\" (\"id\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"Attachment_notificationId_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "Attachment_notificationId_fkey",
+          "public",
+          "\"public\".\"Attachment\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.QueueItem.QueueItem_notificationId_fkey",
+    "label": "Add foreign key \"QueueItem_notificationId_fkey\" on \"QueueItem\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "foreignKey",
+        "name": "QueueItem_notificationId_fkey",
+        "table": "QueueItem"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"QueueItem_notificationId_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "QueueItem_notificationId_fkey",
+          "public",
+          "\"public\".\"QueueItem\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"QueueItem_notificationId_fkey\"",
+        "sql": "ALTER TABLE \"public\".\"QueueItem\"\nADD CONSTRAINT \"QueueItem_notificationId_fkey\"\nFOREIGN KEY (\"notificationId\")\nREFERENCES \"public\".\"Notification\" (\"id\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"QueueItem_notificationId_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "QueueItem_notificationId_fkey",
+          "public",
+          "\"public\".\"QueueItem\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.TodoNotification.TodoNotification_todoId_fkey",
+    "label": "Add foreign key \"TodoNotification_todoId_fkey\" on \"TodoNotification\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "foreignKey",
+        "name": "TodoNotification_todoId_fkey",
+        "table": "TodoNotification"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"TodoNotification_todoId_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "TodoNotification_todoId_fkey",
+          "public",
+          "\"public\".\"TodoNotification\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"TodoNotification_todoId_fkey\"",
+        "sql": "ALTER TABLE \"public\".\"TodoNotification\"\nADD CONSTRAINT \"TodoNotification_todoId_fkey\"\nFOREIGN KEY (\"todoId\")\nREFERENCES \"public\".\"Todo\" (\"id\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"TodoNotification_todoId_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "TodoNotification_todoId_fkey",
+          "public",
+          "\"public\".\"TodoNotification\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.TodoNotification.TodoNotification_notificationId_fkey",
+    "label": "Add foreign key \"TodoNotification_notificationId_fkey\" on \"TodoNotification\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "foreignKey",
+        "name": "TodoNotification_notificationId_fkey",
+        "table": "TodoNotification"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"TodoNotification_notificationId_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "TodoNotification_notificationId_fkey",
+          "public",
+          "\"public\".\"TodoNotification\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"TodoNotification_notificationId_fkey\"",
+        "sql": "ALTER TABLE \"public\".\"TodoNotification\"\nADD CONSTRAINT \"TodoNotification_notificationId_fkey\"\nFOREIGN KEY (\"notificationId\")\nREFERENCES \"public\".\"Notification\" (\"id\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"TodoNotification_notificationId_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "TodoNotification_notificationId_fkey",
+          "public",
+          "\"public\".\"TodoNotification\""
+        ]
+      }
+    ]
+  }
+]

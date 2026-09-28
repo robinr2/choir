@@ -22,6 +22,7 @@ export default defineConfig({
           name: 'e2e',
           sequence: { groupOrder: 1 },
           include: ['test/**/*.e2e-spec.ts'],
+          globalSetup: ['test/global-setup.ts'],
           testTimeout: 60_000,
           hookTimeout: 60_000,
           restoreMocks: true,

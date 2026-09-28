@@ -48,6 +48,8 @@ it('fails to read a session that was never saved', async () => {
     coreUrl: 'http://localhost:3000',
     canvasUrl: 'http://127.0.0.1:3100',
     canvasPublicUrl: 'http://127.0.0.1:3100',
+    databaseUrl: 'postgresql://localhost/choir',
+    claudeDir: '/claude',
   });
   const handle = {
     sessionKey: 'c1',
@@ -67,6 +69,8 @@ it('runs sessions with the profile and the installed Claude Code', async () => {
     coreUrl: 'http://localhost:3100',
     canvasUrl: 'http://127.0.0.1:3100',
     canvasPublicUrl: 'http://127.0.0.1:3100',
+    databaseUrl: 'postgresql://localhost/choir',
+    claudeDir: '/claude',
   };
   const withClaude = new AgentService({
     ...config,
@@ -100,6 +104,8 @@ it('stops its sessions when the app shuts down', async () => {
     coreUrl: 'http://localhost:3000',
     canvasUrl: 'http://127.0.0.1:3100',
     canvasPublicUrl: 'http://127.0.0.1:3100',
+    databaseUrl: 'postgresql://localhost/choir',
+    claudeDir: '/claude',
   }).onApplicationShutdown();
   expect(shutdown).toHaveBeenCalledOnce();
 });
@@ -110,6 +116,8 @@ it('gives every session the Excalidraw MCP server of the canvas', async () => {
     coreUrl: 'http://localhost:3000',
     canvasUrl: 'http://127.0.0.1:3200',
     canvasPublicUrl: 'http://127.0.0.1:3200',
+    databaseUrl: 'postgresql://localhost/choir',
+    claudeDir: '/claude',
   });
   const [options] = vi.mocked(createAcpRuntime).mock.calls.at(-1) ?? [];
   expect(options?.mcpServers).toEqual([

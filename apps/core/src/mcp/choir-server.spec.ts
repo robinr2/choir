@@ -1,4 +1,4 @@
-import { callerOf } from './orchestration-tools.js';
+import { callerOf } from './choir-server.js';
 
 it('takes the calling agent from the request header', () => {
   const request = new Request('http://core/mcp', {

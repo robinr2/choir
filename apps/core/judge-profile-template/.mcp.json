@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "choir": {
+      "type": "http",
+      "url": "${CHOIR_CORE_URL}/mcp",
+      "headers": {
+        "X-Choir-Agent": "${CHOIR_CONVERSATION_ID}"
+      }
+    }
+  }
+}

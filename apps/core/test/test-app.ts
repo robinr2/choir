@@ -2,13 +2,21 @@ import { INestApplication } from '@nestjs/common';
 import { App } from 'supertest/types.js';
 import { ConversationClient } from './conversation-client.js';
 import { freeCanvasUrl } from '../src/test/free-canvas-url.js';
-import { createApp, createDataDir, removeDataDir } from './create-app.js';
+import {
+  createApp,
+  createDataDir,
+  removeDataDir,
+  type TestPaths,
+} from './create-app.js';
+import { createDatabase, dropDatabase } from './test-database.js';
+import type { Mock } from 'vitest';
+import type { Judge } from '../src/judge/judge.port.js';
 import { WorkspaceClient } from './workspace-client.js';
+import { InboxClient } from './inbox-client.js';
 
-type Started = {
+type Started = TestPaths & {
   app: INestApplication<App>;
-  dataDir: string;
-  canvasUrl: string;
+  judged: Mock<Judge['judge']>;
 };
 
 export class TestApp {
@@ -30,8 +38,16 @@ export class TestApp {
     return this.running().dataDir;
   }
 
+  get judged(): Mock<Judge['judge']> {
+    return this.running().judged;
+  }
+
   get canvasUrl(): string {
     return this.running().canvasUrl;
+  }
+
+  get inbox(): InboxClient {
+    return new InboxClient(this.app);
   }
 
   get workspace(): WorkspaceClient {
@@ -44,10 +60,10 @@ export class TestApp {
   }
 
   async reopen(): Promise<ConversationClient> {
-    const { app, dataDir, canvasUrl } = this.running();
+    const { app, ...paths } = this.running();
     await app.close();
-    const reopened = await createApp(dataDir, canvasUrl);
-    this.started = { app: reopened, dataDir, canvasUrl };
+    const reopened = await createApp(paths);
+    this.started = { app: reopened, ...paths };
     return new ConversationClient(reopened, this.conversation.id);
   }
 
@@ -61,16 +77,21 @@ export class TestApp {
   }
 
   private async start(): Promise<void> {
-    const dataDir = await createDataDir();
-    const canvasUrl = await freeCanvasUrl();
-    const app = await createApp(dataDir, canvasUrl);
-    this.started = { app, dataDir, canvasUrl };
+    const paths = {
+      dataDir: await createDataDir(),
+      canvasUrl: await freeCanvasUrl(),
+      databaseUrl: await createDatabase(),
+    };
+    const judged = vi.fn<Judge['judge']>(async () => undefined);
+    const app = await createApp({ ...paths, judge: { judge: judged } });
+    this.started = { app, judged, ...paths, judge: { judge: judged } };
     this.client = new ConversationClient(app);
   }
 
   private async stop(): Promise<void> {
-    const { app, dataDir } = this.running();
+    const { app, dataDir, databaseUrl } = this.running();
     await app.close();
     await removeDataDir(dataDir);
+    await dropDatabase(databaseUrl);
   }
 }

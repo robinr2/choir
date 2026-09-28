@@ -1,0 +1,22 @@
+name: choir
+
+services:
+  postgres:
+    image: postgres:17
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: choir
+      POSTGRES_PASSWORD: choir
+      POSTGRES_DB: choir
+    ports:
+      - 127.0.0.1:5433:5432
+    volumes:
+      - postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: pg_isready --username choir --dbname choir
+      interval: 2s
+      timeout: 5s
+      retries: 30
+
+volumes:
+  postgres:

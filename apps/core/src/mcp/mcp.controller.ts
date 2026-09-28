@@ -7,19 +7,13 @@ import {
   Req,
   Res,
 } from '@nestjs/common';
-import { toNodeHandler } from '@modelcontextprotocol/node';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { paneIdSchema } from '../layout/layout.schemas.js';
-import { CALLER_HEADER, orchestrationHandler } from './orchestration-tools.js';
-import { WORKSPACE, type Workspace } from './workspace.port.js';
+import { CALLER_HEADER, MCP_HANDLER, type McpHandler } from './mcp.port.js';
 
 @Controller('mcp')
 export class McpController {
-  private readonly serve: ReturnType<typeof toNodeHandler>;
-
-  constructor(@Inject(WORKSPACE) workspace: Workspace) {
-    this.serve = toNodeHandler(orchestrationHandler(workspace));
-  }
+  constructor(@Inject(MCP_HANDLER) private readonly serve: McpHandler) {}
 
   @All()
   async handle(

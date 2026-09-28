@@ -27,6 +27,8 @@ it('logs a message it could not deliver', async () => {
       coreUrl: 'http://core',
       canvasUrl: 'http://127.0.0.1:3100',
       canvasPublicUrl: 'http://127.0.0.1:3100',
+      databaseUrl: 'postgresql://localhost/choir',
+      claudeDir: '/claude',
     }),
   );
   await layout.onModuleInit();

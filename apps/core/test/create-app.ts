@@ -3,10 +3,11 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Test } from '@nestjs/testing';
-import { INestApplication } from '@nestjs/common';
-import { App } from 'supertest/types.js';
+import type { NestExpressApplication } from '@nestjs/platform-express';
 import { AppModule } from './../src/app.module.js';
+import { setUpApp } from '../src/app-setup.js';
 import { CHOIR_CONFIG, type ChoirConfig } from '../src/choir/choir-config.js';
+import { JUDGE, type Judge } from '../src/judge/judge.port.js';
 
 const MOCK_AGENT = path.resolve(
   import.meta.dirname,
@@ -30,15 +31,26 @@ export function removeDataDir(dataDir: string): Promise<void> {
   return rm(dataDir, { recursive: true, force: true });
 }
 
-export async function createApp(
-  dataDir: string,
-  canvasUrl: string,
-): Promise<INestApplication<App>> {
+export type TestPaths = {
+  dataDir: string;
+  canvasUrl: string;
+  databaseUrl: string;
+  judge: Judge;
+};
+
+export async function createApp({
+  dataDir,
+  canvasUrl,
+  databaseUrl,
+  judge,
+}: TestPaths): Promise<NestExpressApplication> {
   const config: ChoirConfig = {
     dataDir,
     coreUrl: 'http://localhost:3000',
     canvasUrl,
     canvasPublicUrl: CANVAS_PUBLIC_URL,
+    databaseUrl,
+    claudeDir: path.join(dataDir, 'claude'),
     agentCommand: MOCK_AGENT_COMMAND,
   };
   const moduleFixture = await Test.createTestingModule({
@@ -46,9 +58,12 @@ export async function createApp(
   })
     .overrideProvider(CHOIR_CONFIG)
     .useValue(config)
+    .overrideProvider(JUDGE)
+    .useValue(judge)
     .compile();
 
-  const app = moduleFixture.createNestApplication<INestApplication<App>>();
+  const app = moduleFixture.createNestApplication<NestExpressApplication>();
+  setUpApp(app);
   await app.init();
   return app;
 }

@@ -1,1 +1,64 @@
 // use prisma-8
+model Notification {
+  id          Uuid               @id @default(uuid())
+  source      String
+  eventId     String
+  title       String
+  text        String
+  link        String?
+  sentAt      Timestamptz
+  receivedAt  Timestamptz        @default(now())
+  archivedAt  Timestamptz?
+  position    Float
+  attachments Attachment[]
+  todos       TodoNotification[]
+  queueItem   QueueItem?
+
+  @@unique([source, eventId])
+}
+
+model Attachment {
+  id             Uuid         @id @default(uuid())
+  notificationId Uuid
+  notification   Notification @relation(fields:[notificationId], references:[id])
+  index          Int
+  filename       String
+  mediaType      String
+  content        Bytes
+
+  @@unique([notificationId, index])
+}
+
+model Todo {
+  id            Uuid               @id @default(uuid())
+  title         String
+  description   String
+  dueAt         Timestamptz?
+  createdAt     Timestamptz        @default(now())
+  updatedAt     Timestamptz        @default(now())
+  archivedAt    Timestamptz?
+  position      Float
+  notifications TodoNotification[]
+}
+
+model TodoNotification {
+  todoId         Uuid
+  todo           Todo         @relation(fields:[todoId], references:[id])
+  notificationId Uuid
+  notification   Notification @relation(fields:[notificationId], references:[id])
+  linkedAt       Timestamptz  @default(now())
+
+  @@id([todoId, notificationId])
+  @@index([notificationId])
+}
+
+model QueueItem {
+  notificationId Uuid         @id
+  notification   Notification @relation(fields:[notificationId], references:[id])
+  attempts       Int          @default(0)
+  dueAt          Timestamptz  @default(now())
+  lastError      String?
+  doneAt         Timestamptz?
+
+  @@index([dueAt])
+}
