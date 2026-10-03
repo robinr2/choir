@@ -20,7 +20,7 @@ Do all work based on the documentation of the tools the current task involves. O
 
 - Run `just --list` to see the available commands. Prefer the just commands over running their tools directly.
 - Build every feature end to end across all apps it touches, so it can be seen working.
-- Choir is a greenfield project with no users yet: unless I say otherwise, build as if no earlier data or version exists, never migrate existing data, and never add code that keeps earlier versions, file formats or data working.
+- This is a greenfield project with no users yet: unless I say otherwise, build as if no earlier data or version exists, never migrate existing data, and never add code that keeps earlier versions, file formats or data working.
 - Work strictly in a git worktree and open a pull request when the work is done, without asking first.
 - Never write comments.
 - Never write documentation.
