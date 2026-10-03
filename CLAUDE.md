@@ -15,6 +15,7 @@ Do all work based on the documentation of the tools the current task involves. O
 - mcp_excalidraw: https://github.com/yctimlin/mcp_excalidraw
 - Prisma ORM 8: https://www.prisma.io/docs/llms/orm.txt
 - niri: https://niri-wm.github.io/niri/
+- Agent Client Protocol and its TypeScript SDK: https://agentclientprotocol.com/llms.txt
 
 ## Development
 
