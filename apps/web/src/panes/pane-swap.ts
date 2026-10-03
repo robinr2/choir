@@ -12,7 +12,7 @@ function carriesAnotherPane(event: DragEvent, id: string): boolean {
   return types.includes(PANE_TYPE) && !types.includes(ownType(id));
 }
 
-function leftFor(event: DragEvent<HTMLElement>): boolean {
+export function leftFor(event: DragEvent<HTMLElement>): boolean {
   const next = event.relatedTarget;
   return !(next instanceof Node && event.currentTarget.contains(next));
 }

@@ -10,6 +10,7 @@ import {
   textOf,
   threadMessageOf,
 } from '@/conversation/transcript';
+import { TodoDropZone } from '@/inbox/todo-drop-zone';
 import { withSpeech } from '@/voice/spoken-messages';
 import type { SpokenReply } from '@/voice/spoken-reply';
 
@@ -36,7 +37,7 @@ export function ChatRuntimeProvider({
   });
   return (
     <AssistantRuntimeProvider runtime={runtime}>
-      {children}
+      <TodoDropZone>{children}</TodoDropZone>
     </AssistantRuntimeProvider>
   );
 }

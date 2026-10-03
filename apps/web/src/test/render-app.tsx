@@ -4,6 +4,7 @@ import { vi } from 'vitest';
 import { render } from 'vitest-browser-react';
 import App from '@/App';
 import { CoreCanvas } from '@/canvas/core-canvas';
+import { CoreInbox } from '@/inbox/core-inbox';
 import { createPipecatClient } from '@/voice/create-pipecat-client';
 import { CoreWorkspace } from '@/workspace/core-workspace';
 import { coreShowsWorkspace, twoAgents } from './fake-core';
@@ -18,6 +19,7 @@ export async function renderApp(view = twoAgents()): Promise<Screen> {
       client={client}
       workspace={new CoreWorkspace()}
       canvas={new CoreCanvas()}
+      inbox={new CoreInbox()}
     />,
   );
   coreShowsWorkspace(view);

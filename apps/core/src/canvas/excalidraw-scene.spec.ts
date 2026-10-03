@@ -9,6 +9,8 @@ const config = {
   coreUrl: 'http://localhost:3000',
   canvasUrl,
   canvasPublicUrl: canvasUrl,
+  databaseUrl: 'postgresql://localhost/choir',
+  claudeDir: '/claude',
 };
 
 const server = new CanvasServer(config);

@@ -15,6 +15,11 @@
   ],
   "ignore": [
     ".claude/skills/**",
-    "src/prisma/contract.prisma"
-  ]
+    "migrations/**"
+  ],
+  "prisma": {
+    "entry": [
+      "src/prisma/contract.prisma"
+    ]
+  }
 }

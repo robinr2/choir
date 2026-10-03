@@ -1,21 +1,13 @@
-import { createMcpHandler, McpServer } from '@modelcontextprotocol/server';
 import { z } from 'zod';
-import { CHOIR } from '../choir/choir-config.js';
 import {
   paneIdSchema,
   agentNameSchema,
   edgeSchema,
   splitKindSchema,
 } from '../layout/layout.schemas.js';
-import type { Workspace } from './workspace.port.js';
+import { reply, type Tool } from './tools.js';
 
-type Tool = (server: McpServer, workspace: Workspace, callerId: string) => void;
-
-function reply(value: unknown) {
-  return { content: [{ type: 'text' as const, text: JSON.stringify(value) }] };
-}
-
-const splitPane: Tool = (server, workspace, callerId) => {
+const splitPane: Tool = (server, { workspace, callerId }) => {
   server.registerTool(
     'split_pane',
     {
@@ -37,7 +29,7 @@ const splitPane: Tool = (server, workspace, callerId) => {
   );
 };
 
-const addPaneAtEdge: Tool = (server, workspace) => {
+const addPaneAtEdge: Tool = (server, { workspace }) => {
   server.registerTool(
     'add_pane_at_edge',
     {
@@ -53,7 +45,7 @@ const addPaneAtEdge: Tool = (server, workspace) => {
   );
 };
 
-const sendMessage: Tool = (server, workspace, callerId) => {
+const sendMessage: Tool = (server, { workspace, callerId }) => {
   server.registerTool(
     'send_message',
     {
@@ -71,7 +63,7 @@ const sendMessage: Tool = (server, workspace, callerId) => {
   );
 };
 
-const closeAgent: Tool = (server, workspace) => {
+const closeAgent: Tool = (server, { workspace }) => {
   server.registerTool(
     'close_agent',
     {
@@ -85,7 +77,7 @@ const closeAgent: Tool = (server, workspace) => {
   );
 };
 
-const listAgents: Tool = (server, workspace, callerId) => {
+const listAgents: Tool = (server, { workspace, callerId }) => {
   server.registerTool(
     'list_agents',
     {
@@ -97,25 +89,10 @@ const listAgents: Tool = (server, workspace, callerId) => {
   );
 };
 
-const TOOLS = [splitPane, addPaneAtEdge, sendMessage, closeAgent, listAgents];
-
-const INSTRUCTIONS =
-  'The agents of this workspace are the panes the user sees, each running its own session. When the user asks for a new agent, start it in a new pane with split_pane or add_pane_at_edge, and reach other agents only with the send_message and list_agents tools of this server. The excalidraw tools draw on the one canvas all agents share, which the user sees in the Excalidraw pane; screenshots, image exports and Mermaid diagrams work only while that pane is open.';
-
-export const CALLER_HEADER = 'x-choir-agent';
-
-export function callerOf(request: Request | undefined): string {
-  return request?.headers.get(CALLER_HEADER) ?? '';
-}
-
-function orchestrationServer(workspace: Workspace, callerId: string) {
-  const server = new McpServer(CHOIR, { instructions: INSTRUCTIONS });
-  for (const register of TOOLS) register(server, workspace, callerId);
-  return server;
-}
-
-export function orchestrationHandler(workspace: Workspace) {
-  return createMcpHandler(({ requestInfo }) =>
-    orchestrationServer(workspace, callerOf(requestInfo)),
-  );
-}
+export const ORCHESTRATION_TOOLS = [
+  splitPane,
+  addPaneAtEdge,
+  sendMessage,
+  closeAgent,
+  listAgents,
+];

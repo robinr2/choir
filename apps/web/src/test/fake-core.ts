@@ -2,6 +2,7 @@ import { vi } from 'vitest';
 import type { TranscriptMessage } from '@/conversation/transcript';
 import type { WorkspaceView } from '@/workspace/core-workspace';
 import { fakeEventSources, streamOf } from './fake-event-source';
+import { coreHasInbox, inboxResponse } from './fake-inbox';
 
 export const A = '0b6f2c9e-3f5d-4a8e-9c1b-2d7e6f5a4b3c';
 export const B = '7d1e5a2b-9c4f-4e8a-b6d3-1f2a3b4c5d6e';
@@ -10,9 +11,13 @@ export const CANVAS_URL = 'about:blank';
 
 export function fakeCore(): void {
   fakeEventSources();
-  vi.spyOn(window, 'fetch').mockImplementation(async (url) => {
+  coreHasInbox({});
+  vi.spyOn(window, 'fetch').mockImplementation(async (url, init) => {
     if (url === '/canvas') return Response.json({ url: CANVAS_URL });
-    return new Response(null, { status: 204 });
+    const path = url instanceof Request ? url.url : url.toString();
+    return (
+      inboxResponse(path, init?.method) ?? new Response(null, { status: 204 })
+    );
   });
 }
 

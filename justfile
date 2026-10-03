@@ -7,8 +7,12 @@ dev: web core voice
 web:
     npm run dev -- --port 5173 --strictPort < /dev/null
 
+db:
+    docker compose up --detach --wait postgres
+
 [working-directory('apps/core')]
-core:
+core: db
+    npx prisma db migrate -q
     PORT=3000 npm run start:dev
 
 [working-directory('apps/voice')]

@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import './index.css';
 import App from './App.tsx';
 import { CoreCanvas } from './canvas/core-canvas.ts';
+import { CoreInbox } from './inbox/core-inbox.ts';
 import { createPipecatClient } from './voice/create-pipecat-client.ts';
 import { CoreWorkspace } from './workspace/core-workspace.ts';
 
@@ -15,6 +16,7 @@ if (root) {
         client={createPipecatClient()}
         workspace={new CoreWorkspace()}
         canvas={new CoreCanvas()}
+        inbox={new CoreInbox()}
       />
     </StrictMode>,
   );

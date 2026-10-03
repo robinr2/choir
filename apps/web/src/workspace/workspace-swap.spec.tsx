@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import App from '@/App';
 import { CoreCanvas } from '@/canvas/core-canvas';
+import { CoreInbox } from '@/inbox/core-inbox';
 import {
   A,
   B,
@@ -27,7 +28,12 @@ async function swapWorkspace(
   const stop = workspace.subscribe(() => undefined);
   coreShowsWorkspace(view);
   await screen.rerender(
-    <App client={client} workspace={workspace} canvas={new CoreCanvas()} />,
+    <App
+      client={client}
+      workspace={workspace}
+      canvas={new CoreCanvas()}
+      inbox={new CoreInbox()}
+    />,
   );
   stop();
   return { workspace, client };

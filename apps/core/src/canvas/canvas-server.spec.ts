@@ -11,6 +11,8 @@ const config = {
   coreUrl: 'http://localhost:3000',
   canvasUrl: CANVAS_URL,
   canvasPublicUrl: CANVAS_URL,
+  databaseUrl: 'postgresql://localhost/choir',
+  claudeDir: '/claude',
 };
 
 async function health(): Promise<unknown> {
