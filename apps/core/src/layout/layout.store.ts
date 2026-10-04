@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { DatabaseService, type Orm } from '../database/database.service.js';
 import type { WorkspaceState } from './layout.schemas.js';
-import { fromRows, type Rows, STATE_ID, toRows } from './layout-rows.js';
+import { fromRows, type Rows, toRows } from './layout-rows.js';
 
 function savedWorkspaces(orm: Orm) {
   return orm.Workspace.orderBy((workspace) => workspace.position.asc())
@@ -20,7 +20,6 @@ async function replaceRows(orm: Orm, rows: Rows): Promise<void> {
   await orm.Workspace.where((space) => space.position.gte(0)).deleteAndCount();
   await orm.LayoutState.create(rows.state);
   await orm.Workspace.createAndCount(rows.workspaces);
-  if (rows.columns.length === 0) return;
   await orm.LayoutColumn.createAndCount(rows.columns);
   await orm.Pane.createAndCount(rows.panes);
 }
@@ -35,7 +34,7 @@ export class LayoutStore {
 
   async load(): Promise<WorkspaceState | undefined> {
     const { orm } = this.database;
-    const state = await orm.LayoutState.where({ id: STATE_ID }).first();
+    const state = await orm.LayoutState.first();
     if (!state) return undefined;
     return fromRows(state, await savedWorkspaces(orm));
   }
