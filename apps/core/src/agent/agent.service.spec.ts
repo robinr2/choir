@@ -2,28 +2,61 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { Test } from '@nestjs/testing';
-import { AcpxRuntime, createAcpRuntime } from 'acpx/runtime';
+import { lastValueFrom, map } from 'rxjs';
 import { excalidrawMcpPath } from '../canvas/excalidraw.js';
+import type { ChoirConfig } from '../choir/choir-config.js';
 import { CHOIR_CONFIG, choirConfigFrom } from '../choir/choir-config.js';
 import { ChoirModule } from '../choir/choir.module.js';
+import { DatabaseModule } from '../database/database.module.js';
 import { findExecutable } from '../choir/executable.js';
+import { mockAgentCommand } from '../test/mock-agent-command.js';
 import { AgentModule } from './agent.module.js';
 import { AgentService } from './agent.service.js';
+import type { AgentSessionsStore } from './agent-sessions.store.js';
+import type { AgentTurn } from './prompt-turn.js';
 
-vi.mock('acpx/runtime', async (importOriginal) => {
-  const original = await importOriginal<typeof import('acpx/runtime')>();
-  return {
-    ...original,
-    createAcpRuntime: vi.fn<typeof original.createAcpRuntime>(
-      original.createAcpRuntime,
-    ),
-  };
-});
+vi.setConfig({ testTimeout: 60_000 });
 
 let dataDir: string;
+let links: Map<string, string>;
+
+const store = {
+  find: vi.fn<AgentSessionsStore['find']>(async (id) => links.get(id)),
+  save: vi.fn<AgentSessionsStore['save']>(async (id, sessionId) => {
+    links.set(id, sessionId);
+  }),
+};
+
+function config(...flags: string[]): ChoirConfig {
+  return {
+    dataDir,
+    coreUrl: 'http://localhost:3000',
+    canvasUrl: 'http://127.0.0.1:3200',
+    canvasPublicUrl: 'http://127.0.0.1:3200',
+    databaseUrl: 'postgresql://localhost/choir',
+    claudeDir: '/claude',
+    projectDir: dataDir,
+    agentCommand: mockAgentCommand(path.join(dataDir, 'sessions'), ...flags),
+  };
+}
+
+function said(turn: AgentTurn): Promise<string> {
+  return lastValueFrom(
+    turn.updates.pipe(
+      map((update) =>
+        update.sessionUpdate === 'agent_message_chunk' &&
+        update.content.type === 'text'
+          ? update.content.text
+          : '',
+      ),
+    ),
+  );
+}
 
 beforeEach(async () => {
   dataDir = await mkdtemp(path.join(tmpdir(), 'choir-agent-'));
+  links = new Map();
+  vi.clearAllMocks();
 });
 
 afterEach(async () => {
@@ -32,7 +65,7 @@ afterEach(async () => {
 
 it('configures the agent from the environment', async () => {
   const moduleRef = await Test.createTestingModule({
-    imports: [ChoirModule, AgentModule],
+    imports: [ChoirModule, DatabaseModule, AgentModule],
   }).compile();
   expect(moduleRef.get(CHOIR_CONFIG)).toEqual({
     ...choirConfigFrom(process.env),
@@ -42,97 +75,52 @@ it('configures the agent from the environment', async () => {
   await moduleRef.close();
 });
 
-it('fails to read a session that was never saved', async () => {
-  const agent = new AgentService({
-    dataDir,
-    coreUrl: 'http://localhost:3000',
-    canvasUrl: 'http://127.0.0.1:3100',
-    canvasPublicUrl: 'http://127.0.0.1:3100',
-    databaseUrl: 'postgresql://localhost/choir',
-    claudeDir: '/claude',
-  });
-  const handle = {
-    sessionKey: 'c1',
-    backend: 'acpx',
-    runtimeSessionName: 'c1',
-  };
-  await expect(agent.record(handle)).rejects.toThrow('No saved session for c1');
-  await expect(
-    agent.record({ ...handle, acpxRecordId: 'missing' }),
-  ).rejects.toThrow('No saved session for c1');
-  await agent.onApplicationShutdown();
-});
-
-it('runs sessions with the profile and the installed Claude Code', async () => {
-  const config = {
-    dataDir,
-    coreUrl: 'http://localhost:3100',
-    canvasUrl: 'http://127.0.0.1:3100',
-    canvasPublicUrl: 'http://127.0.0.1:3100',
-    databaseUrl: 'postgresql://localhost/choir',
-    claudeDir: '/claude',
-  };
-  const withClaude = new AgentService({
-    ...config,
-    claudeExecutable: '/bin/claude',
-  });
-  const withoutClaude = new AgentService(config);
-  const environments = vi
-    .mocked(createAcpRuntime)
-    .mock.calls.slice(-2)
-    .map(([options]) => options.agentProcessEnv);
-  const profile = path.join(dataDir, 'profiles', 'default');
-  expect(environments).toEqual([
-    {
-      CLAUDE_CODE_PLUGIN_DIRS: profile,
-      CHOIR_CORE_URL: 'http://localhost:3100',
-      CLAUDE_CODE_EXECUTABLE: '/bin/claude',
+it('starts a session for a new conversation and loads it when the conversation reopens', async () => {
+  const agent = new AgentService(config(), store);
+  const session = await agent.open('c1');
+  expect(store.save).toHaveBeenCalledExactlyOnceWith('c1', session.id);
+  expect(JSON.parse(await said(session.startTurn('session-setup')))).toEqual({
+    cwd: dataDir,
+    mcpServers: [
+      {
+        name: 'excalidraw',
+        command: process.execPath,
+        args: [excalidrawMcpPath()],
+        env: [
+          { name: 'EXPRESS_SERVER_URL', value: 'http://127.0.0.1:3200' },
+          { name: 'EXCALIDRAW_NO_AUTOSTART', value: '1' },
+        ],
+      },
+    ],
+    _meta: {
+      claudeCode: { options: { settingSources: ['project', 'local'] } },
     },
-    {
-      CLAUDE_CODE_PLUGIN_DIRS: profile,
-      CHOIR_CORE_URL: 'http://localhost:3100',
-    },
-  ]);
-  await withClaude.onApplicationShutdown();
-  await withoutClaude.onApplicationShutdown();
-});
-
-it('stops its sessions when the app shuts down', async () => {
-  const shutdown = vi.spyOn(AcpxRuntime.prototype, 'shutdown');
-  await new AgentService({
-    dataDir,
-    coreUrl: 'http://localhost:3000',
-    canvasUrl: 'http://127.0.0.1:3100',
-    canvasPublicUrl: 'http://127.0.0.1:3100',
-    databaseUrl: 'postgresql://localhost/choir',
-    claudeDir: '/claude',
-  }).onApplicationShutdown();
-  expect(shutdown).toHaveBeenCalledOnce();
-});
-
-it('gives every session the Excalidraw MCP server of the canvas', async () => {
-  const agent = new AgentService({
-    dataDir,
-    coreUrl: 'http://localhost:3000',
-    canvasUrl: 'http://127.0.0.1:3200',
-    canvasPublicUrl: 'http://127.0.0.1:3200',
-    databaseUrl: 'postgresql://localhost/choir',
-    claudeDir: '/claude',
   });
-  const [options] = vi.mocked(createAcpRuntime).mock.calls.at(-1) ?? [];
-  expect(options?.mcpServers).toEqual([
-    {
-      name: 'excalidraw',
-      command: process.execPath,
-      args: [excalidrawMcpPath()],
-      env: [
-        { name: 'EXPRESS_SERVER_URL', value: 'http://127.0.0.1:3200' },
-        { name: 'EXCALIDRAW_NO_AUTOSTART', value: '1' },
-      ],
-    },
-  ]);
-  expect(excalidrawMcpPath()).toMatch(
-    /mcp-excalidraw-server\/dist\/index\.js$/,
+  await agent.close(session);
+  const reopened = await agent.open('c1');
+  expect(store.save).toHaveBeenCalledOnce();
+  expect(reopened.history).toHaveLength(2);
+  expect(await said(reopened.startTurn('env CHOIR_CONVERSATION_ID'))).toBe(
+    'c1',
   );
-  await agent.onApplicationShutdown();
+  await agent.beforeApplicationShutdown();
+});
+
+it('stops the sessions still open when the app shuts down, and each only once', async () => {
+  const agent = new AgentService(config(), store);
+  const closed = await agent.open('c1');
+  const open = await agent.open('c2');
+  const close = vi.spyOn(closed, 'close');
+  await agent.close(closed);
+  await agent.beforeApplicationShutdown();
+  expect(close).toHaveBeenCalledOnce();
+  await expect(open.startTurn('echo late').result).rejects.toThrow(
+    'ACP connection closed',
+  );
+});
+
+it('stops the agent of a session that cannot start', async () => {
+  const agent = new AgentService(config('--set-session-mode-fails'), store);
+  await expect(agent.open('c1')).rejects.toThrow('Internal error');
+  await agent.beforeApplicationShutdown();
 });

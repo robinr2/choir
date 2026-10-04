@@ -1,25 +1,13 @@
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { Test } from '@nestjs/testing';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import { AppModule } from './../src/app.module.js';
 import { setUpApp } from '../src/app-setup.js';
 import { CHOIR_CONFIG, type ChoirConfig } from '../src/choir/choir-config.js';
 import { JUDGE, type Judge } from '../src/judge/judge.port.js';
-
-const MOCK_AGENT = path.resolve(
-  import.meta.dirname,
-  '../node_modules/acpx-mock-agent/test/mock-agent.ts',
-);
-
-const MOCK_AGENT_COMMAND = [
-  process.execPath,
-  fileURLToPath(import.meta.resolve('tsx/cli')),
-  MOCK_AGENT,
-  '--supports-load-session',
-];
+import { mockAgentCommand } from '../src/test/mock-agent-command.js';
 
 export const CANVAS_PUBLIC_URL = 'https://choir.example/canvas';
 
@@ -51,7 +39,7 @@ export async function createApp({
     canvasPublicUrl: CANVAS_PUBLIC_URL,
     databaseUrl,
     claudeDir: path.join(dataDir, 'claude'),
-    agentCommand: MOCK_AGENT_COMMAND,
+    agentCommand: mockAgentCommand(path.join(dataDir, 'claude', 'sessions')),
   };
   const moduleFixture = await Test.createTestingModule({
     imports: [AppModule],

@@ -11,7 +11,6 @@ import {
   defaultFolder,
   profileDir,
   sessionFolder,
-  sessionsDir,
 } from './choir-config.js';
 
 describe('choirConfigFrom', () => {
@@ -87,10 +86,9 @@ describe('choir folders', () => {
     claudeDir: '/claude',
   };
 
-  it('lays out the profile, the default folder, the saved sessions and the canvas', () => {
+  it('lays out the profile, the default folder and the canvas', () => {
     expect(profileDir(config)).toBe('/data/profiles/default');
     expect(defaultFolder(config)).toBe('/data/default');
-    expect(sessionsDir(config)).toBe('/data/sessions');
     expect(canvasDir(config)).toBe('/data/canvas');
   });
 

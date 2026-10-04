@@ -4,6 +4,10 @@
   "target": "postgres",
   "profileHash": "3916f444a8a17ad749191acf9e08dad97d1a327b88c2f1d45d12f240296aa8b2",
   "roots": {
+    "AgentSession": {
+      "model": "AgentSession",
+      "namespace": "public"
+    },
     "Attachment": {
       "model": "Attachment",
       "namespace": "public"
@@ -64,6 +68,37 @@
           }
         },
         "models": {
+          "AgentSession": {
+            "fields": {
+              "conversationId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/uuid@1",
+                  "kind": "scalar"
+                }
+              },
+              "sessionId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              }
+            },
+            "relations": {},
+            "storage": {
+              "fields": {
+                "conversationId": {
+                  "column": "conversationId"
+                },
+                "sessionId": {
+                  "column": "sessionId"
+                }
+              },
+              "namespaceId": "public",
+              "table": "AgentSession"
+            }
+          },
           "Attachment": {
             "fields": {
               "content": {
@@ -893,6 +928,28 @@
       "public": {
         "entries": {
           "table": {
+            "AgentSession": {
+              "columns": {
+                "conversationId": {
+                  "codecId": "pg/uuid@1",
+                  "nativeType": "uuid",
+                  "nullable": false
+                },
+                "sessionId": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                }
+              },
+              "foreignKeys": [],
+              "indexes": [],
+              "primaryKey": {
+                "columns": [
+                  "conversationId"
+                ]
+              },
+              "uniques": []
+            },
             "Attachment": {
               "columns": {
                 "content": {
@@ -1485,7 +1542,7 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "4761329d57fc1d1743f690d6dd94919d7666f59c315fa4571b498afa7fbfb05b"
+    "storageHash": "825a10801284527cfba4f5629e05842fbbe00a7817c266b58ae6ff12ae3261cf"
   },
   "execution": {
     "executionHash": "6fbf7e6aa536b6a88fb41180e2ff8f5785b32cd18c8a889ca136ade2902944a9",

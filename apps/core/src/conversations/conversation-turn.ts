@@ -1,5 +1,5 @@
-import type { AcpRuntimeEvent, AcpRuntimeTurn } from 'acpx/runtime';
-import { ReplaySubject } from 'rxjs';
+import { lastValueFrom, ReplaySubject, tap } from 'rxjs';
+import type { AgentTurn } from '../agent/prompt-turn.js';
 import {
   answerText,
   type TranscriptPart,
@@ -24,21 +24,26 @@ export type TurnRequest = {
 export class ConversationTurn {
   readonly answer = new ReplaySubject<string>();
   private readonly confirmation = Promise.withResolvers<boolean>();
+  readonly settled: Promise<void>;
   private currentParts: TranscriptPart[] = [];
 
   constructor(
-    private readonly turn: AcpRuntimeTurn,
+    private readonly turn: AgentTurn,
     readonly request: TurnRequest,
     private readonly onChange: () => void,
   ) {
     if (!request.early) this.confirmation.resolve(true);
+    this.settled = turn.result.then(
+      () => undefined,
+      () => undefined,
+    );
   }
 
   get parts(): TranscriptPart[] {
     return this.currentParts;
   }
 
-  get settled(): Promise<unknown> {
+  get result(): AgentTurn['result'] {
     return this.turn.result;
   }
 
@@ -57,19 +62,22 @@ export class ConversationTurn {
 
   async run(): Promise<string> {
     try {
-      for await (const event of this.turn.events) this.follow(event);
+      await lastValueFrom(
+        this.turn.updates.pipe(
+          tap((update) => {
+            this.currentParts = withEvent(this.currentParts, update);
+            this.onChange();
+            const text = answerText(update);
+            if (text !== undefined) this.answer.next(text);
+          }),
+        ),
+        { defaultValue: undefined },
+      );
       const result = await this.turn.result;
-      return `${result.status}: ${describeUsage(turnUsage(result))}`;
+      return `${result?.stopReason ?? 'withdrawn'}: ${describeUsage(turnUsage(result))}`;
     } finally {
       this.answer.complete();
       this.confirmation.resolve(false);
     }
-  }
-
-  private follow(event: AcpRuntimeEvent): void {
-    this.currentParts = withEvent(this.currentParts, event);
-    this.onChange();
-    const text = answerText(event);
-    if (text !== undefined) this.answer.next(text);
   }
 }

@@ -95,10 +95,6 @@ export function defaultFolder(config: ChoirConfig): string {
   return path.join(config.dataDir, 'default');
 }
 
-export function sessionsDir(config: ChoirConfig): string {
-  return path.join(config.dataDir, 'sessions');
-}
-
 export function sessionFolder(config: ChoirConfig): string {
   return config.projectDir ?? defaultFolder(config);
 }

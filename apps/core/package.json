@@ -24,6 +24,8 @@
     "contract:emit": "prisma contract emit"
   },
   "dependencies": {
+    "@agentclientprotocol/claude-agent-acp": "^0.85.1",
+    "@agentclientprotocol/sdk": "^1.7.0",
     "@modelcontextprotocol/client": "^2.1.0",
     "@modelcontextprotocol/node": "^2.1.0",
     "@modelcontextprotocol/server": "^2.1.0",
@@ -32,7 +34,6 @@
     "@nestjs/platform-express": "^12.0.1",
     "@nestjs/schedule": "^12.0.2",
     "@prisma/orm-postgres": "^8.0.0-rc.12",
-    "acpx": "^0.19.3",
     "mcp-excalidraw-server": "^2.0.0",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
@@ -52,7 +53,6 @@
     "@types/pg": "^8.23.1",
     "@types/supertest": "^7.0.0",
     "@vitest/coverage-v8": "^4.1.2",
-    "acpx-mock-agent": "https://codeload.github.com/openclaw/acpx/tar.gz/refs/tags/v0.19.3",
     "dependency-cruiser": "^18.4.0",
     "dotenv": "^18.0.4",
     "jscpd": "5.3.2",

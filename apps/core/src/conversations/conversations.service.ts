@@ -1,13 +1,9 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import type {
-  AcpRuntimeHandle,
-  AcpRuntimeTurn,
-  AcpSessionRecord,
-} from 'acpx/runtime';
 import { from, type Observable, switchMap } from 'rxjs';
 import { AgentService } from '../agent/agent.service.js';
 import { ProfileService } from '../agent/profile.service.js';
 import { VoiceService } from '../voice/voice.service.js';
+import type { AgentConversation } from '../agent/prompt-turn.js';
 import { type Conversation, newConversation } from './conversation.js';
 import {
   ConversationTurn,
@@ -15,6 +11,7 @@ import {
   type TurnRequest,
 } from './conversation-turn.js';
 import {
+  historyOf,
   liveMessages,
   type Sender,
   type TranscriptMessage,
@@ -25,10 +22,8 @@ import { TurnMarksService } from './turn-marks.service.js';
 import { WorkingAgents } from './working-agents.js';
 
 export type ConversationAgent = {
-  open(conversationId: string): Promise<AcpRuntimeHandle>;
-  record(handle: AcpRuntimeHandle): Promise<Pick<AcpSessionRecord, 'messages'>>;
-  startTurn(handle: AcpRuntimeHandle, text: string): AcpRuntimeTurn;
-  close(handle: AcpRuntimeHandle): Promise<void>;
+  open(conversationId: string): Promise<AgentConversation>;
+  close(session: AgentConversation): Promise<void>;
 };
 
 @Injectable()
@@ -70,21 +65,21 @@ export class ConversationsService {
     { early, voice }: TurnKind,
   ): Promise<Observable<string>> {
     const conversation = this.conversation(id);
-    const handle = await this.handle(conversation);
+    const session = await this.handle(conversation);
     const framed = conversation.gate.frame(words);
     const aloud = voice || this.voice.isActive(id);
     const mark = { ...(voice && { voice }), ...(aloud && { aloud }) } as const;
-    return this.start(conversation, handle, { ...framed, words, early, mark });
+    return this.start(conversation, session, { ...framed, words, early, mark });
   }
 
   async sendMessage(id: string, text: string, sender: Sender): Promise<void> {
     const conversation = this.conversation(id);
-    const handle = await this.handle(conversation);
+    const session = await this.handle(conversation);
     const aloud = this.voice.isActive(id);
     const mark = { from: sender, text, ...(aloud && { aloud }) } as const;
     const prompt = fromAgent(sender, text);
     const request = { prompt, words: prompt, early: false, mark };
-    await this.start(conversation, handle, request);
+    await this.start(conversation, session, request);
   }
 
   confirm(id: string, words: string): void {
@@ -119,8 +114,8 @@ export class ConversationsService {
     this.conversations.delete(id);
     this.working.forget(id);
     conversation.snapshot.complete();
-    const handle = await conversation.opened;
-    if (handle) await this.agent.close(handle);
+    const session = await conversation.opened;
+    if (session) await this.agent.close(session);
   }
 
   private conversation(id: string): Conversation {
@@ -131,31 +126,32 @@ export class ConversationsService {
     return conversation;
   }
 
-  private handle(conversation: Conversation): Promise<AcpRuntimeHandle> {
+  private handle(conversation: Conversation): Promise<AgentConversation> {
     conversation.opened ??= this.open(conversation);
     return conversation.opened;
   }
 
-  private async open(conversation: Conversation): Promise<AcpRuntimeHandle> {
-    const handle = await this.agent.open(conversation.id);
+  private async open(conversation: Conversation): Promise<AgentConversation> {
+    const session = await this.agent.open(conversation.id);
     conversation.marks = await this.turnMarks.load(conversation.id);
-    await this.reload(conversation, handle);
-    return handle;
+    conversation.history = historyOf(session.history);
+    this.publish(conversation);
+    return session;
   }
 
   private async start(
     conversation: Conversation,
-    handle: AcpRuntimeHandle,
+    session: AgentConversation,
     request: TurnRequest,
   ): Promise<Observable<string>> {
     const turn = new ConversationTurn(
-      this.agent.startTurn(handle, request.prompt),
+      session.startTurn(request.prompt),
       request,
       () => this.publish(conversation),
     );
     await this.track(conversation, turn);
     this.publish(conversation);
-    void this.finish(conversation, handle, turn).catch((error: unknown) => {
+    void this.finish(conversation, turn).catch((error: unknown) => {
       this.logger.error(
         `Conversation ${conversation.id} turn failed: ${String(error)}`,
       );
@@ -189,31 +185,29 @@ export class ConversationsService {
     this.publish(conversation);
   }
 
-  private async reload(
-    conversation: Conversation,
-    handle: AcpRuntimeHandle,
-  ): Promise<void> {
-    conversation.record = await this.agent.record(handle);
-    this.publish(conversation);
-  }
-
-  private publish({ snapshot, record, marks, gate }: Conversation): void {
+  private publish({ snapshot, history, marks, gate }: Conversation): void {
     const { current } = gate;
-    const index = record.messages.length;
     const live = current
-      ? liveMessages(current.request, current.parts, index)
+      ? liveMessages(current.request, current.parts, history.length)
       : [];
-    snapshot.next([...transcriptOf(record, marks), ...live]);
+    snapshot.next([...transcriptOf(history, marks), ...live]);
   }
 
   private async finish(
     conversation: Conversation,
-    handle: AcpRuntimeHandle,
     turn: ConversationTurn,
   ): Promise<void> {
     const summary = await turn.run();
     this.logger.log(`Conversation ${conversation.id} turn ${summary}`);
     conversation.gate.release(turn);
-    await this.reload(conversation, handle);
+    if (await turn.result) {
+      const { prompt } = turn.request;
+      const { parts } = turn;
+      conversation.history.push(
+        { role: 'user', text: prompt },
+        { role: 'assistant', parts },
+      );
+    }
+    this.publish(conversation);
   }
 }

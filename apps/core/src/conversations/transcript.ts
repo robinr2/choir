@@ -1,4 +1,4 @@
-import type { AcpRuntimeEvent, AcpSessionRecord } from 'acpx/runtime';
+import type { SessionUpdate } from '@agentclientprotocol/sdk';
 
 type TextPart = { type: 'text'; text: string };
 
@@ -32,34 +32,19 @@ export type TranscriptMessage = {
   from?: Sender;
 };
 
-type SessionMessage = AcpSessionRecord['messages'][number];
-type UserMessage = Extract<SessionMessage, { User: unknown }>['User'];
-type AgentMessage = Extract<SessionMessage, { Agent: unknown }>['Agent'];
-type AgentContent = AgentMessage['content'][number];
+export type HistoryEntry =
+  | { role: 'user'; text: string; messageId?: string | null }
+  | { role: 'assistant'; parts: TranscriptPart[] };
 
-function userText({ content }: UserMessage): string {
-  return content.map((part) => ('Text' in part ? part.Text : '')).join('');
-}
+type ToolCallUpdate = Extract<
+  SessionUpdate,
+  { sessionUpdate: 'tool_call' | 'tool_call_update' }
+>;
 
-function agentPart(
-  content: AgentContent,
-  results: AgentMessage['tool_results'],
-): TranscriptPart[] {
-  if ('Text' in content) return [{ type: 'text', text: content.Text }];
-  if (!('ToolUse' in content)) return [];
-  const { id, name, input } = content.ToolUse;
-  const result = results[id];
-  return [
-    {
-      type: 'tool-call',
-      toolCallId: id,
-      toolName: name,
-      args: input,
-      result: result?.output,
-      isError: result?.is_error,
-    },
-  ];
-}
+type UserChunk = Extract<
+  SessionUpdate,
+  { sessionUpdate: 'user_message_chunk' }
+>;
 
 function userMarks(mark: TurnMark): Partial<TranscriptMessage> {
   return mark.from ? { from: mark.from } : {};
@@ -71,20 +56,9 @@ function replyMarks(mark: TurnMark): Partial<TranscriptMessage> {
   return { spoken: true, ...(heard !== undefined && { heard }) };
 }
 
-function messageOf(
-  message: SessionMessage,
-  id: string,
-  mark: TurnMark,
-): TranscriptMessage[] {
-  if (message === 'Resume') return [];
-  if ('User' in message) {
-    const text = mark.text ?? userText(message.User);
-    const parts = [{ type: 'text' as const, text }];
-    return [{ id, role: 'user', parts, ...userMarks(mark) }];
-  }
-  const { content, tool_results } = message.Agent;
-  const parts = content.flatMap((part) => agentPart(part, tool_results));
-  return [{ id, role: 'assistant', parts, ...replyMarks(mark) }];
+function userMessage(text: string, id: string, mark: TurnMark) {
+  const parts = [{ type: 'text' as const, text: mark.text ?? text }];
+  return { id, role: 'user' as const, parts, ...userMarks(mark) };
 }
 
 export function liveMessages(
@@ -93,31 +67,72 @@ export function liveMessages(
   index: number,
 ): TranscriptMessage[] {
   return [
-    {
-      id: `m${index}`,
-      role: 'user',
-      parts: [{ type: 'text', text: mark.text ?? prompt }],
-      ...userMarks(mark),
-    },
+    userMessage(prompt, `m${index}`, mark),
     { id: `m${index + 1}`, role: 'assistant', parts, ...replyMarks(mark) },
   ];
 }
 
-function promptOf(message: SessionMessage): string | undefined {
-  if (message === 'Resume' || !('User' in message)) return undefined;
-  return userText(message.User);
-}
-
 export function transcriptOf(
-  record: Pick<AcpSessionRecord, 'messages'>,
+  entries: HistoryEntry[],
   marks: ReadonlyMap<string, TurnMark>,
 ): TranscriptMessage[] {
   let mark: TurnMark = {};
-  return record.messages.flatMap((message, index) => {
-    const prompt = promptOf(message);
-    if (prompt !== undefined) mark = marks.get(prompt) ?? {};
-    return messageOf(message, `m${index}`, mark);
+  return entries.map((entry, index) => {
+    if (entry.role === 'assistant') {
+      const { parts } = entry;
+      return { id: `m${index}`, role: 'assistant', parts, ...replyMarks(mark) };
+    }
+    mark = marks.get(entry.text) ?? {};
+    return userMessage(entry.text, `m${index}`, mark);
   });
+}
+
+function continues(
+  last: HistoryEntry | undefined,
+  { messageId }: UserChunk,
+): last is Extract<HistoryEntry, { role: 'user' }> {
+  if (last?.role !== 'user') return false;
+  return !messageId || !last.messageId || messageId === last.messageId;
+}
+
+function withUserChunk(
+  entries: HistoryEntry[],
+  chunk: UserChunk,
+): HistoryEntry[] {
+  const text = chunk.content.type === 'text' ? chunk.content.text : '';
+  const last = entries.at(-1);
+  if (!continues(last, chunk)) {
+    return [...entries, { role: 'user', text, messageId: chunk.messageId }];
+  }
+  return [...entries.slice(0, -1), { ...last, text: last.text + text }];
+}
+
+const NO_PARTS: TranscriptPart[] = [];
+
+function lastReply(entries: HistoryEntry[]): TranscriptPart[] | undefined {
+  const last = entries.at(-1);
+  return last?.role === 'assistant' ? last.parts : undefined;
+}
+
+function withReplyUpdate(
+  entries: HistoryEntry[],
+  update: SessionUpdate,
+): HistoryEntry[] {
+  const previous = lastReply(entries) ?? NO_PARTS;
+  const parts = withEvent(previous, update);
+  if (parts === previous) return entries;
+  const kept = previous === NO_PARTS ? entries : entries.slice(0, -1);
+  return [...kept, { role: 'assistant', parts }];
+}
+
+export function historyOf(updates: SessionUpdate[]): HistoryEntry[] {
+  return updates.reduce<HistoryEntry[]>(
+    (entries, update) =>
+      update.sessionUpdate === 'user_message_chunk'
+        ? withUserChunk(entries, update)
+        : withReplyUpdate(entries, update),
+    [],
+  );
 }
 
 function withText(parts: TranscriptPart[], text: string): TranscriptPart[] {
@@ -126,26 +141,24 @@ function withText(parts: TranscriptPart[], text: string): TranscriptPart[] {
   return [...parts.slice(0, -1), { type: 'text', text: last.text + text }];
 }
 
-type ToolCallEvent = Extract<AcpRuntimeEvent, { type: 'tool_call' }>;
-
 function definedOnly(values: Partial<ToolCallPart>): Partial<ToolCallPart> {
   return Object.fromEntries(
     Object.entries(values).filter(([, value]) => value !== undefined),
   );
 }
 
-function failed(status: string | undefined): boolean | undefined {
-  return status === undefined ? undefined : status === 'failed';
+function failed(status: string | null | undefined): boolean | undefined {
+  return status ? status === 'failed' : undefined;
 }
 
-function updated(part: ToolCallPart, event: ToolCallEvent): ToolCallPart {
+function updated(part: ToolCallPart, update: ToolCallUpdate): ToolCallPart {
   return {
     ...part,
     ...definedOnly({
-      toolName: event.title ?? event.kind,
-      args: event.rawInput,
-      result: event.rawOutput,
-      isError: failed(event.status),
+      toolName: update.title ?? update.kind ?? undefined,
+      args: update.rawInput ?? undefined,
+      result: update.rawOutput ?? undefined,
+      isError: failed(update.status),
     }),
   };
 }
@@ -157,9 +170,9 @@ function isToolCall(id: string) {
 
 function withToolCall(
   parts: TranscriptPart[],
-  event: ToolCallEvent,
+  update: ToolCallUpdate,
 ): TranscriptPart[] {
-  const toolCallId = event.toolCallId ?? '';
+  const { toolCallId } = update;
   const index = parts.findIndex(isToolCall(toolCallId));
   const previous = parts.find(isToolCall(toolCallId)) ?? {
     type: 'tool-call',
@@ -167,24 +180,27 @@ function withToolCall(
     toolName: 'tool_call',
     args: undefined,
   };
-  const part = updated(previous, event);
+  const part = updated(previous, update);
   if (index < 0) return [...parts, part];
   return parts.with(index, part);
 }
 
-export function answerText(event: AcpRuntimeEvent): string | undefined {
-  if (event.type !== 'text_delta' || event.stream === 'thought') {
-    return undefined;
-  }
-  return event.text;
+export function answerText(update: SessionUpdate): string | undefined {
+  if (update.sessionUpdate !== 'agent_message_chunk') return undefined;
+  return update.content.type === 'text' ? update.content.text : undefined;
 }
 
 export function withEvent(
   parts: TranscriptPart[],
-  event: AcpRuntimeEvent,
+  update: SessionUpdate,
 ): TranscriptPart[] {
-  const text = answerText(event);
+  const text = answerText(update);
   if (text !== undefined) return withText(parts, text);
-  if (event.type === 'tool_call') return withToolCall(parts, event);
+  if (
+    update.sessionUpdate === 'tool_call' ||
+    update.sessionUpdate === 'tool_call_update'
+  ) {
+    return withToolCall(parts, update);
+  }
   return parts;
 }

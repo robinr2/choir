@@ -1,13 +1,14 @@
 import { Logger } from '@nestjs/common';
-import type {
-  AcpRuntimeEvent,
-  AcpRuntimeHandle,
-  AcpRuntimeTurn,
-  AcpRuntimeTurnResult,
-  AcpSessionRecord,
-} from 'acpx/runtime';
-import { firstValueFrom, lastValueFrom, take, toArray } from 'rxjs';
+import type { PromptResponse, SessionUpdate } from '@agentclientprotocol/sdk';
+import {
+  firstValueFrom,
+  lastValueFrom,
+  ReplaySubject,
+  take,
+  toArray,
+} from 'rxjs';
 import type { MockInstance } from 'vitest';
+import type { AgentTurn } from '../agent/prompt-turn.js';
 import {
   type ConversationAgent,
   ConversationsService,
@@ -17,35 +18,31 @@ import type { ProfileService } from '../agent/profile.service.js';
 import type { VoiceService } from '../voice/voice.service.js';
 import type { TurnMarksService } from './turn-marks.service.js';
 
-class ScriptedTurn implements AcpRuntimeTurn {
-  readonly requestId = 'request-1';
-  readonly promptStarted = Promise.resolve();
-  readonly events: ReadableStream<AcpRuntimeEvent>;
-  readonly result: Promise<AcpRuntimeTurnResult>;
-  readonly cancel = vi.fn<AcpRuntimeTurn['cancel']>(async () =>
-    this.end({ status: 'cancelled' }),
+class ScriptedTurn implements AgentTurn {
+  readonly updates = new ReplaySubject<SessionUpdate>();
+  readonly cancel = vi.fn<AgentTurn['cancel']>(async () =>
+    this.end({ stopReason: 'cancelled' }),
   );
-  readonly closeStream = vi.fn<AcpRuntimeTurn['closeStream']>();
-  private readonly finished = Promise.withResolvers<AcpRuntimeTurnResult>();
-  private stream?: ReadableStreamDefaultController<AcpRuntimeEvent>;
+  private readonly finished = Promise.withResolvers<
+    PromptResponse | undefined
+  >();
 
-  constructor(private readonly failure?: Error) {
-    this.events = new ReadableStream({
-      start: (controller) => {
-        this.stream = controller;
-      },
-    });
-    this.result = this.finished.promise;
+  get result(): Promise<PromptResponse | undefined> {
+    return this.finished.promise;
   }
 
-  emit(event: AcpRuntimeEvent): void {
-    this.stream?.enqueue(event);
+  says(text: string): void {
+    this.updates.next(agentSays(text));
   }
 
-  end(result: AcpRuntimeTurnResult): void {
-    this.finished.resolve(result);
-    if (this.failure) this.stream?.error(this.failure);
-    else this.stream?.close();
+  end(response?: PromptResponse): void {
+    this.finished.resolve(response);
+    this.updates.complete();
+  }
+
+  fail(error: Error): void {
+    this.finished.reject(error);
+    this.updates.error(error);
   }
 }
 
@@ -53,34 +50,34 @@ const ID = 'c1';
 const TYPED = { early: false, voice: false };
 const SPOKEN = { early: false, voice: true };
 const SPOKEN_EARLY = { early: true, voice: true };
+const DONE = { stopReason: 'end_turn' } as const;
 
-const handle: AcpRuntimeHandle = {
-  sessionKey: ID,
-  backend: 'acpx',
-  runtimeSessionName: ID,
-};
-
-type Messages = AcpSessionRecord['messages'];
-
-function user(text: string): Messages[number] {
-  return { User: { id: text, content: [{ Text: text }] } };
+function userSays(text: string): SessionUpdate {
+  return {
+    sessionUpdate: 'user_message_chunk',
+    content: { type: 'text', text },
+  };
 }
 
-function agentSaid(text: string): Messages[number] {
-  return { Agent: { content: [{ Text: text }], tool_results: {} } };
+function agentSays(text: string): SessionUpdate {
+  return {
+    sessionUpdate: 'agent_message_chunk',
+    content: { type: 'text', text },
+  };
 }
 
-let saved: Messages;
 let turns: ScriptedTurn[];
-let failure: Error | undefined;
-const agent = {
-  open: vi.fn<ConversationAgent['open']>(async () => handle),
-  record: vi.fn<ConversationAgent['record']>(async () => ({ messages: saved })),
-  startTurn: vi.fn<ConversationAgent['startTurn']>(() => {
-    const turn = new ScriptedTurn(failure);
+const session = {
+  history: [] as SessionUpdate[],
+  startTurn: vi.fn<(text: string) => AgentTurn>(() => {
+    const turn = new ScriptedTurn();
     turns.push(turn);
     return turn;
   }),
+  close: vi.fn<() => Promise<void>>(async () => undefined),
+};
+const agent = {
+  open: vi.fn<ConversationAgent['open']>(async () => session),
   close: vi.fn<ConversationAgent['close']>(async () => undefined),
 } satisfies ConversationAgent;
 
@@ -115,21 +112,21 @@ function latestTurn(): ScriptedTurn {
   return turn;
 }
 
-async function reloaded(times: number): Promise<void> {
-  await vi.waitFor(() => expect(agent.record).toHaveBeenCalledTimes(times));
+async function finished(times: number): Promise<void> {
+  await vi.waitFor(() => expect(log).toHaveBeenCalledTimes(times));
+  await new Promise(setImmediate);
 }
 
 function prompts(): string[] {
-  return agent.startTurn.mock.calls.map(([, text]) => text);
+  return session.startTurn.mock.calls.map(([text]) => text);
 }
 
 beforeEach(() => {
   vi.clearAllMocks();
   log = vi.spyOn(Logger.prototype, 'log').mockReturnValue();
   logError = vi.spyOn(Logger.prototype, 'error').mockReturnValue();
-  saved = [user('hi'), agentSaid('Hello.')];
+  session.history = [userSays('hi'), agentSays('Hello.')];
   turns = [];
-  failure = undefined;
   savedMarks = [];
   voiceAgent = undefined;
   conversations = new ConversationsService(
@@ -160,7 +157,8 @@ it('streams the answer and shows the turn while it runs', async () => {
   const shown = lastValueFrom(
     conversations.updates(ID).pipe(take(2), toArray()),
   );
-  latestTurn().emit({ type: 'text_delta', text: 'Nothing.' });
+  await new Promise(setImmediate);
+  latestTurn().says('Nothing.');
   const [started, live] = await shown;
   const asked = {
     id: 'm2',
@@ -180,9 +178,8 @@ it('streams the answer and shows the turn while it runs', async () => {
     },
   ]);
   expect(prompts()).toEqual(['what is new']);
-  saved = [...saved, user('what is new'), agentSaid('Nothing.')];
   latestTurn().end({
-    status: 'completed',
+    stopReason: 'end_turn',
     _meta: {
       quota: {
         token_count: {
@@ -195,11 +192,18 @@ it('streams the answer and shows the turn while it runs', async () => {
     },
   });
   expect(await lastValueFrom(answer.pipe(toArray()))).toEqual(['Nothing.']);
-  await reloaded(2);
+  await finished(1);
   expect(log).toHaveBeenCalledExactlyOnceWith(
-    'Conversation c1 turn completed: cache read 900, cache write 40, input 2, output 5',
+    'Conversation c1 turn end_turn: cache read 900, cache write 40, input 2, output 5',
   );
-  expect(await conversations.messages(ID)).toHaveLength(4);
+  expect((await conversations.messages(ID)).slice(2)).toEqual([
+    asked,
+    {
+      id: 'm3',
+      role: 'assistant',
+      parts: [{ type: 'text', text: 'Nothing.' }],
+    },
+  ]);
 });
 
 it('lets tool calls through only once an early turn is confirmed', async () => {
@@ -209,8 +213,8 @@ it('lets tool calls through only once an early turn is confirmed', async () => {
   conversations.confirm(ID, 'hi');
   conversations.confirm(ID, 'hello');
   expect(await allowed).toBe(true);
-  latestTurn().end({ status: 'completed' });
-  await reloaded(2);
+  latestTurn().end(DONE);
+  await finished(1);
   expect(await conversations.toolCallAllowed(ID)).toBe(false);
 });
 
@@ -259,10 +263,9 @@ it('cancels an interrupted turn and tells what the user heard', async () => {
 it('remembers how much of a spoken reply the user heard', async () => {
   await conversations.addUserTurn(ID, 'tell me a story', SPOKEN);
   const story = latestTurn();
-  story.emit({ type: 'text_delta', text: 'Once upon a time.' });
-  story.end({ status: 'completed' });
-  saved = [...saved, user('tell me a story'), agentSaid('Once upon a time.')];
-  await reloaded(2);
+  story.says('Once upon a time.');
+  story.end(DONE);
+  await finished(1);
   await conversations.interrupt(ID, 'Once upon');
   expect(turnMarks.save).toHaveBeenLastCalledWith(
     ID,
@@ -283,20 +286,29 @@ it('keeps showing a newer turn when an older one finishes', async () => {
   await conversations.addUserTurn(ID, 'first', TYPED);
   const first = latestTurn();
   await conversations.addUserTurn(ID, 'second', TYPED);
-  first.end({ status: 'completed' });
-  await reloaded(2);
+  first.end(DONE);
+  await finished(1);
   expect((await conversations.messages(ID)).at(-2)).toEqual({
-    id: 'm2',
+    id: 'm4',
     role: 'user',
     parts: [{ type: 'text', text: 'second' }],
   });
   expect(await conversations.toolCallAllowed(ID)).toBe(true);
 });
 
+it('leaves out a turn that never reached the agent', async () => {
+  await conversations.addUserTurn(ID, 'never sent', TYPED);
+  latestTurn().end();
+  await finished(1);
+  expect(log).toHaveBeenCalledWith(
+    'Conversation c1 turn withdrawn: no token usage reported',
+  );
+  expect(await conversations.messages(ID)).toHaveLength(2);
+});
+
 it('logs a turn the agent could not finish', async () => {
-  failure = new Error('agent exited');
   await conversations.addUserTurn(ID, 'hello', TYPED);
-  latestTurn().end({ status: 'failed', error: { message: 'agent exited' } });
+  latestTurn().fail(new Error('agent exited'));
   await vi.waitFor(() =>
     expect(logError).toHaveBeenCalledExactlyOnceWith(
       'Conversation c1 turn failed: Error: agent exited',
@@ -317,15 +329,15 @@ it('adds the voice rules and the continuation note to the prompt of a turn', asy
   expect(await conversations.promptContext(ID, 'aloud')).toBe('Speak plainly.');
   expect(await conversations.promptContext(ID, 'typed')).toBe('');
   expect(await conversations.promptContext(ID, 'unknown')).toBe('');
-  spoken.end({ status: 'completed' });
-  await reloaded(2);
+  spoken.end(DONE);
+  await finished(1);
   expect(await conversations.promptContext(ID, 'go on')).toBe('');
 });
 
 it('marks spoken exchanges while they run and once they are saved', async () => {
   savedMarks = [['hi', { voice: true, aloud: true }]];
   await conversations.addUserTurn(ID, 'tell me', SPOKEN);
-  latestTurn().emit({ type: 'text_delta', text: 'Sure.' });
+  latestTurn().says('Sure.');
   await vi.waitFor(async () =>
     expect((await conversations.messages(ID)).at(-1)?.parts).toHaveLength(1),
   );
@@ -341,9 +353,8 @@ it('marks spoken exchanges while they run and once they are saved', async () => 
     ]),
   );
   expect(voiceChannel.speak).not.toHaveBeenCalled();
-  saved = [...saved, user('tell me'), agentSaid('Sure.')];
-  latestTurn().end({ status: 'completed' });
-  await reloaded(2);
+  latestTurn().end(DONE);
+  await finished(1);
   expect(
     (await conversations.messages(ID)).map(({ spoken }) => spoken),
   ).toEqual([undefined, true, undefined, true]);
@@ -395,5 +406,5 @@ it('ends only the sessions it opened when a conversation closes', async () => {
   expect(agent.close).not.toHaveBeenCalled();
   await conversations.messages(ID);
   await conversations.close(ID);
-  expect(agent.close).toHaveBeenCalledExactlyOnceWith(handle);
+  expect(agent.close).toHaveBeenCalledExactlyOnceWith(session);
 });

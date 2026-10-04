@@ -1,29 +1,21 @@
-import { randomUUID } from 'node:crypto';
-import { Inject, Injectable, type OnApplicationShutdown } from '@nestjs/common';
 import {
-  type AcpRuntimeHandle,
-  type AcpRuntimeTurn,
-  type AcpSessionRecord,
-  type AcpSessionStore,
-  type AcpxRuntime,
-  createAcpRuntime,
-  createAgentRegistry,
-  createRuntimeStore,
-} from 'acpx/runtime';
+  Inject,
+  Injectable,
+  type BeforeApplicationShutdown,
+} from '@nestjs/common';
 import {
   CHOIR_CONFIG,
   type ChoirConfig,
   profileDir,
   sessionFolder,
-  sessionsDir,
 } from '../choir/choir-config.js';
 import {
   excalidrawMcpEnvironment,
   excalidrawMcpPath,
 } from '../canvas/excalidraw.js';
-
-const AGENT = 'claude';
-const BYPASS_PERMISSIONS = 'bypassPermissions';
+import { agentLaunch, sessionMeta } from './agent-launch.js';
+import { AgentSession, type SessionSetup } from './agent-session.js';
+import { AgentSessionsStore } from './agent-sessions.store.js';
 
 function excalidrawMcpServer(config: ChoirConfig) {
   return {
@@ -37,66 +29,58 @@ function excalidrawMcpServer(config: ChoirConfig) {
 }
 
 @Injectable()
-export class AgentService implements OnApplicationShutdown {
-  private readonly store: AcpSessionStore;
-  private readonly runtime: AcpxRuntime;
+export class AgentService implements BeforeApplicationShutdown {
+  private readonly sessions = new Set<AgentSession>();
 
-  constructor(@Inject(CHOIR_CONFIG) private readonly config: ChoirConfig) {
-    this.store = createRuntimeStore({ stateDir: sessionsDir(config) });
-    this.runtime = createAcpRuntime({
-      cwd: sessionFolder(config),
-      sessionStore: this.store,
-      agentRegistry: createAgentRegistry({
-        overrides: config.agentCommand && { [AGENT]: config.agentCommand },
+  constructor(
+    @Inject(CHOIR_CONFIG) private readonly config: ChoirConfig,
+    @Inject(AgentSessionsStore)
+    private readonly links: Pick<AgentSessionsStore, 'find' | 'save'>,
+  ) {}
+
+  async open(conversationId: string): Promise<AgentSession> {
+    const cwd = sessionFolder(this.config);
+    const session = new AgentSession(
+      agentLaunch(this.config, {
+        profile: profileDir(this.config),
+        cwd,
+        conversationId,
       }),
-      mcpServers: [excalidrawMcpServer(config)],
-      permissionMode: 'approve-all',
-      agentProcessEnv: {
-        CLAUDE_CODE_PLUGIN_DIRS: profileDir(config),
-        CHOIR_CORE_URL: config.coreUrl,
-        ...(config.claudeExecutable && {
-          CLAUDE_CODE_EXECUTABLE: config.claudeExecutable,
-        }),
-      },
-    });
-  }
-
-  async open(conversationId: string): Promise<AcpRuntimeHandle> {
-    const handle = await this.runtime.ensureSession({
-      sessionKey: conversationId,
-      agent: AGENT,
-      mode: 'persistent',
-      cwd: sessionFolder(this.config),
-      sessionOptions: { env: { CHOIR_CONVERSATION_ID: conversationId } },
-    });
-    const record = await this.record(handle);
-    if (record.acpx?.desired_mode_id !== BYPASS_PERMISSIONS) {
-      await this.runtime.setMode({ handle, mode: BYPASS_PERMISSIONS });
+    );
+    this.sessions.add(session);
+    try {
+      await this.start(session, conversationId, cwd);
+    } catch (error) {
+      await this.close(session);
+      throw error;
     }
-    return handle;
+    return session;
   }
 
-  async record(handle: AcpRuntimeHandle): Promise<AcpSessionRecord> {
-    const id = handle.acpxRecordId;
-    const record = id && (await this.store.load(id));
-    if (!record) throw new Error(`No saved session for ${handle.sessionKey}`);
-    return record;
+  async close(session: AgentSession): Promise<void> {
+    this.sessions.delete(session);
+    await session.close();
   }
 
-  startTurn(handle: AcpRuntimeHandle, text: string): AcpRuntimeTurn {
-    return this.runtime.startTurn({
-      handle,
-      text,
-      mode: 'prompt',
-      requestId: randomUUID(),
-    });
+  async beforeApplicationShutdown(): Promise<void> {
+    await Promise.all([...this.sessions].map((session) => this.close(session)));
   }
 
-  async close(handle: AcpRuntimeHandle): Promise<void> {
-    await this.runtime.close({ handle, reason: 'The agent was closed' });
+  private async start(
+    session: AgentSession,
+    conversationId: string,
+    cwd: string,
+  ): Promise<void> {
+    const saved = await this.links.find(conversationId);
+    await session.start(this.setup(cwd), saved);
+    if (!saved) await this.links.save(conversationId, session.id);
   }
 
-  async onApplicationShutdown(): Promise<void> {
-    await this.runtime.shutdown();
+  private setup(cwd: string): SessionSetup {
+    return {
+      cwd,
+      mcpServers: [excalidrawMcpServer(this.config)],
+      _meta: sessionMeta(),
+    };
   }
 }
