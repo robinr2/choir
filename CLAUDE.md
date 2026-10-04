@@ -17,6 +17,7 @@ Do all work based on the documentation of the tools the current task involves. O
 - niri: https://niri-wm.github.io/niri/
 - Agent Client Protocol and its TypeScript SDK: https://agentclientprotocol.com/llms.txt
 - Electron: https://www.electronjs.org/docs/latest/
+- Electron Forge: https://www.electronforge.io/llms.txt
 
 ## Development
 
