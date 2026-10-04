@@ -71,8 +71,8 @@ it('speaks the reply to a message from another agent', async () => {
   const events = await EventStream.open(testApp.app, '/voice/events');
   const sender = await callForJson<{ id: string }>(
     await testApp.workspace.tools(id),
-    'split_pane',
-    { direction: 'vertical', name: 'helper' },
+    'open_agent',
+    { name: 'helper' },
   );
   try {
     await callForJson(

@@ -2,7 +2,6 @@ import { GripVerticalIcon } from 'lucide-react';
 import type { PaneView } from '@/workspace/core-workspace';
 import { PaneControls } from './pane-controls';
 import { PaneName } from './pane-name';
-import { startPaneDrag } from './pane-swap';
 import { paneTitle } from './pane-frame';
 
 function AgentStatus({
@@ -50,9 +49,6 @@ export function PaneTitleBar({
   return (
     <div
       data-slot="pane-title"
-      data-pane-id={pane.id}
-      draggable
-      onDragStart={startPaneDrag}
       className="border-border/60 flex h-9 shrink-0 cursor-grab items-center gap-1 border-b px-1.5 active:cursor-grabbing"
     >
       <GripVerticalIcon

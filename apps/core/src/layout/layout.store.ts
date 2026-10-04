@@ -1,42 +1,52 @@
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
-import path from 'node:path';
 import { Inject, Injectable } from '@nestjs/common';
-import {
-  CHOIR_CONFIG,
-  type ChoirConfig,
-  workspaceFile,
-} from '../choir/choir-config.js';
-import { type WorkspaceState, workspaceStateSchema } from './layout.schemas.js';
+import { DatabaseService, type Orm } from '../database/database.service.js';
+import type { WorkspaceState } from './layout.schemas.js';
+import { fromRows, type Rows, STATE_ID, toRows } from './layout-rows.js';
 
-function missing(error: NodeJS.ErrnoException): undefined {
-  if (error.code !== 'ENOENT') throw error;
-  return undefined;
+function savedWorkspaces(orm: Orm) {
+  return orm.Workspace.orderBy((workspace) => workspace.position.asc())
+    .include('columns', (columns) =>
+      columns
+        .orderBy((column) => column.position.asc())
+        .include('panes', (panes) =>
+          panes.orderBy((pane) => pane.position.asc()),
+        ),
+    )
+    .all();
+}
+
+async function replaceRows(orm: Orm, rows: Rows): Promise<void> {
+  await orm.LayoutState.where((state) => state.id.gte(0)).deleteAndCount();
+  await orm.Workspace.where((space) => space.position.gte(0)).deleteAndCount();
+  await orm.LayoutState.create(rows.state);
+  await orm.Workspace.createAndCount(rows.workspaces);
+  if (rows.columns.length === 0) return;
+  await orm.LayoutColumn.createAndCount(rows.columns);
+  await orm.Pane.createAndCount(rows.panes);
 }
 
 @Injectable()
 export class LayoutStore {
   private saving = Promise.resolve();
 
-  constructor(@Inject(CHOIR_CONFIG) private readonly config: ChoirConfig) {}
+  constructor(
+    @Inject(DatabaseService) private readonly database: DatabaseService,
+  ) {}
 
   async load(): Promise<WorkspaceState | undefined> {
-    const saved = await readFile(this.file, 'utf8').catch(missing);
-    return saved === undefined
-      ? undefined
-      : workspaceStateSchema.parse(JSON.parse(saved));
+    const { orm } = this.database;
+    const state = await orm.LayoutState.where({ id: STATE_ID }).first();
+    if (!state) return undefined;
+    return fromRows(state, await savedWorkspaces(orm));
   }
 
   save(state: WorkspaceState): Promise<void> {
-    const saved = JSON.stringify(state);
-    const write = async () => {
-      await mkdir(path.dirname(this.file), { recursive: true });
-      await writeFile(this.file, saved);
-    };
+    const rows = toRows(state);
+    const write = () =>
+      this.database.client.transaction((tx) =>
+        replaceRows(tx.orm.public, rows),
+      );
     this.saving = this.saving.then(write, write);
     return this.saving;
-  }
-
-  private get file(): string {
-    return workspaceFile(this.config);
   }
 }

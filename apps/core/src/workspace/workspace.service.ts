@@ -10,14 +10,12 @@ import { LayoutService } from '../layout/layout.service.js';
 import { VoiceService } from '../voice/voice.service.js';
 import {
   type AgentListing,
-  type Edge,
-  type LayoutNode,
+  type LayoutAction,
   type NewPane,
   type OpenableKind,
   type Pane,
   type PaneContent,
   type PaneView,
-  type SplitKind,
   WORKSPACE,
   type Workspace,
   type WorkspaceView,
@@ -65,7 +63,7 @@ export class WorkspaceService implements Workspace {
       this.voice.changes,
     ]).pipe(
       map(([{ layout, panes }, working, voiceAgentId]) => ({
-        layout,
+        ...layout,
         panes: Object.entries(panes).map(([id, content]) =>
           paneView(id, content, working),
         ),
@@ -78,24 +76,16 @@ export class WorkspaceService implements Workspace {
     return firstValueFrom(this.changes);
   }
 
-  split(id: string, kind: SplitKind, pane: NewPane): Promise<Pane> {
-    return this.layout.split(id, kind, pane);
-  }
-
-  addAtEdge(edge: Edge, pane: NewPane): Promise<Pane> {
-    return this.layout.addAtEdge(edge, pane);
+  openPane(pane: NewPane): Promise<Pane> {
+    return this.layout.openPane(pane);
   }
 
   open(id: string, kind: OpenableKind): Promise<Pane> {
     return this.layout.open(id, kind);
   }
 
-  swap(first: string, second: string): Promise<void> {
-    return this.layout.swap(first, second);
-  }
-
-  resize(layout: LayoutNode | null): Promise<void> {
-    return this.layout.resize(layout);
+  act(action: LayoutAction): Promise<void> {
+    return this.layout.act(action);
   }
 
   rename(id: string, name: string): Promise<void> {
@@ -127,7 +117,7 @@ export class WorkspaceService implements Workspace {
   }
 
   async list(callerId: string): Promise<AgentListing> {
-    const { layout, panes } = await this.view();
+    const { panes } = await this.view();
     return {
       agents: panes.flatMap((pane) =>
         pane.kind === 'agent' ? [listedAgent(pane, callerId)] : [],
@@ -135,7 +125,7 @@ export class WorkspaceService implements Workspace {
       otherPanes: panes.flatMap((pane) =>
         pane.kind === 'agent' ? [] : [pane],
       ),
-      layout,
+      layout: this.layout.current.layout,
     };
   }
 }

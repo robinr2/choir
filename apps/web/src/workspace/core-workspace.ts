@@ -1,7 +1,23 @@
-import type { MosaicNode } from 'react-mosaic-component';
 import { LiveStore, send } from '@/lib/live-store';
 
-export type Layout = MosaicNode<string> | null;
+export type Height = { auto: number } | { fixed: number };
+
+type Tile = { paneId: string; height: Height };
+
+export type Column = {
+  id: string;
+  width: number;
+  fullWidth: boolean;
+  activeTile: number;
+  tiles: readonly Tile[];
+};
+
+export type StripLayout = {
+  id: string;
+  columns: readonly Column[];
+  activeColumn: number;
+  restoresPrevious: boolean;
+};
 
 export type AgentView = {
   id: string;
@@ -19,14 +35,45 @@ export type OpenableKind = 'agent' | 'excalidraw';
 
 export type WorkspaceView = {
   loaded: boolean;
-  layout: Layout;
+  workspaces: readonly StripLayout[];
+  activeWorkspace: number;
   panes: readonly PaneView[];
   voiceAgentId: string | null;
 };
 
-export type Edge = 'left' | 'right' | 'top' | 'bottom';
+export type SimpleAction =
+  | 'focusColumnLeft'
+  | 'focusColumnRight'
+  | 'focusWindowUp'
+  | 'focusWindowDown'
+  | 'moveColumnLeft'
+  | 'moveColumnRight'
+  | 'moveWindowUp'
+  | 'moveWindowDown'
+  | 'consumeOrExpelWindowLeft'
+  | 'consumeOrExpelWindowRight'
+  | 'consumeWindowIntoColumn'
+  | 'expelWindowFromColumn'
+  | 'resetWindowHeight'
+  | 'maximizeColumn'
+  | 'focusWorkspaceUp'
+  | 'focusWorkspaceDown'
+  | 'moveWindowToWorkspaceUp'
+  | 'moveWindowToWorkspaceDown'
+  | 'moveColumnToWorkspaceUp'
+  | 'moveColumnToWorkspaceDown'
+  | 'moveWorkspaceUp'
+  | 'moveWorkspaceDown';
 
-export type SplitKind = 'vertical' | 'horizontal';
+export type LayoutAction =
+  | { action: SimpleAction }
+  | { action: 'setColumnWidth' | 'setWindowHeight'; change: number }
+  | { action: 'expandColumnToAvailableWidth'; visibleColumns: string[] }
+  | { action: 'focusPane'; paneId: string }
+  | { action: 'focusColumn'; columnId: string }
+  | { action: 'focusWorkspace'; workspaceId: string }
+  | { action: 'movePane'; paneId: string; column: number; tile?: number }
+  | { action: 'resizePane'; paneId: string; width?: number; height?: number };
 
 const PATH = '/workspace';
 
@@ -36,34 +83,31 @@ export function agentOf(view: WorkspaceView, id: string): AgentView | null {
 }
 
 export class CoreWorkspace extends LiveStore<WorkspaceView> {
+  #acting: Promise<unknown> = Promise.resolve();
+
   constructor() {
     super(`${PATH}/events`, {
       loaded: false,
-      layout: null,
+      workspaces: [],
+      activeWorkspace: 0,
       panes: [],
       voiceAgentId: null,
     });
   }
 
-  async split(paneId: string, direction: SplitKind): Promise<void> {
-    await send('POST', `${PATH}/splits`, { paneId, direction });
-  }
-
-  async addAtEdge(edge: Edge): Promise<void> {
-    await send('POST', `${PATH}/edges`, { edge });
+  async openPane(): Promise<void> {
+    await send('POST', `${PATH}/panes`);
   }
 
   async open(paneId: string, kind: OpenableKind): Promise<void> {
     await send('PUT', `${PATH}/panes/${paneId}/content`, { kind });
   }
 
-  async swap(first: string, second: string): Promise<void> {
-    await send('POST', `${PATH}/swaps`, { first, second });
-  }
-
-  async resize(layout: Layout): Promise<void> {
-    this.update({ layout });
-    await send('PUT', `${PATH}/layout`, { layout });
+  async act(action: LayoutAction): Promise<void> {
+    const sent = () => send('POST', `${PATH}/actions`, action);
+    const acting = this.#acting.then(sent, sent);
+    this.#acting = acting;
+    await acting;
   }
 
   async rename(id: string, name: string): Promise<void> {

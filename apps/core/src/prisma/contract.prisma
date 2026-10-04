@@ -62,3 +62,50 @@ model QueueItem {
 
   @@index([dueAt])
 }
+
+enum PaneKind {
+  @@type("pg/text@1")
+  empty = "empty"
+  agent = "agent"
+  excalidraw = "excalidraw"
+}
+
+model LayoutState {
+  id              Int @id
+  activeWorkspace Int
+  nextNumber      Int
+}
+
+model Workspace {
+  id               Uuid           @id
+  position         Int
+  activeColumn     Int
+  restoresPrevious Boolean
+  columns          LayoutColumn[]
+}
+
+model LayoutColumn {
+  id          Uuid      @id
+  workspaceId Uuid
+  workspace   Workspace @relation(fields:[workspaceId], references:[id], onDelete: Cascade)
+  position    Int
+  width       Float
+  fullWidth   Boolean
+  activeTile  Int
+  panes       Pane[]
+
+  @@index([workspaceId])
+}
+
+model Pane {
+  id          Uuid         @id
+  columnId    Uuid
+  column      LayoutColumn @relation(fields:[columnId], references:[id], onDelete: Cascade)
+  position    Int
+  kind        PaneKind
+  name        String?
+  autoHeight  Float?
+  fixedHeight Float?
+
+  @@index([columnId])
+}

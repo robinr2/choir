@@ -91,10 +91,6 @@ export function profileVoicePrompt(config: ChoirConfig): string {
   return path.join(profileDir(config), VOICE_PROMPT);
 }
 
-export function workspaceFile(config: ChoirConfig): string {
-  return path.join(config.dataDir, 'workspaces', 'default.json');
-}
-
 export function defaultFolder(config: ChoirConfig): string {
   return path.join(config.dataDir, 'default');
 }

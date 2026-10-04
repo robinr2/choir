@@ -1,0 +1,320 @@
+[
+  {
+    "id": "table.LayoutColumn",
+    "label": "Create table \"LayoutColumn\"",
+    "summary": "Creates table \"LayoutColumn\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "table",
+        "name": "LayoutColumn"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"LayoutColumn\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"LayoutColumn\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"LayoutColumn\"",
+        "sql": "CREATE TABLE \"public\".\"LayoutColumn\" (\n  \"activeTile\" int4 NOT NULL,\n  \"fullWidth\" bool NOT NULL,\n  \"id\" uuid NOT NULL,\n  \"position\" int4 NOT NULL,\n  \"width\" float8 NOT NULL,\n  \"workspaceId\" uuid NOT NULL,\n  PRIMARY KEY (\"id\")\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"LayoutColumn\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"LayoutColumn\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "table.LayoutState",
+    "label": "Create table \"LayoutState\"",
+    "summary": "Creates table \"LayoutState\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "table",
+        "name": "LayoutState"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"LayoutState\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"LayoutState\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"LayoutState\"",
+        "sql": "CREATE TABLE \"public\".\"LayoutState\" (\n  \"activeWorkspace\" int4 NOT NULL,\n  \"id\" int4 NOT NULL,\n  \"nextNumber\" int4 NOT NULL,\n  PRIMARY KEY (\"id\")\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"LayoutState\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"LayoutState\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "table.Pane",
+    "label": "Create table \"Pane\"",
+    "summary": "Creates table \"Pane\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "table",
+        "name": "Pane"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"Pane\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"Pane\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"Pane\"",
+        "sql": "CREATE TABLE \"public\".\"Pane\" (\n  \"autoHeight\" float8,\n  \"columnId\" uuid NOT NULL,\n  \"fixedHeight\" float8,\n  \"id\" uuid NOT NULL,\n  \"kind\" text NOT NULL,\n  \"name\" text,\n  \"position\" int4 NOT NULL,\n  PRIMARY KEY (\"id\"),\n  CONSTRAINT \"Pane_kind_check_36d7f133\" CHECK (\"kind\" IN ('empty', 'agent', 'excalidraw'))\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"Pane\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"Pane\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "table.Workspace",
+    "label": "Create table \"Workspace\"",
+    "summary": "Creates table \"Workspace\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "table",
+        "name": "Workspace"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"Workspace\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"Workspace\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"Workspace\"",
+        "sql": "CREATE TABLE \"public\".\"Workspace\" (\n  \"activeColumn\" int4 NOT NULL,\n  \"id\" uuid NOT NULL,\n  \"position\" int4 NOT NULL,\n  \"restoresPrevious\" bool NOT NULL,\n  PRIMARY KEY (\"id\")\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"Workspace\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"Workspace\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.LayoutColumn.LayoutColumn_workspaceId_idx_ba65f874",
+    "label": "Create index \"LayoutColumn_workspaceId_idx_ba65f874\" on \"LayoutColumn\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "LayoutColumn_workspaceId_idx_ba65f874",
+        "table": "LayoutColumn"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"LayoutColumn_workspaceId_idx_ba65f874\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"LayoutColumn_workspaceId_idx_ba65f874\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"LayoutColumn_workspaceId_idx_ba65f874\"",
+        "sql": "CREATE INDEX \"LayoutColumn_workspaceId_idx_ba65f874\" ON \"public\".\"LayoutColumn\" (\"workspaceId\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"LayoutColumn_workspaceId_idx_ba65f874\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"LayoutColumn_workspaceId_idx_ba65f874\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.Pane.Pane_columnId_idx_728f084b",
+    "label": "Create index \"Pane_columnId_idx_728f084b\" on \"Pane\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "Pane_columnId_idx_728f084b",
+        "table": "Pane"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"Pane_columnId_idx_728f084b\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"Pane_columnId_idx_728f084b\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"Pane_columnId_idx_728f084b\"",
+        "sql": "CREATE INDEX \"Pane_columnId_idx_728f084b\" ON \"public\".\"Pane\" (\"columnId\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"Pane_columnId_idx_728f084b\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"Pane_columnId_idx_728f084b\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.LayoutColumn.LayoutColumn_workspaceId_fkey",
+    "label": "Add foreign key \"LayoutColumn_workspaceId_fkey\" on \"LayoutColumn\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "foreignKey",
+        "name": "LayoutColumn_workspaceId_fkey",
+        "table": "LayoutColumn"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"LayoutColumn_workspaceId_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "LayoutColumn_workspaceId_fkey",
+          "public",
+          "\"public\".\"LayoutColumn\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"LayoutColumn_workspaceId_fkey\"",
+        "sql": "ALTER TABLE \"public\".\"LayoutColumn\"\nADD CONSTRAINT \"LayoutColumn_workspaceId_fkey\"\nFOREIGN KEY (\"workspaceId\")\nREFERENCES \"public\".\"Workspace\" (\"id\")\nON DELETE CASCADE"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"LayoutColumn_workspaceId_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "LayoutColumn_workspaceId_fkey",
+          "public",
+          "\"public\".\"LayoutColumn\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.Pane.Pane_columnId_fkey",
+    "label": "Add foreign key \"Pane_columnId_fkey\" on \"Pane\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "foreignKey",
+        "name": "Pane_columnId_fkey",
+        "table": "Pane"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"Pane_columnId_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "Pane_columnId_fkey",
+          "public",
+          "\"public\".\"Pane\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"Pane_columnId_fkey\"",
+        "sql": "ALTER TABLE \"public\".\"Pane\"\nADD CONSTRAINT \"Pane_columnId_fkey\"\nFOREIGN KEY (\"columnId\")\nREFERENCES \"public\".\"LayoutColumn\" (\"id\")\nON DELETE CASCADE"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"Pane_columnId_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "Pane_columnId_fkey",
+          "public",
+          "\"public\".\"Pane\""
+        ]
+      }
+    ]
+  }
+]

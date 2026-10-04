@@ -1,6 +1,11 @@
 import { vi } from 'vitest';
 import type { TranscriptMessage } from '@/conversation/transcript';
-import type { WorkspaceView } from '@/workspace/core-workspace';
+import type {
+  Column,
+  PaneView,
+  StripLayout,
+  WorkspaceView,
+} from '@/workspace/core-workspace';
 import { fakeEventSources, streamOf } from './fake-event-source';
 import { coreHasInbox, inboxResponse } from './fake-inbox';
 
@@ -41,20 +46,55 @@ export function coreShowsChat(
   streamOf(`/conversations/${agentId}/events`)?.receive({ messages });
 }
 
-export function twoAgents(
-  voiceAgentId: string | null = null,
-): Omit<WorkspaceView, 'loaded'> {
+export function column(
+  id: string,
+  paneIds: readonly string[],
+  change: Partial<Column> = {},
+): Column {
   return {
-    layout: {
-      type: 'split',
-      direction: 'row',
-      children: [A, B],
-      splitPercentages: [50, 50],
-    },
-    panes: [
-      { id: A, kind: 'agent', name: 'agent 1', working: false },
-      { id: B, kind: 'agent', name: 'agent 2', working: true },
-    ],
-    voiceAgentId,
+    id,
+    width: 0.5,
+    fullWidth: false,
+    activeTile: 0,
+    tiles: paneIds.map((paneId) => ({ paneId, height: { auto: 1 } })),
+    ...change,
   };
+}
+
+export function strip(
+  id: string,
+  columns: readonly Column[],
+  change: Partial<StripLayout> = {},
+): StripLayout {
+  return { id, columns, activeColumn: 0, restoresPrevious: false, ...change };
+}
+
+const LAST = strip('last', []);
+
+export type CoreView = Omit<WorkspaceView, 'loaded'>;
+
+export function viewOf(
+  workspaces: readonly StripLayout[],
+  panes: readonly PaneView[],
+  change: Partial<CoreView> = {},
+): CoreView {
+  return {
+    workspaces: [...workspaces, LAST],
+    activeWorkspace: 0,
+    panes,
+    voiceAgentId: null,
+    ...change,
+  };
+}
+
+export function agent(id: string, name: string, working = false): PaneView {
+  return { id, kind: 'agent', name, working };
+}
+
+export function twoAgents(voiceAgentId: string | null = null): CoreView {
+  return viewOf(
+    [strip('first', [column('left', [A]), column('right', [B])])],
+    [agent(A, 'agent 1'), agent(B, 'agent 2', true)],
+    { voiceAgentId },
+  );
 }

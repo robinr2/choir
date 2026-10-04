@@ -1,93 +1,122 @@
 import { z } from 'zod';
-import type { LayoutNode } from './layout-tree.js';
+
+export type Height = { auto: number } | { fixed: number };
+
+export type Tile = { paneId: string; height: Height };
+
+export type Column = {
+  id: string;
+  width: number;
+  fullWidth: boolean;
+  activeTile: number;
+  tiles: Tile[];
+};
+
+export type ColumnSize = { width: number; fullWidth: boolean };
+
+export type Space = {
+  id: string;
+  columns: Column[];
+  activeColumn: number;
+  restoresPrevious: boolean;
+};
+
+export type Layout = { workspaces: Space[]; activeWorkspace: number };
 
 export const paneIdSchema = z.uuid();
 
 export const agentNameSchema = z.string().trim().min(1).max(40);
 
-const splitSchema = z.object({
-  type: z.literal('split'),
-  direction: z.enum(['row', 'column']),
-  get children() {
-    return z.array(layoutNodeSchema);
-  },
-  splitPercentages: z.array(z.number().positive()),
-});
-
-function splitsEvenly({
-  children,
-  splitPercentages,
-}: z.infer<typeof splitSchema>): boolean {
-  const total = splitPercentages.reduce((sum, p) => sum + p, 0);
-  return (
-    children.length >= 2 &&
-    children.length === splitPercentages.length &&
-    Math.round(total) === 100
-  );
-}
-
-const layoutNodeSchema: z.ZodType<LayoutNode> = z.union([
-  paneIdSchema,
-  splitSchema.refine(
-    splitsEvenly,
-    'A split needs two or more panes and one percentage per pane, adding up to 100',
-  ),
-]);
-
-export const layoutSchema = layoutNodeSchema.nullable();
-
 export const openableKindSchema = z.enum(['agent', 'excalidraw']);
 
 export type OpenableKind = z.infer<typeof openableKindSchema>;
 
-const paneContentSchema = z.union([
-  z.object({ kind: z.literal('empty') }),
-  z.object({ kind: z.literal('agent'), name: agentNameSchema }),
-  z.object({ kind: z.literal('excalidraw') }),
-]);
+export type PaneContent =
+  { kind: 'empty' } | { kind: 'agent'; name: string } | { kind: 'excalidraw' };
 
-export type PaneContent = z.infer<typeof paneContentSchema>;
-
-const nextNumberSchema = z.number().int().positive();
-
-const currentStateSchema = z.object({
-  layout: layoutSchema,
-  panes: z.record(paneIdSchema, paneContentSchema),
-  nextNumber: nextNumberSchema,
-});
-
-const agentsOnlyStateSchema = z
-  .object({
-    layout: layoutSchema,
-    agents: z.record(paneIdSchema, z.object({ name: agentNameSchema })),
-    nextNumber: nextNumberSchema,
-  })
-  .transform(({ layout, agents, nextNumber }) => ({
-    layout,
-    panes: Object.fromEntries(
-      Object.entries(agents).map(([id, { name }]) => [
-        id,
-        { kind: 'agent' as const, name },
-      ]),
-    ),
-    nextNumber,
-  }));
-
-export const workspaceStateSchema = z.union([
-  currentStateSchema,
-  agentsOnlyStateSchema,
-]);
-
-export type WorkspaceState = z.infer<typeof currentStateSchema>;
-
-export const edgeSchema = z.enum(['left', 'right', 'top', 'bottom']);
-
-export const splitKindSchema = z.enum(['vertical', 'horizontal']);
-
-export type SplitKind = z.infer<typeof splitKindSchema>;
+export type WorkspaceState = {
+  layout: Layout;
+  panes: Record<string, PaneContent>;
+  nextNumber: number;
+};
 
 export type Agent = { id: string; name: string };
 
 export type Pane = { id: string } & PaneContent;
 
 export type NewPane = { kind: 'empty' } | { kind: 'agent'; name?: string };
+
+const index = z.int().nonnegative();
+
+const proportion = z.number().nonnegative().max(10_000);
+
+const SPACE_ACTIONS = [
+  'focusColumnLeft',
+  'focusColumnRight',
+  'focusWindowUp',
+  'focusWindowDown',
+  'moveColumnLeft',
+  'moveColumnRight',
+  'moveWindowUp',
+  'moveWindowDown',
+  'consumeOrExpelWindowLeft',
+  'consumeOrExpelWindowRight',
+  'consumeWindowIntoColumn',
+  'expelWindowFromColumn',
+  'resetWindowHeight',
+  'maximizeColumn',
+] as const;
+
+const WORKSPACE_ACTIONS = [
+  'focusWorkspaceUp',
+  'focusWorkspaceDown',
+  'moveWindowToWorkspaceUp',
+  'moveWindowToWorkspaceDown',
+  'moveColumnToWorkspaceUp',
+  'moveColumnToWorkspaceDown',
+  'moveWorkspaceUp',
+  'moveWorkspaceDown',
+] as const;
+
+export type SpaceActionName = (typeof SPACE_ACTIONS)[number];
+
+export type WorkspaceActionName = (typeof WORKSPACE_ACTIONS)[number];
+
+export const layoutActionSchema = z.union([
+  z.object({ action: z.enum(SPACE_ACTIONS) }),
+  z.object({ action: z.enum(WORKSPACE_ACTIONS) }),
+  z.object({
+    action: z.enum(['setColumnWidth', 'setWindowHeight']),
+    change: z.number().min(-10_000).max(10_000),
+  }),
+  z.object({
+    action: z.literal('expandColumnToAvailableWidth'),
+    visibleColumns: z.array(z.uuid()),
+  }),
+  z.object({ action: z.literal('focusPane'), paneId: paneIdSchema }),
+  z.object({ action: z.literal('focusColumn'), columnId: z.uuid() }),
+  z.object({ action: z.literal('focusWorkspace'), workspaceId: z.uuid() }),
+  z.object({
+    action: z.literal('movePane'),
+    paneId: paneIdSchema,
+    column: index,
+    tile: index.optional(),
+  }),
+  z.object({
+    action: z.literal('resizePane'),
+    paneId: paneIdSchema,
+    width: proportion.optional(),
+    height: z.number().min(0).max(1).optional(),
+  }),
+]);
+
+export type LayoutAction = z.infer<typeof layoutActionSchema>;
+
+export type SpaceAction = Extract<
+  LayoutAction,
+  | { action: SpaceActionName }
+  | { change: number }
+  | { visibleColumns: string[] }
+>;
+
+export type WorkspaceAction = Exclude<LayoutAction, SpaceAction>;

@@ -19,7 +19,7 @@ afterEach(async () => {
 
 it('gives every agent the inbox tools', async () => {
   const { tools: listed } = await tools.listTools();
-  expect(listed.map(({ name }) => name).slice(5)).toEqual([
+  expect(listed.map(({ name }) => name).slice(4)).toEqual([
     'list_notifications',
     'search_notifications',
     'grab_notification',

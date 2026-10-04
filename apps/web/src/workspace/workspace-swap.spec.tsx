@@ -9,13 +9,8 @@ import {
   fakeCore,
   twoAgents,
 } from '@/test/fake-core';
-import {
-  dragEvent,
-  micOf,
-  pane,
-  renderApp,
-  type Screen,
-} from '@/test/render-app';
+import { userEvent } from 'vitest/browser';
+import { micOf, pane, renderApp, type Screen } from '@/test/render-app';
 import { createPipecatClient } from '@/voice/create-pipecat-client';
 import { CoreWorkspace, type WorkspaceView } from './core-workspace';
 
@@ -51,40 +46,13 @@ afterEach(() => {
 test('acts on the workspace it was last given', async () => {
   const screen = await renderApp();
   const { workspace } = await swapWorkspace(screen);
-  const actions = {
-    addAtEdge: vi.spyOn(workspace, 'addAtEdge'),
-    split: vi.spyOn(workspace, 'split'),
-    close: vi.spyOn(workspace, 'close'),
-    swap: vi.spyOn(workspace, 'swap'),
-    resize: vi.spyOn(workspace, 'resize'),
-  };
-  await screen.getByRole('button', { name: 'Add a row at the top' }).click();
-  await pane(screen, 'agent 1')
-    .getByRole('button', { name: 'Split vertically' })
-    .click();
+  const close = vi.spyOn(workspace, 'close');
+  const act = vi.spyOn(workspace, 'act');
   await pane(screen, 'agent 2').getByRole('button', { name: 'Close' }).click();
-  const data = new DataTransfer();
-  pane(screen, 'agent 1')
-    .element()
-    .querySelector('[data-slot="pane-title"]')
-    ?.dispatchEvent(dragEvent('dragstart', data));
-  pane(screen, 'agent 2').element().dispatchEvent(dragEvent('dragover', data));
-  pane(screen, 'agent 2').element().dispatchEvent(dragEvent('drop', data));
-  const bar = document.querySelector('.mosaic-split');
-  const box = bar?.getBoundingClientRect() ?? new DOMRect();
-  const at = (clientX: number) => ({
-    bubbles: true,
-    clientX,
-    clientY: box.top,
-  });
-  bar?.dispatchEvent(new MouseEvent('mousedown', at(box.left)));
-  document.dispatchEvent(new MouseEvent('mouseup', at(box.left - 50)));
+  await userEvent.keyboard('{Alt>}j{/Alt}');
   await vi.waitFor(() => {
-    expect(actions.addAtEdge).toHaveBeenCalledWith('top');
-    expect(actions.split).toHaveBeenCalledWith(A, 'vertical');
-    expect(actions.close).toHaveBeenCalledWith(B);
-    expect(actions.swap).toHaveBeenCalledWith(A, B);
-    expect(actions.resize).toHaveBeenCalled();
+    expect(close).toHaveBeenCalledWith(B);
+    expect(act).toHaveBeenCalledWith({ action: 'focusWindowDown' });
   });
 });
 
