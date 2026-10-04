@@ -13,7 +13,9 @@ const BINDINGS = new Map<string, Command>([
   ['Alt+KeyQ', 'close'],
   ...both(['Alt+ArrowDown', 'Alt+KeyJ'], act('focusWindowDown')),
   ...both(['Alt+ArrowUp', 'Alt+KeyK'], act('focusWindowUp')),
-  ['Alt+KeyL', act('focusColumnRight')],
+  ['Alt+KeyT', 'open'],
+  ...both(['Alt+ArrowLeft', 'Alt+KeyH'], act('focusColumnLeft')),
+  ...both(['Alt+ArrowRight', 'Alt+KeyL'], act('focusColumnRight')),
   ...both(['Alt+Ctrl+ArrowLeft', 'Alt+Ctrl+KeyH'], act('moveColumnLeft')),
   ...both(['Alt+Ctrl+ArrowRight', 'Alt+Ctrl+KeyL'], act('moveColumnRight')),
   ...both(['Alt+Ctrl+ArrowDown', 'Alt+Ctrl+KeyJ'], act('moveWindowDown')),
@@ -26,7 +28,7 @@ const BINDINGS = new Map<string, Command>([
   ),
   ...both(['Alt+Ctrl+PageUp', 'Alt+Ctrl+KeyI'], act('moveColumnToWorkspaceUp')),
   ...both(['Alt+Shift+PageDown', 'Alt+Shift+KeyU'], act('moveWorkspaceDown')),
-  ['Alt+Shift+PageUp', act('moveWorkspaceUp')],
+  ...both(['Alt+Shift+PageUp', 'Alt+Shift+KeyI'], act('moveWorkspaceUp')),
   ...both(
     ['Alt+Ctrl+Shift+PageDown', 'Alt+Ctrl+Shift+KeyU'],
     act('moveWindowToWorkspaceDown'),
@@ -44,6 +46,7 @@ const BINDINGS = new Map<string, Command>([
   ['Alt+Shift+Minus', { action: 'setWindowHeight', change: -10 }],
   ['Alt+Shift+Equal', { action: 'setWindowHeight', change: 10 }],
   ['Alt+Ctrl+KeyR', act('resetWindowHeight')],
+  ['Alt+KeyF', act('maximizeColumn')],
   ['Alt+Ctrl+KeyF', 'expand'],
 ]);
 

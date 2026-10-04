@@ -7,8 +7,7 @@ const MAGENTA_PIXEL = 0xffff00ff;
 const DRAW = `Use the create_element tool of the excalidraw MCP server to draw one rectangle at x 100, y 100 with width 300, height 200, backgroundColor ${MAGENTA}, strokeColor ${MAGENTA} and fillStyle solid. Do nothing else.`;
 
 async function openInNewPane(page: Page, kind: string): Promise<void> {
-  const opened = await page.request.post('/workspace/panes');
-  expect(opened.ok()).toBe(true);
+  await page.keyboard.press('Alt+KeyT');
   const empty = page.getByRole('region', { name: 'New pane' });
   await empty.getByRole('button', { name: kind }).click();
   await expect(empty).toHaveCount(0);

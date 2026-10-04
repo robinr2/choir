@@ -1,5 +1,13 @@
 import { expect, test, vi } from 'vitest';
-import { A, B, column, strip, twoAgents, viewOf } from '@/test/fake-core';
+import {
+  A,
+  B,
+  agent,
+  column,
+  strip,
+  twoAgents,
+  viewOf,
+} from '@/test/fake-core';
 import { pane, renderApp } from '@/test/render-app';
 import {
   actions,
@@ -55,6 +63,27 @@ test('keeps the focused column when the view snaps to it', async () => {
   drag('pointerup', { x: 700, y: 400 });
   await vi.waitFor(() => expect(boxOf(second).x).toBe(658));
   expect(actions()).toEqual([]);
+});
+
+test('forgets the speed of a drag that paused before the release', async () => {
+  const C = '5c3d2e1f-0a9b-4c8d-8e7f-6a5b4c3d2e1f';
+  const three = strip('first', [
+    column('left', [A]),
+    column('middle', [B]),
+    column('right', [C]),
+  ]);
+  const panes = [...twoAgents().panes, agent(C, 'agent 3')];
+  const screen = await renderApp(viewOf([three], panes));
+  const first = pane(screen, 'agent 1').element();
+  await vi.waitFor(() => expect(boxOf(first).x).toBe(60));
+  press(stripElement(), { x: 600, y: 400 }, MIDDLE);
+  drag('pointermove', { x: 570, y: 400 });
+  await new Promise((resolve) => setTimeout(resolve, 10));
+  drag('pointermove', { x: 560, y: 400 });
+  await vi.waitFor(() => expect(boxOf(first).x).toBe(20));
+  await new Promise((resolve) => setTimeout(resolve, 200));
+  drag('pointerup', { x: 560, y: 400 });
+  await vi.waitFor(() => expect(boxOf(first).x).toBe(60));
 });
 
 test('switches workspaces by dragging the view up or down', async () => {

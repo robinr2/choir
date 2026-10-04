@@ -84,11 +84,20 @@ test('binds the column and size keys', () => {
   expect(bound('KeyF', { ctrlKey: true })).toBe('expand');
 });
 
-test('leaves the browser keys and repeated closes alone', () => {
-  for (const code of ['ArrowLeft', 'ArrowRight', 'KeyH', 'KeyT', 'KeyF']) {
-    expect(commandFor(key(code))).toBeUndefined();
-  }
-  expect(commandFor(key('KeyI', { shiftKey: true }))).toBeUndefined();
+test('takes the keys niri shares with the browser', () => {
+  expect(bound('KeyT')).toBe('open');
+  expect(bound('ArrowLeft')).toEqual({ action: 'focusColumnLeft' });
+  expect(bound('KeyH')).toEqual({ action: 'focusColumnLeft' });
+  expect(bound('ArrowRight')).toEqual({ action: 'focusColumnRight' });
+  expect(bound('KeyF')).toEqual({ action: 'maximizeColumn' });
+  expect(bound('KeyI', { shiftKey: true })).toEqual({
+    action: 'moveWorkspaceUp',
+  });
+});
+
+test('leaves other keys and repeated closes alone', () => {
+  expect(commandFor(key('KeyE'))).toBeUndefined();
+  expect(commandFor(key('KeyQ', { shiftKey: true }))).toBeUndefined();
   expect(commandFor(key('KeyQ', { repeat: true }))).toBeUndefined();
   expect(commandFor(key('KeyJ', { repeat: true }))).toEqual({
     action: 'focusWindowDown',

@@ -42,15 +42,32 @@ test('keeps handled keys from the page', async () => {
   const heard = vi.fn<() => void>();
   document.addEventListener('keydown', heard);
   keydown('KeyJ');
-  keydown('KeyT');
+  keydown('KeyE');
   document.removeEventListener('keydown', heard);
   expect(heard).toHaveBeenCalledOnce();
 });
 
-test('keeps the browser keys and other keys for the page', async () => {
+test('keeps the browser from the keys niri shares with it', async () => {
   await renderApp();
-  expect(keydown('ArrowLeft')).toBe(true);
-  expect(keydown('KeyT')).toBe(true);
+  for (const code of ['ArrowLeft', 'ArrowRight', 'KeyH', 'KeyT', 'KeyF']) {
+    expect(keydown(code)).toBe(false);
+  }
+  expect(keydown('KeyI', { shiftKey: true })).toBe(false);
+  await vi.waitFor(() =>
+    expect(actions()).toEqual([
+      { action: 'focusColumnLeft' },
+      { action: 'focusColumnRight' },
+      { action: 'focusColumnLeft' },
+      { action: 'maximizeColumn' },
+      { action: 'moveWorkspaceUp' },
+    ]),
+  );
+  expect(requests()).toContainEqual(['/workspace/panes', 'POST', undefined]);
+});
+
+test('leaves unbound keys to the page', async () => {
+  await renderApp();
+  expect(keydown('KeyE')).toBe(true);
   expect(keydown('KeyJ', { altKey: false })).toBe(true);
   expect(keydown('KeyJ')).toBe(false);
 });
