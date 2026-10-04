@@ -8,21 +8,36 @@ import {
   writeFile,
 } from 'node:fs/promises';
 import path from 'node:path';
-import type {
-  ContentBlock,
-  ListSessionsResponse,
-  NewSessionRequest,
-  SessionInfo,
-  SessionUpdate,
+import {
+  type ContentBlock,
+  type ListSessionsResponse,
+  type NewSessionRequest,
+  RequestError,
+  type SessionInfo,
+  type SessionUpdate,
 } from '@agentclientprotocol/sdk';
 import { type Config, initialConfig } from './mock-agent-config.js';
 
+type SubagentNotice = {
+  sessionUpdate: 'subagent_spawned' | 'subagent_state_update';
+  subagentSessionId: string;
+  name?: string;
+  task?: string;
+  state?: string;
+};
+
+export type Recorded = {
+  sessionId: string;
+  update: SessionUpdate | SubagentNotice;
+};
+
 export type Session = {
-  updates: SessionUpdate[];
+  updates: Recorded[];
   setup: NewSessionRequest;
   config: Config;
   prompt?: ContentBlock[];
   running?: AbortController;
+  held?: () => void;
 };
 
 type Saved = Pick<Session, 'updates' | 'setup' | 'config'>;
@@ -51,14 +66,14 @@ export class MockSessions {
       setup,
       config: initialConfig(setup),
     });
-    await this.save(sessionId);
     return sessionId;
   }
 
   async load(sessionId: string, setup: NewSessionRequest): Promise<Session> {
-    const saved: Saved = JSON.parse(
-      await readFile(this.file(sessionId), 'utf8'),
-    );
+    const file = await readFile(this.file(sessionId), 'utf8').catch(() => {
+      throw RequestError.resourceNotFound(sessionId);
+    });
+    const saved: Saved = JSON.parse(file);
     const session = { ...saved, setup };
     this.live.set(sessionId, session);
     return session;
@@ -79,7 +94,15 @@ export class MockSessions {
     );
     const forked = randomUUID();
     const setup = { ...saved.setup, cwd };
-    await writeFile(this.file(forked), JSON.stringify({ ...saved, setup }));
+    const updates = saved.updates.map((notification) =>
+      notification.sessionId === sessionId
+        ? { ...notification, sessionId: forked }
+        : notification,
+    );
+    await writeFile(
+      this.file(forked),
+      JSON.stringify({ ...saved, setup, updates }),
+    );
     return forked;
   }
 
@@ -116,7 +139,7 @@ export class MockSessions {
   ): Promise<{ info: SessionInfo; changed: number }> {
     const full = path.join(this.dir, file);
     const saved: Saved = JSON.parse(await readFile(full, 'utf8'));
-    const [first] = saved.updates.flatMap((update) =>
+    const [first] = saved.updates.flatMap(({ update }) =>
       update.sessionUpdate === 'user_message_chunk' &&
       update.content.type === 'text'
         ? [update.content.text]

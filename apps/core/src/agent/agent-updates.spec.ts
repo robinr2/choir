@@ -1,5 +1,5 @@
 import type { AnyMessage } from '@agentclientprotocol/sdk';
-import { agentUpdate, carried, sessionUpdates } from './agent-updates.js';
+import { agentUpdate, carried, isSessionUpdate } from './agent-updates.js';
 
 const SPAWNED = {
   sessionUpdate: 'subagent_spawned',
@@ -52,20 +52,12 @@ it('leaves every other message as it is', () => {
   });
 });
 
-it('picks the updates of one session without its subagents', () => {
+it('tells session updates from subagent updates', () => {
   const state = {
     sessionUpdate: 'subagent_state_update',
     subagentSessionId: 'child',
     state: 'failed',
   } as const;
-  expect(
-    sessionUpdates(
-      [
-        { sessionId: 'root', update: CHUNK },
-        { sessionId: 'root', update: state },
-        { sessionId: 'child', update: CHUNK },
-      ],
-      'root',
-    ),
-  ).toEqual([CHUNK]);
+  expect(isSessionUpdate(CHUNK)).toBe(true);
+  expect(isSessionUpdate(state)).toBe(false);
 });

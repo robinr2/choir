@@ -3,30 +3,18 @@ import { parseArgs } from 'node:util';
 import {
   agent,
   type AgentContext,
-  type ContentBlock,
   methods,
   type LoadSessionRequest,
   ndJsonStream,
   type NewSessionRequest,
   PROTOCOL_VERSION,
-  type PromptRequest,
-  type PromptResponse,
   type SetSessionConfigOptionRequest,
-  type StopReason,
 } from '@agentclientprotocol/sdk';
 import { z } from 'zod';
-import { commands, said, type Turn } from './mock-agent-commands.js';
 import { type Config, configOptions, configured } from './mock-agent-config.js';
 import { MockSessions } from './mock-agent-sessions.js';
+import { MockTurns, UPDATE } from './mock-agent-turns.js';
 import { readableStream } from '../src/agent/agent-process.js';
-
-const STOP_REASONS: StopReason[] = [
-  'end_turn',
-  'max_tokens',
-  'max_turn_requests',
-  'refusal',
-  'cancelled',
-];
 
 const { values: flags } = parseArgs({
   options: {
@@ -54,61 +42,15 @@ const steeringSchema = z
 
 const sessions = new MockSessions(flags.sessions);
 
-let capabilities: unknown;
+const turns = new MockTurns(sessions, {
+  respond: flags.respond,
+  stopReason: flags['stop-reason'],
+});
 
 function offered(config: Config) {
   return flags['no-config-options']
     ? {}
     : { configOptions: configOptions(config) };
-}
-
-function text(blocks: ContentBlock[]): string {
-  return blocks.map((block) => ('text' in block ? block.text : '')).join('');
-}
-
-async function respond(words: string, turn: Turn): Promise<PromptResponse> {
-  const [name = '', ...rest] = (flags.respond ?? words).split(' ');
-  const command = commands[name];
-  if (command) await command(rest, turn);
-  else await turn.emit(said(`unrecognized prompt: ${words}`));
-  const stopReason = STOP_REASONS.find(
-    (reason) => reason === flags['stop-reason'],
-  );
-  return { stopReason: stopReason ?? 'end_turn' };
-}
-
-function emitter(sessionId: string, client: AgentContext): Turn['emit'] {
-  return async (update) => {
-    sessions.get(sessionId).updates.push(update);
-    await sessions.save(sessionId);
-    await client.notify(methods.client.session.update, { sessionId, update });
-  };
-}
-
-async function prompt(
-  { sessionId, prompt: blocks }: PromptRequest,
-  client: AgentContext,
-): Promise<PromptResponse> {
-  const session = sessions.get(sessionId);
-  const running = new AbortController();
-  Object.assign(session, { running, prompt: blocks });
-  const words = text(blocks);
-  session.updates.push({
-    sessionUpdate: 'user_message_chunk',
-    content: { type: 'text', text: words },
-  });
-  await sessions.save(sessionId);
-  const { signal } = running;
-  const emit = emitter(sessionId, client);
-  const turn = { sessionId, session, client, emit, signal, capabilities };
-  return respond(words, turn)
-    .catch((error: unknown) => {
-      if (running.signal.aborted) return { stopReason: 'cancelled' as const };
-      throw error;
-    })
-    .finally(() => {
-      session.running = undefined;
-    });
 }
 
 function announceCommands(sessionId: string, client: AgentContext): void {
@@ -117,7 +59,10 @@ function announceCommands(sessionId: string, client: AgentContext): void {
       sessionId,
       update: {
         sessionUpdate: 'available_commands_update',
-        availableCommands: [{ name: 'compact', description: 'Compact' }],
+        availableCommands: [
+          { name: 'compact', description: 'Compact' },
+          { name: 'review', description: 'Review', input: { hint: 'pr' } },
+        ],
       },
     });
   }, 0);
@@ -134,11 +79,12 @@ async function load(
   client: AgentContext,
 ): Promise<object> {
   const session = await sessions.load(sessionId, setup);
-  await Promise.all(
-    session.updates.map((update) =>
-      client.notify(methods.client.session.update, { sessionId, update }),
-    ),
+  await session.updates.reduce(
+    (previous, notification) =>
+      previous.then(() => client.notify(UPDATE, notification)),
+    Promise.resolve(),
   );
+  announceCommands(sessionId, client);
   return offered(session.config);
 }
 
@@ -153,20 +99,19 @@ async function steer(
   params: z.infer<typeof steeringSchema>,
   client: AgentContext,
 ) {
-  const session = sessions.get(params.sessionId);
-  if (!session.running) {
-    const required = params.idleBehavior === 'promptRequired';
-    return { outcome: required ? 'promptRequired' : 'startedNewTurn' };
+  if (params.idleBehavior !== 'promptRequired') {
+    throw new Error('Steering needs the promptRequired idle behavior');
   }
-  const steered = params.prompt.map((block) => block.text).join('');
-  const update = said(`steered: ${steered}`);
-  await emitter(params.sessionId, client)(update);
+  if (!sessions.get(params.sessionId).running) {
+    return { outcome: 'promptRequired' };
+  }
+  turns.steer(params, client);
   return { outcome: 'injected' };
 }
 
 agent({ name: 'mock-agent' })
   .onRequest(methods.agent.initialize, ({ params }) => {
-    capabilities = params.clientCapabilities;
+    turns.capabilities = params.clientCapabilities;
     return {
       protocolVersion: PROTOCOL_VERSION,
       agentCapabilities: { loadSession: !flags['no-load-session'] },
@@ -196,7 +141,7 @@ agent({ name: 'mock-agent' })
     return {};
   })
   .onRequest(methods.agent.session.prompt, ({ params, client }) =>
-    prompt(params, client),
+    turns.prompt(params, client),
   )
   .onRequest('_session/steering', steeringSchema, ({ params, client }) =>
     steer(params, client),

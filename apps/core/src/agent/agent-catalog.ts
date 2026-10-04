@@ -6,14 +6,14 @@ import type {
 
 export type CatalogEffort = { value: string; name: string };
 
-type CatalogModel = {
+export type CatalogModel = {
   value: string;
   name: string;
   description: string | null;
   efforts: CatalogEffort[];
 };
 
-type CatalogMode = {
+export type CatalogMode = {
   value: string;
   name: string;
   description: string | null;
@@ -60,7 +60,10 @@ export function choices(
   );
 }
 
-function current(options: SessionConfigOption[], id: string): string | null {
+export function current(
+  options: SessionConfigOption[],
+  id: string,
+): string | null {
   const found = option(options, id);
   return found?.type === 'select' ? found.currentValue : null;
 }

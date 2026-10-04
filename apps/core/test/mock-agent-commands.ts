@@ -9,7 +9,7 @@ import {
   type SessionUpdate,
 } from '@agentclientprotocol/sdk';
 import { configOptions } from './mock-agent-config.js';
-import type { Session } from './mock-agent-sessions.js';
+import type { Recorded, Session } from './mock-agent-sessions.js';
 
 type Emit = (update: SessionUpdate) => Promise<void>;
 
@@ -18,6 +18,7 @@ export type Turn = {
   session: Session;
   client: AgentContext;
   emit: Emit;
+  record: (notification: Recorded) => Promise<void>;
   signal: AbortSignal;
   capabilities: unknown;
 };
@@ -32,8 +33,6 @@ const PERMISSION_KINDS: PermissionOptionKind[] = [
 ];
 
 const WITHDRAWAL = 200;
-
-const UPDATE: string = methods.client.session.update;
 
 export function said(text: string): SessionUpdate {
   return {
@@ -67,9 +66,16 @@ async function askPermission(
   { sessionId, client, emit }: Turn,
 ): Promise<void> {
   const kinds = PERMISSION_KINDS.filter((kind) => names.includes(kind));
+  const toolCallId = randomUUID();
+  const toolCall = {
+    toolCallId,
+    title: 'rm -rf build',
+    kind: 'execute' as const,
+  };
+  await emit({ sessionUpdate: 'tool_call', ...toolCall, status: 'pending' });
   const request: RequestPermissionRequest = {
     sessionId,
-    toolCall: { toolCallId: randomUUID() },
+    toolCall: { ...toolCall, rawInput: { command: 'rm -rf build' } },
     options: kinds.map((kind) => ({
       optionId: `${kind}-option`,
       name: kind,
@@ -85,6 +91,24 @@ async function askPermission(
   await emit(said(JSON.stringify(outcome)));
 }
 
+const FORM = {
+  type: 'object' as const,
+  properties: {
+    name: { type: 'string' as const, title: 'Name' },
+    color: { type: 'string' as const, enum: ['red', 'blue'] },
+    ok: { type: 'boolean' as const },
+  },
+  required: ['name'],
+};
+
+function elicitation(sessionId: string, mode: string, elicitationId: string) {
+  if (mode !== 'url') {
+    return { sessionId, mode: 'form', message: 'Pick', requestedSchema: FORM };
+  }
+  const url = 'https://example.com';
+  return { sessionId, mode: 'url', elicitationId, url, message: 'Sign in' };
+}
+
 async function elicit(
   [mode = 'form']: string[],
   { sessionId, client, emit }: Turn,
@@ -92,20 +116,7 @@ async function elicit(
   const elicitationId = randomUUID();
   const response = await client.request(
     methods.client.elicitation.create,
-    mode === 'url'
-      ? {
-          sessionId,
-          mode: 'url',
-          elicitationId,
-          url: 'https://example.com',
-          message: 'Sign in',
-        }
-      : {
-          sessionId,
-          mode: 'form',
-          message: 'Pick',
-          requestedSchema: { type: 'object', properties: {} },
-        },
+    elicitation(sessionId, mode, elicitationId),
   );
   if (mode === 'url') {
     await client.notify(methods.client.elicitation.complete, { elicitationId });
@@ -113,10 +124,13 @@ async function elicit(
   await emit(said(JSON.stringify(response)));
 }
 
-async function subagent(words: string[], { sessionId, client, emit }: Turn) {
+async function subagent(
+  words: string[],
+  { sessionId, client, record, emit }: Turn,
+) {
   const subagentSessionId = randomUUID();
   const name = words.join(' ');
-  await client.notify(UPDATE, {
+  await record({
     sessionId,
     update: {
       sessionUpdate: 'subagent_spawned',
@@ -125,11 +139,8 @@ async function subagent(words: string[], { sessionId, client, emit }: Turn) {
       task: `Do ${name}`,
     },
   });
-  await client.notify(methods.client.session.update, {
-    sessionId: subagentSessionId,
-    update: said(`${name} done`),
-  });
-  await client.notify(UPDATE, {
+  await record({ sessionId: subagentSessionId, update: said(`${name} done`) });
+  await record({
     sessionId,
     update: {
       sessionUpdate: 'subagent_state_update',

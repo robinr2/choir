@@ -6,7 +6,10 @@ import {
 } from '@nestjs/common';
 import { combineLatest, firstValueFrom, map, type Observable } from 'rxjs';
 import { AgentService } from '../agent/agent.service.js';
-import { ConversationsService } from '../conversations/conversations.service.js';
+import {
+  CONVERSATIONS,
+  type Conversations,
+} from '../conversations/conversations.port.js';
 import { LayoutService } from '../layout/layout.service.js';
 import { VoiceService } from '../voice/voice.service.js';
 import {
@@ -49,9 +52,9 @@ export class WorkspaceService implements Workspace {
 
   constructor(
     @Inject(LayoutService) private readonly layout: LayoutService,
-    @Inject(ConversationsService)
+    @Inject(CONVERSATIONS)
     private readonly conversations: Pick<
-      ConversationsService,
+      Conversations,
       'workingChanges' | 'sendMessage' | 'close'
     >,
     @Inject(VoiceService) private readonly voice: VoiceService,

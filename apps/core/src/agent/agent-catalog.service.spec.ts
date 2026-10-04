@@ -1,4 +1,4 @@
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { lastValueFrom } from 'rxjs';
@@ -161,8 +161,14 @@ it('lists, forks and deletes the sessions of every folder', async () => {
 it('lists sessions without a title or a time of change', async () => {
   const catalog = catalogService();
   await catalog.catalog();
-  const [probe] = await catalog.sessions();
-  expect(probe).toEqual({
+  expect(await catalog.sessions()).toEqual([]);
+  await mkdir(sessionsDir(), { recursive: true });
+  await writeFile(
+    path.join(sessionsDir(), 'untitled.json'),
+    JSON.stringify({ setup: { cwd: dataDir }, updates: [], config: {} }),
+  );
+  const [untitled] = await catalog.sessions();
+  expect(untitled).toEqual({
     sessionId: expect.any(String),
     cwd: dataDir,
     title: null,

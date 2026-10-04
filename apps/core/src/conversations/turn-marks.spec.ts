@@ -1,21 +1,14 @@
 import { mkdir, mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { TurnMarksService } from './turn-marks.service.js';
+import { TurnMarks } from './turn-marks.js';
 
 let dataDir: string;
-let turnMarks: TurnMarksService;
+let turnMarks: TurnMarks;
 
 beforeEach(async () => {
   dataDir = await mkdtemp(path.join(tmpdir(), 'choir-marks-'));
-  turnMarks = new TurnMarksService({
-    dataDir,
-    coreUrl: 'http://core',
-    canvasUrl: 'http://127.0.0.1:3100',
-    canvasPublicUrl: 'http://127.0.0.1:3100',
-    databaseUrl: 'postgresql://localhost/choir',
-    claudeDir: '/claude',
-  });
+  turnMarks = new TurnMarks(path.join(dataDir, 'turn-marks'));
 });
 
 afterEach(async () => {

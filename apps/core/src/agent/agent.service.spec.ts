@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, rm } from 'node:fs/promises';
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { Test } from '@nestjs/testing';
@@ -171,7 +171,9 @@ it('resumes a session as it is or as a fork of it', async () => {
   await agent.launch('c3', { resume: original.id, cwd: dataDir, fork: true });
   const forked = await agent.open('c3');
   expect(forked.id).not.toBe(original.id);
-  expect(forked.history).toHaveLength(2);
+  expect(
+    forked.history.slice(0, 2).map(({ update }) => update.sessionUpdate),
+  ).toEqual(['user_message_chunk', 'agent_message_chunk']);
   expect(await said(forked, 'mode')).toBe('bypassPermissions');
   await agent.link('c4', forked.id, dataDir);
   expect(links.get('c4')).toEqual({
@@ -201,5 +203,57 @@ it('stops the sessions still open when the app shuts down, and each only once', 
 it('stops the agent of a session that cannot start', async () => {
   const agent = service('--set-config-fails');
   await expect(agent.open('c1')).rejects.toThrow('Internal error');
+  await agent.beforeApplicationShutdown();
+});
+
+it('starts over in a new session when the saved one was never used', async () => {
+  const agent = service();
+  const unused = await agent.open('c1');
+  await agent.close(unused);
+  const fresh = await agent.open('c1');
+  expect(fresh.id).not.toBe(unused.id);
+  expect(links.get('c1')?.sessionId).toBe(fresh.id);
+  await agent.beforeApplicationShutdown();
+});
+
+it('fails to reopen a session the agent cannot read', async () => {
+  await mkdir(path.join(dataDir, 'sessions'), { recursive: true });
+  await writeFile(path.join(dataDir, 'sessions', 'broken.json'), 'not json');
+  links.set('c1', {
+    conversationId: 'c1',
+    sessionId: 'broken',
+    cwd: dataDir,
+    model: null,
+    effort: null,
+    mode: null,
+  });
+  const agent = service();
+  await expect(agent.open('c1')).rejects.toThrow('Internal error');
+  await agent.beforeApplicationShutdown();
+});
+
+it('fails to reopen a session the agent cannot load', async () => {
+  links.set('c1', {
+    conversationId: 'c1',
+    sessionId: 's1',
+    cwd: dataDir,
+    model: null,
+    effort: null,
+    mode: null,
+  });
+  const agent = service('--no-load-session');
+  await expect(agent.open('c1')).rejects.toThrow('cannot load the session s1');
+  await agent.beforeApplicationShutdown();
+});
+
+it('describes the agent and its sessions and forks them', async () => {
+  const agent = service();
+  expect((await agent.catalog()).defaults.mode).toBe('bypassPermissions');
+  const session = await agent.open('c1');
+  await said(session, 'echo hi');
+  expect((await agent.sessions()).map(({ sessionId }) => sessionId)).toEqual([
+    session.id,
+  ]);
+  expect(await agent.fork(session.id, dataDir)).not.toBe(session.id);
   await agent.beforeApplicationShutdown();
 });

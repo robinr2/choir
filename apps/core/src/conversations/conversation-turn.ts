@@ -1,50 +1,39 @@
+import type { SessionUpdate } from '@agentclientprotocol/sdk';
+import { randomUUID } from 'node:crypto';
 import { lastValueFrom, ReplaySubject, tap } from 'rxjs';
 import type { AgentTurn } from '../agent/prompt-turn.js';
-import {
-  answerText,
-  type TranscriptPart,
-  type TurnMark,
-  withEvent,
-} from './transcript.js';
+import type { PromptContent } from '../agent/session-content.js';
+import type { TurnRequest } from './turn-request.js';
 import { describeUsage, turnUsage } from './turn-usage.js';
 
-export type TurnKind = {
-  early: boolean;
-  voice: boolean;
-};
-
-export type TurnRequest = {
-  prompt: string;
-  note?: string;
-  words: string;
-  early: boolean;
-  mark: TurnMark;
-};
+function answerText(update: SessionUpdate): string[] {
+  return update.sessionUpdate === 'agent_message_chunk' &&
+    update.content.type === 'text'
+    ? [update.content.text]
+    : [];
+}
 
 export class ConversationTurn {
+  readonly id = randomUUID();
   readonly answer = new ReplaySubject<string>();
   private readonly confirmation = Promise.withResolvers<boolean>();
-  readonly settled: Promise<void>;
-  private currentParts: TranscriptPart[] = [];
+  private readonly done = Promise.withResolvers<void>();
+  private agentTurn?: AgentTurn;
 
   constructor(
-    private readonly turn: AgentTurn,
     readonly request: TurnRequest,
-    private readonly onChange: () => void,
+    private readonly withdrawn: (turn: ConversationTurn) => void,
   ) {
     if (!request.early) this.confirmation.resolve(true);
-    this.settled = turn.result.then(
-      () => undefined,
-      () => undefined,
-    );
   }
 
-  get parts(): TranscriptPart[] {
-    return this.currentParts;
+  get content(): PromptContent {
+    const { prompt, images } = this.request;
+    return { text: prompt, ...(images && { images }) };
   }
 
-  get result(): AgentTurn['result'] {
-    return this.turn.result;
+  get settled(): Promise<void> {
+    return this.done.promise;
   }
 
   get confirmed(): Promise<boolean> {
@@ -57,27 +46,36 @@ export class ConversationTurn {
 
   async cancel(): Promise<void> {
     this.confirmation.resolve(false);
-    await this.turn.cancel();
+    if (this.agentTurn) await this.agentTurn.cancel();
+    else this.withdraw();
   }
 
-  async run(): Promise<string> {
+  withdraw(): void {
+    this.withdrawn(this);
+    this.finish();
+  }
+
+  async run(agentTurn: AgentTurn): Promise<string> {
+    this.agentTurn = agentTurn;
     try {
       await lastValueFrom(
-        this.turn.updates.pipe(
+        agentTurn.updates.pipe(
           tap((update) => {
-            this.currentParts = withEvent(this.currentParts, update);
-            this.onChange();
-            const text = answerText(update);
-            if (text !== undefined) this.answer.next(text);
+            for (const text of answerText(update)) this.answer.next(text);
           }),
         ),
         { defaultValue: undefined },
       );
-      const result = await this.turn.result;
-      return `${result?.stopReason ?? 'withdrawn'}: ${describeUsage(turnUsage(result))}`;
+      const result = await agentTurn.result;
+      return `${result.stopReason}: ${describeUsage(turnUsage(result))}`;
     } finally {
-      this.answer.complete();
-      this.confirmation.resolve(false);
+      this.finish();
     }
+  }
+
+  private finish(): void {
+    this.answer.complete();
+    this.confirmation.resolve(false);
+    this.done.resolve();
   }
 }

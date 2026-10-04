@@ -1,280 +1,260 @@
-import { Logger } from '@nestjs/common';
-import type { PromptResponse, SessionUpdate } from '@agentclientprotocol/sdk';
-import {
-  firstValueFrom,
-  lastValueFrom,
-  ReplaySubject,
-  take,
-  toArray,
-} from 'rxjs';
-import type { MockInstance } from 'vitest';
-import type { AgentTurn } from '../agent/prompt-turn.js';
-import type { PromptContent } from '../agent/session-content.js';
-import {
-  type ConversationAgent,
-  ConversationsService,
-} from './conversations.service.js';
-import type { TurnMark } from './transcript.js';
+import { firstValueFrom, lastValueFrom, Subject, take, toArray } from 'rxjs';
 import type { ProfileService } from '../agent/profile.service.js';
+import { FakeSession } from '../test/fake-session.js';
 import type { VoiceService } from '../voice/voice.service.js';
-import type { TurnMarksService } from './turn-marks.service.js';
-
-class ScriptedTurn implements AgentTurn {
-  readonly updates = new ReplaySubject<SessionUpdate>();
-  readonly cancel = vi.fn<AgentTurn['cancel']>(async () =>
-    this.end({ stopReason: 'cancelled' }),
-  );
-  private readonly finished = Promise.withResolvers<
-    PromptResponse | undefined
-  >();
-
-  get result(): Promise<PromptResponse | undefined> {
-    return this.finished.promise;
-  }
-
-  says(text: string): void {
-    this.updates.next(agentSays(text));
-  }
-
-  end(response?: PromptResponse): void {
-    this.finished.resolve(response);
-    this.updates.complete();
-  }
-
-  fail(error: Error): void {
-    this.finished.reject(error);
-    this.updates.error(error);
-  }
-}
+import type { ConversationHost } from './conversation.js';
+import type { Fork } from './conversation-state.js';
+import { ConversationsService } from './conversations.service.js';
+import type { TurnMark } from './transcript.js';
 
 const ID = 'c1';
 const TYPED = { early: false, voice: false };
 const SPOKEN = { early: false, voice: true };
 const SPOKEN_EARLY = { early: true, voice: true };
-const DONE = { stopReason: 'end_turn' } as const;
+const UNFINISHED =
+  "The user's last message was not finished. This message continues it.";
 
-function userSays(text: string): SessionUpdate {
-  return {
-    sessionUpdate: 'user_message_chunk',
-    content: { type: 'text', text },
-  };
-}
-
-function agentSays(text: string): SessionUpdate {
-  return {
-    sessionUpdate: 'agent_message_chunk',
-    content: { type: 'text', text },
-  };
-}
-
-let turns: ScriptedTurn[];
-const session = {
-  rootHistory: [] as SessionUpdate[],
-  startTurn: vi.fn<(content: PromptContent) => AgentTurn>(() => {
-    const turn = new ScriptedTurn();
-    turns.push(turn);
-    return turn;
-  }),
-  close: vi.fn<() => Promise<void>>(async () => undefined),
-};
-const agent = {
-  open: vi.fn<ConversationAgent['open']>(async () => session),
-  close: vi.fn<ConversationAgent['close']>(async () => undefined),
-} satisfies ConversationAgent;
-
+let sessions: Map<string, FakeSession>;
 let savedMarks: [string, TurnMark][];
-const turnMarks = {
-  load: vi.fn<TurnMarksService['load']>(async () => new Map(savedMarks)),
-  save: vi.fn<TurnMarksService['save']>(async () => undefined),
+let working: Subject<ReadonlySet<string>>;
+let host: {
+  [K in keyof ConversationHost]: ReturnType<typeof vi.fn<ConversationHost[K]>>;
+} & {
+  workingChanges: Subject<ReadonlySet<string>>;
+  link: ReturnType<
+    typeof vi.fn<(id: string, sessionId: string, cwd: string) => Promise<void>>
+  >;
+  forget: ReturnType<typeof vi.fn<(id: string) => void>>;
 };
-
 let voiceAgent: string | undefined;
-const voiceChannel = {
+const voice = {
   isActive: vi.fn<VoiceService['isActive']>((id) => id === voiceAgent),
   speak: vi.fn<VoiceService['speak']>(),
 };
-
 const profile = {
   voicePrompt: vi.fn<ProfileService['voicePrompt']>(
     async () => 'Speak plainly.',
   ),
 };
-
-const UNFINISHED =
-  "The user's last message was not finished. This message continues it.";
-
 let conversations: ConversationsService;
-let log: MockInstance<Logger['log']>;
-let logError: MockInstance<Logger['error']>;
 
-function latestTurn(): ScriptedTurn {
-  const turn = turns.at(-1);
-  if (!turn) throw new Error('No turn started');
-  return turn;
+function session(id = ID): FakeSession {
+  const found = sessions.get(id);
+  if (!found) throw new Error(`No session for ${id}`);
+  return found;
 }
 
-async function finished(times: number): Promise<void> {
-  await vi.waitFor(() => expect(log).toHaveBeenCalledTimes(times));
+function prompts(id = ID): string[] {
+  return session(id).prompts.map(({ text }) => text);
+}
+
+async function flushed(): Promise<void> {
   await new Promise(setImmediate);
 }
 
-function prompts(): string[] {
-  return session.startTurn.mock.calls.map(([{ text }]) => text);
+async function say(text: string, kind = TYPED) {
+  const answer = await conversations.addUserTurn(ID, { text }, kind);
+  await flushed();
+  return answer;
+}
+
+async function ended(): Promise<void> {
+  session().latest.end();
+  await flushed();
 }
 
 beforeEach(() => {
   vi.clearAllMocks();
-  log = vi.spyOn(Logger.prototype, 'log').mockReturnValue();
-  logError = vi.spyOn(Logger.prototype, 'error').mockReturnValue();
-  session.rootHistory = [userSays('hi'), agentSays('Hello.')];
-  turns = [];
+  sessions = new Map();
   savedMarks = [];
   voiceAgent = undefined;
-  conversations = new ConversationsService(
-    agent,
-    turnMarks,
-    voiceChannel,
-    profile,
-  );
+  working = new Subject();
+  host = {
+    open: vi.fn<ConversationHost['open']>(async (id) => {
+      const opened = new FakeSession(`session-${id}`);
+      opened.emit({
+        sessionUpdate: 'user_message_chunk',
+        content: { type: 'text', text: 'hi' },
+      });
+      opened.emit({
+        sessionUpdate: 'agent_message_chunk',
+        content: { type: 'text', text: 'Hello.' },
+      });
+      sessions.set(id, opened);
+      return opened;
+    }),
+    close: vi.fn<ConversationHost['close']>(async () => undefined),
+    catalog: vi.fn<ConversationHost['catalog']>(async () => null),
+    loadMarks: vi.fn<ConversationHost['loadMarks']>(
+      async () => new Map(savedMarks),
+    ),
+    saveMarks: vi.fn<ConversationHost['saveMarks']>(async () => undefined),
+    usage: vi.fn<ConversationHost['usage']>(),
+    ended: vi.fn<ConversationHost['ended']>(),
+    follow: vi.fn<ConversationHost['follow']>(),
+    workingChanges: working,
+    link: vi.fn<(id: string, sessionId: string, cwd: string) => Promise<void>>(
+      async () => undefined,
+    ),
+    forget: vi.fn<(id: string) => void>(),
+  };
+  conversations = new ConversationsService(host, voice, profile);
 });
 
-afterEach(() => {
-  vi.restoreAllMocks();
-});
-
-it('opens each session once and shows what it holds', async () => {
+it('opens each conversation once and shows what its session holds', async () => {
   const history = [
     { id: 'm0', role: 'user', parts: [{ type: 'text', text: 'hi' }] },
     { id: 'm1', role: 'assistant', parts: [{ type: 'text', text: 'Hello.' }] },
   ];
-  expect(await conversations.messages(ID)).toEqual(history);
-  expect(await firstValueFrom(conversations.updates(ID))).toEqual(history);
-  await conversations.messages('c2');
-  expect(agent.open.mock.calls).toEqual([[ID], ['c2']]);
+  expect((await conversations.state(ID)).messages).toEqual(history);
+  expect((await firstValueFrom(conversations.changes(ID))).messages).toEqual(
+    history,
+  );
+  expect(await conversations.session(ID)).toEqual({
+    id: 'session-c1',
+    cwd: '/work',
+  });
+  await conversations.state('c2');
+  expect(host.open.mock.calls).toEqual([[ID], ['c2']]);
+  expect(conversations.workingChanges).toBe(working);
 });
 
 it('streams the answer and shows the turn while it runs', async () => {
-  const answer = await conversations.addUserTurn(ID, 'what is new', TYPED);
-  const shown = lastValueFrom(
-    conversations.updates(ID).pipe(take(2), toArray()),
-  );
-  await new Promise(setImmediate);
-  latestTurn().says('Nothing.');
-  const [started, live] = await shown;
-  const asked = {
-    id: 'm2',
-    role: 'user',
-    parts: [{ type: 'text', text: 'what is new' }],
-  };
-  expect(started?.slice(2)).toEqual([
-    asked,
-    { id: 'm3', role: 'assistant', parts: [] },
-  ]);
-  expect(live?.slice(2)).toEqual([
-    asked,
-    {
-      id: 'm3',
-      role: 'assistant',
-      parts: [{ type: 'text', text: 'Nothing.' }],
-    },
-  ]);
-  expect(prompts()).toEqual(['what is new']);
-  latestTurn().end({
-    stopReason: 'end_turn',
-    _meta: {
-      quota: {
-        token_count: {
-          inputTokens: 2,
-          cachedInputTokens: 900,
-          cachedWriteTokens: 40,
-          outputTokens: 5,
-        },
-      },
-    },
-  });
+  const answer = await say('what is new');
+  session().latest.says('Nothing.');
+  await ended();
   expect(await lastValueFrom(answer.pipe(toArray()))).toEqual(['Nothing.']);
-  await finished(1);
-  expect(log).toHaveBeenCalledExactlyOnceWith(
-    'Conversation c1 turn end_turn: cache read 900, cache write 40, input 2, output 5',
-  );
-  expect((await conversations.messages(ID)).slice(2)).toEqual([
-    asked,
-    {
-      id: 'm3',
-      role: 'assistant',
-      parts: [{ type: 'text', text: 'Nothing.' }],
-    },
+  expect(prompts()).toEqual(['what is new']);
+  expect((await conversations.state(ID)).messages.slice(2)).toEqual([
+    { id: 'm2', role: 'user', parts: [{ type: 'text', text: 'what is new' }] },
   ]);
+});
+
+it('steers, removes queued turns, cancels, answers and configures through the conversation', async () => {
+  await say('first');
+  const queued = conversations.addUserTurn(ID, { text: 'second' }, TYPED);
+  await queued;
+  const [item] = (await conversations.state(ID)).queue;
+  expect(conversations.removeQueued(ID, 'unknown')).toBe(false);
+  expect(await conversations.steerQueued(ID, item?.id ?? '')).toBe(true);
+  await conversations.steer(ID, { text: 'more' });
+  expect(session().steer.mock.calls).toEqual([
+    [{ text: 'second' }],
+    [{ text: 'more' }],
+  ]);
+  await conversations.cancel(ID);
+  expect(session().cancel).toHaveBeenCalledOnce();
+  expect(await conversations.respond(ID, 'i1', { optionId: 'yes' })).toBe(
+    'answered',
+  );
+  await conversations.configure(ID, { mode: 'plan' });
+  expect(session().setConfigOption).toHaveBeenCalledExactlyOnceWith(
+    'mode',
+    'plan',
+  );
+});
+
+it('switches the session of a conversation and follows its forks', async () => {
+  await conversations.state(ID);
+  await conversations.switchSession(ID, 's2', '/other');
+  expect(host.link).toHaveBeenCalledExactlyOnceWith(ID, 's2', '/other');
+  expect(host.open).toHaveBeenCalledTimes(2);
+  const forks = new Subject<Fork>();
+  conversations.followFork(ID, forks);
+  forks.next({
+    id: 'f1',
+    sessionId: 's3',
+    title: 'Fork',
+    state: 'ready',
+    startedAt: 1,
+    endedAt: 2,
+  });
+  expect((await conversations.state(ID)).forks).toHaveLength(1);
 });
 
 it('lets tool calls through only once an early turn is confirmed', async () => {
   expect(await conversations.toolCallAllowed(ID)).toBe(false);
-  await conversations.addUserTurn(ID, 'hello', SPOKEN_EARLY);
+  await say('hello', SPOKEN_EARLY);
   const allowed = conversations.toolCallAllowed(ID);
   conversations.confirm(ID, 'hi');
   conversations.confirm(ID, 'hello');
   expect(await allowed).toBe(true);
-  latestTurn().end(DONE);
-  await finished(1);
+  await ended();
   expect(await conversations.toolCallAllowed(ID)).toBe(false);
 });
 
 it('withdraws an early turn and sends only the rest of what the user says', async () => {
   await conversations.withdraw(ID);
-  await conversations.addUserTurn(ID, 'hello', SPOKEN_EARLY);
+  await say('hello', SPOKEN_EARLY);
   const allowed = conversations.toolCallAllowed(ID);
   await conversations.withdraw(ID);
-  expect(latestTurn().cancel).toHaveBeenCalledOnce();
+  expect(session().latest.cancel).toHaveBeenCalledOnce();
   expect(await allowed).toBe(false);
-  await conversations.addUserTurn(ID, 'hello choir', TYPED);
-  await conversations.addUserTurn(ID, 'thanks', TYPED);
-  expect(prompts()).toEqual(['hello', 'choir', 'thanks']);
-  expect(turnMarks.save).toHaveBeenLastCalledWith(
+  await say('hello choir');
+  await say('thanks');
+  expect(prompts()).toEqual(['hello', 'choir']);
+  expect(host.saveMarks).toHaveBeenLastCalledWith(
     ID,
     new Map([['hello', { voice: true, aloud: true, heard: '' }]]),
   );
   expect(await conversations.promptContext(ID, 'choir')).toBe(UNFINISHED);
   expect(await conversations.promptContext(ID, 'thanks')).toBe('');
+  await ended();
+  expect(prompts()).toEqual(['hello', 'choir', 'thanks']);
+});
+
+it('withdraws a queued early turn before it reaches the agent', async () => {
+  await say('typed');
+  const early = await conversations.addUserTurn(
+    ID,
+    { text: 'maybe' },
+    SPOKEN_EARLY,
+  );
+  await conversations.withdraw(ID);
+  expect(await lastValueFrom(early.pipe(toArray()))).toEqual([]);
+  expect((await conversations.state(ID)).queue).toEqual([]);
+  await ended();
+  expect(prompts()).toEqual(['typed']);
 });
 
 it('withdraws nothing once the turn did not start early', async () => {
-  await conversations.addUserTurn(ID, 'hello', TYPED);
+  await say('hello');
   await conversations.withdraw(ID);
-  expect(latestTurn().cancel).not.toHaveBeenCalled();
-  await conversations.addUserTurn(ID, 'again', TYPED);
-  expect(prompts()).toEqual(['hello', 'again']);
+  expect(session().latest.cancel).not.toHaveBeenCalled();
 });
 
 it('cancels an interrupted turn and tells what the user heard', async () => {
   await conversations.interrupt(ID, 'nothing');
-  await conversations.addUserTurn(ID, 'tell me a story', TYPED);
+  await say('tell me a story');
   expect(await conversations.promptContext(ID, 'tell me a story')).toBe(
     'The user interrupted your last answer after hearing only: "nothing".',
   );
   await conversations.interrupt(ID, 'Once upon');
-  expect(latestTurn().cancel).toHaveBeenCalledOnce();
-  await conversations.addUserTurn(ID, 'a shorter one', TYPED);
+  expect(session().latest.cancel).toHaveBeenCalledOnce();
+  await flushed();
+  await say('a shorter one');
   expect(prompts()).toEqual(['tell me a story', 'a shorter one']);
   expect(await conversations.promptContext(ID, 'a shorter one')).toBe(
     'The user interrupted your last answer after hearing only: "Once upon".',
   );
-  expect(turnMarks.save).not.toHaveBeenCalled();
+  expect(host.saveMarks).not.toHaveBeenCalled();
 });
 
 it('remembers how much of a spoken reply the user heard', async () => {
-  await conversations.addUserTurn(ID, 'tell me a story', SPOKEN);
-  const story = latestTurn();
-  story.says('Once upon a time.');
-  story.end(DONE);
-  await finished(1);
+  await say('tell me a story', SPOKEN);
+  session().emit({
+    sessionUpdate: 'agent_message_chunk',
+    content: { type: 'text', text: 'Once upon a time.' },
+  });
+  await ended();
   await conversations.interrupt(ID, 'Once upon');
-  expect(turnMarks.save).toHaveBeenLastCalledWith(
+  expect(host.saveMarks).toHaveBeenLastCalledWith(
     ID,
     new Map([
       ['tell me a story', { voice: true, aloud: true, heard: 'Once upon' }],
     ]),
   );
-  expect((await conversations.messages(ID)).at(-1)).toEqual({
+  expect((await conversations.state(ID)).messages.at(-1)).toEqual({
     id: 'm3',
     role: 'assistant',
     parts: [{ type: 'text', text: 'Once upon a time.' }],
@@ -283,129 +263,80 @@ it('remembers how much of a spoken reply the user heard', async () => {
   });
 });
 
-it('keeps showing a newer turn when an older one finishes', async () => {
-  await conversations.addUserTurn(ID, 'first', TYPED);
-  const first = latestTurn();
-  await conversations.addUserTurn(ID, 'second', TYPED);
-  first.end(DONE);
-  await finished(1);
-  expect((await conversations.messages(ID)).at(-2)).toEqual({
-    id: 'm4',
-    role: 'user',
-    parts: [{ type: 'text', text: 'second' }],
-  });
-  expect(await conversations.toolCallAllowed(ID)).toBe(true);
-});
-
-it('leaves out a turn that never reached the agent', async () => {
-  await conversations.addUserTurn(ID, 'never sent', TYPED);
-  latestTurn().end();
-  await finished(1);
-  expect(log).toHaveBeenCalledWith(
-    'Conversation c1 turn withdrawn: no token usage reported',
-  );
-  expect(await conversations.messages(ID)).toHaveLength(2);
-});
-
-it('logs a turn the agent could not finish', async () => {
-  await conversations.addUserTurn(ID, 'hello', TYPED);
-  latestTurn().fail(new Error('agent exited'));
-  await vi.waitFor(() =>
-    expect(logError).toHaveBeenCalledExactlyOnceWith(
-      'Conversation c1 turn failed: Error: agent exited',
-    ),
-  );
-  expect(log).not.toHaveBeenCalled();
-});
-
 it('adds the voice rules and the continuation note to the prompt of a turn', async () => {
   await conversations.interrupt(ID, 'Once');
-  await conversations.addUserTurn(ID, 'go on', SPOKEN);
-  const spoken = latestTurn();
-  await conversations.addUserTurn(ID, 'typed', TYPED);
-  await conversations.addUserTurn(ID, 'aloud', SPOKEN);
+  await say('go on', SPOKEN);
+  await say('typed');
+  await say('aloud', SPOKEN);
   expect(await conversations.promptContext(ID, ' go on\n')).toBe(
     'Speak plainly.\n\nThe user interrupted your last answer after hearing only: "Once".',
   );
   expect(await conversations.promptContext(ID, 'aloud')).toBe('Speak plainly.');
   expect(await conversations.promptContext(ID, 'typed')).toBe('');
   expect(await conversations.promptContext(ID, 'unknown')).toBe('');
-  spoken.end(DONE);
-  await finished(1);
+  await ended();
   expect(await conversations.promptContext(ID, 'go on')).toBe('');
 });
 
-it('marks spoken exchanges while they run and once they are saved', async () => {
-  savedMarks = [['hi', { voice: true, aloud: true }]];
-  await conversations.addUserTurn(ID, 'tell me', SPOKEN);
-  latestTurn().says('Sure.');
-  await vi.waitFor(async () =>
-    expect((await conversations.messages(ID)).at(-1)?.parts).toHaveLength(1),
+it('speaks typed turns to the voice agent and sends messages of other agents', async () => {
+  voiceAgent = ID;
+  const answer = await say('typed aloud');
+  expect(voice.speak).toHaveBeenCalledExactlyOnceWith(ID, expect.anything());
+  await ended();
+  expect(await lastValueFrom(answer.pipe(toArray()))).toEqual([]);
+  await conversations.sendMessage(ID, 'hi there', { id: 'a2', name: 'helper' });
+  await flushed();
+  expect(prompts().at(-1)).toMatch(
+    /^\(A message from the agent "helper", ID a2\./,
   );
-  expect(
-    (await conversations.messages(ID)).map(({ spoken }) => spoken),
-  ).toEqual([undefined, true, undefined, true]);
-  expect(turnMarks.load).toHaveBeenCalledExactlyOnceWith(ID);
-  expect(turnMarks.save).toHaveBeenCalledExactlyOnceWith(
-    ID,
-    new Map([
-      ['hi', { voice: true, aloud: true }],
-      ['tell me', { voice: true, aloud: true }],
-    ]),
+  expect(voice.speak).toHaveBeenCalledTimes(2);
+  voiceAgent = undefined;
+  await ended();
+  await conversations.sendMessage(ID, 'quiet', { id: 'a2', name: 'helper' });
+  await say('spoken', SPOKEN);
+  expect(voice.speak).toHaveBeenCalledTimes(2);
+  const { messages } = await conversations.state(ID);
+  expect(messages.map(({ role, from }) => [role, from])).toContainEqual([
+    'user',
+    { id: 'a2', name: 'helper' },
+  ]);
+});
+
+it('never withdraws a message from another agent', async () => {
+  await conversations.sendMessage(ID, 'hi', { id: 'a2', name: 'helper' });
+  await flushed();
+  await conversations.withdraw(ID);
+  expect(session().latest.cancel).not.toHaveBeenCalled();
+  expect(await conversations.toolCallAllowed(ID)).toBe(true);
+});
+
+it('forgets a closed conversation and ends its session', async () => {
+  await conversations.close(ID);
+  expect(host.forget).not.toHaveBeenCalled();
+  await say('hello');
+  const updates = lastValueFrom(
+    conversations.changes(ID).pipe(take(1000), toArray()),
   );
-  expect(voiceChannel.speak).not.toHaveBeenCalled();
-  latestTurn().end(DONE);
-  await finished(1);
-  expect(
-    (await conversations.messages(ID)).map(({ spoken }) => spoken),
-  ).toEqual([undefined, true, undefined, true]);
-  await conversations.addUserTurn(ID, 'typed', TYPED);
-  expect(turnMarks.save).toHaveBeenCalledOnce();
-  expect(
-    (await conversations.messages(ID)).slice(-2).map(({ spoken }) => spoken),
-  ).toEqual([undefined, undefined]);
+  await conversations.close(ID);
+  expect(host.forget).toHaveBeenCalledExactlyOnceWith(ID);
+  expect(host.close).toHaveBeenCalledExactlyOnceWith(session());
+  await updates;
+  await conversations.state(ID);
+  expect(host.open).toHaveBeenCalledTimes(2);
 });
 
 it('keeps a confirmation that arrives before its early turn', async () => {
   conversations.confirm(ID, 'hello');
-  await conversations.addUserTurn(ID, 'hello', SPOKEN_EARLY);
+  await say('hello', SPOKEN_EARLY);
   expect(await conversations.toolCallAllowed(ID)).toBe(true);
   conversations.confirm(ID, 'later');
-  await conversations.addUserTurn(ID, 'other', SPOKEN_EARLY);
-  await conversations.addUserTurn(ID, 'later', SPOKEN_EARLY);
+  await ended();
+  await say('other', SPOKEN_EARLY);
+  await ended();
+  await say('later', SPOKEN_EARLY);
   const unconfirmed = await Promise.race([
     conversations.toolCallAllowed(ID),
     Promise.resolve('pending'),
   ]);
   expect(unconfirmed).toBe('pending');
-});
-
-it('never withdraws a message from another agent', async () => {
-  await conversations.sendMessage(ID, 'hi', { id: 'a2', name: 'helper' });
-  await conversations.withdraw(ID);
-  expect(latestTurn().cancel).not.toHaveBeenCalled();
-  expect(await conversations.toolCallAllowed(ID)).toBe(true);
-});
-
-it('forgets a closed conversation and stops following it', async () => {
-  const working = firstValueFrom(
-    conversations.workingChanges.pipe(take(3), toArray()),
-  );
-  await conversations.addUserTurn(ID, 'hello', TYPED);
-  const updates = lastValueFrom(conversations.updates(ID).pipe(toArray()));
-  await conversations.close(ID);
-  expect(await working).toEqual([new Set(), new Set([ID]), new Set()]);
-  expect(await updates).toEqual([]);
-  await conversations.messages(ID);
-  expect(agent.open).toHaveBeenCalledTimes(2);
-});
-
-it('ends only the sessions it opened when a conversation closes', async () => {
-  await conversations.close(ID);
-  conversations.confirm(ID, 'hello');
-  await conversations.close(ID);
-  expect(agent.close).not.toHaveBeenCalled();
-  await conversations.messages(ID);
-  await conversations.close(ID);
-  expect(agent.close).toHaveBeenCalledExactlyOnceWith(session);
 });

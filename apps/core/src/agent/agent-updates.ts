@@ -62,12 +62,3 @@ export function isSessionUpdate(
 ): update is SessionUpdate {
   return !subagentUpdateSchema.safeParse(update).success;
 }
-
-export function sessionUpdates(
-  updates: readonly AgentUpdate[],
-  sessionId: string,
-): SessionUpdate[] {
-  return updates.flatMap(({ sessionId: id, update }) =>
-    id === sessionId && isSessionUpdate(update) ? [update] : [],
-  );
-}

@@ -56,9 +56,17 @@ it('shows the tool calls of a turn and their results', async () => {
       type: 'tool-call',
       toolCallId: expect.any(String),
       toolName: 'Read',
+      kind: 'read',
       args: { filePath: notes },
       result: { content: 'buy milk' },
       isError: false,
+      status: 'completed',
+      diffs: [],
+      locations: [],
+      timing: {
+        startedAt: expect.any(Number),
+        completedAt: expect.any(Number),
+      },
     },
     { type: 'text', text: `read complete: ${notes}` },
   ]);
@@ -71,7 +79,7 @@ it('streams every change of the conversation', async () => {
     `/conversations/${conversation.id}/events`,
   );
   try {
-    await events.until('data: {"messages":[]}\n\n');
+    await events.until('data: {"messages":[],');
     await conversation.say('echo hi');
     await events.until(
       '{"id":"m1","role":"assistant","parts":[{"type":"text","text":"hi"}]}',

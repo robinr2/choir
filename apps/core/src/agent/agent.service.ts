@@ -1,3 +1,4 @@
+import { RequestError } from '@agentclientprotocol/sdk';
 import {
   Inject,
   Injectable,
@@ -26,6 +27,15 @@ import {
 import { AgentLinksStore } from './agent-links.store.js';
 import { AgentSession, type SessionSetup } from './agent-session.js';
 
+type Closable = { close(): Promise<void> };
+
+function unsaved(error: unknown): boolean {
+  return (
+    error instanceof RequestError &&
+    error.code === RequestError.resourceNotFound().code
+  );
+}
+
 function excalidrawMcpServer(config: ChoirConfig) {
   return {
     name: 'excalidraw',
@@ -39,14 +49,17 @@ function excalidrawMcpServer(config: ChoirConfig) {
 
 @Injectable()
 export class AgentService implements BeforeApplicationShutdown {
-  private readonly sessions = new Set<AgentSession>();
+  private readonly opened = new Set<Closable>();
 
   constructor(
     @Inject(CHOIR_CONFIG) private readonly config: ChoirConfig,
     @Inject(AgentLinksStore)
     private readonly links: Pick<AgentLinksStore, 'find' | 'save'>,
     @Inject(AgentCatalogService)
-    private readonly catalog: Pick<AgentCatalogService, 'fork'>,
+    private readonly agentCatalog: Pick<
+      AgentCatalogService,
+      'catalog' | 'sessions' | 'fork'
+    >,
   ) {}
 
   async launch(conversationId: string, launch: Launch): Promise<void> {
@@ -55,8 +68,20 @@ export class AgentService implements BeforeApplicationShutdown {
       return;
     }
     const { resume, cwd, fork } = launch;
-    const sessionId = fork ? await this.catalog.fork(resume, cwd) : resume;
+    const sessionId = fork ? await this.fork(resume, cwd) : resume;
     await this.link(conversationId, sessionId, cwd);
+  }
+
+  catalog() {
+    return this.agentCatalog.catalog();
+  }
+
+  sessions() {
+    return this.agentCatalog.sessions();
+  }
+
+  fork(sessionId: string, cwd: string): Promise<string> {
+    return this.agentCatalog.fork(sessionId, cwd);
   }
 
   async link(
@@ -71,14 +96,24 @@ export class AgentService implements BeforeApplicationShutdown {
     const link =
       (await this.links.find(conversationId)) ??
       newSessionLink(conversationId, { cwd: sessionFolder(this.config) });
+    try {
+      return await this.started(link);
+    } catch (error) {
+      if (!unsaved(error)) throw error;
+      return this.started({ ...link, sessionId: null });
+    }
+  }
+
+  private async started(link: AgentLink): Promise<AgentSession> {
+    const { conversationId, cwd } = link;
     const session = new AgentSession(
       agentLaunch(this.config, {
         profile: profileDir(this.config),
-        cwd: link.cwd,
+        cwd,
         conversationId,
       }),
     );
-    this.sessions.add(session);
+    this.opened.add(session);
     try {
       await this.start(session, link);
     } catch (error) {
@@ -88,13 +123,13 @@ export class AgentService implements BeforeApplicationShutdown {
     return session;
   }
 
-  async close(session: AgentSession): Promise<void> {
-    this.sessions.delete(session);
+  async close(session: Closable): Promise<void> {
+    this.opened.delete(session);
     await session.close();
   }
 
   async beforeApplicationShutdown(): Promise<void> {
-    await Promise.all([...this.sessions].map((session) => this.close(session)));
+    await Promise.all([...this.opened].map((session) => this.close(session)));
   }
 
   private async start(session: AgentSession, link: AgentLink): Promise<void> {

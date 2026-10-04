@@ -46,6 +46,7 @@ async function opened(
 ): Promise<AgentSession> {
   const session = created(...flags);
   expect(session.id).toBe('');
+  expect(session.cwd).toBe('');
   await session.start({ cwd: dir, mcpServers: [], _meta: {} }, start);
   return session;
 }
@@ -86,17 +87,15 @@ function requested(
   );
 }
 
-it('runs the turns of a session one after another', async () => {
+it('sends a turn at once and hands the updates to the latest turn', async () => {
   const session = await opened();
-  const order: string[] = [];
-  const first = session.startTurn({ text: 'stream-sleep 300 first' });
+  expect(session.cwd).toBe(dir);
+  const first = session.startTurn({ text: 'stream-sleep 1000 first' });
+  await streaming(first);
   const second = session.startTurn({ text: 'echo second' });
-  void first.result.then(() => order.push('first'));
-  void second.result.then(() => order.push('second'));
-  expect(await answer(first)).toBe('first');
   expect(await answer(second)).toBe('second');
-  expect(await second.result).toEqual({ stopReason: 'end_turn' });
-  expect(order).toEqual(['first', 'second']);
+  expect(await answer(first)).toBe('first');
+  expect(await first.result).toEqual({ stopReason: 'end_turn' });
   expect(await say(session, 'env CHOIR_CONVERSATION_ID')).toBe('c1');
 });
 
@@ -138,7 +137,10 @@ it('replays every update of the session to each subscriber before the live ones'
       sessionId: session.id,
       update: {
         sessionUpdate: 'available_commands_update',
-        availableCommands: [{ name: 'compact', description: 'Compact' }],
+        availableCommands: [
+          { name: 'compact', description: 'Compact' },
+          { name: 'review', description: 'Review', input: { hint: 'pr' } },
+        ],
       },
     },
     chunk(session.id, 'hi'),
@@ -153,7 +155,7 @@ it('loads a saved session with its history', async () => {
   await first.close();
   const loaded = await opened({ sessionId: first.id });
   expect(loaded.id).toBe(first.id);
-  expect(loaded.history).toEqual([
+  expect(loaded.history.slice(0, 2)).toEqual([
     {
       sessionId: first.id,
       update: {
@@ -208,31 +210,28 @@ it('starts and loads sessions of an agent without config options', async () => {
   const flag = '--no-config-options';
   const started = await opened(undefined, flag);
   expect(await firstValueFrom(started.configOptions)).toEqual([]);
+  await say(started, 'echo hi');
   await started.close();
   const loaded = await opened({ sessionId: started.id }, flag);
   expect(await firstValueFrom(loaded.configOptions)).toEqual([]);
 });
 
-it('cancels a running turn and withdraws a queued one', async () => {
+it('cancels a running turn', async () => {
   const session = await opened();
   const running = session.startTurn({ text: 'stream-sleep 20000 long' });
-  const queued = session.startTurn({ text: 'echo never' });
   await streaming(running);
-  await queued.cancel();
   await running.cancel();
   expect(await running.result).toEqual({ stopReason: 'cancelled' });
-  expect(await queued.result).toBeUndefined();
   expect(await say(session, 'echo next')).toBe('next');
 });
 
-it('steers a running turn and starts a turn when none runs', async () => {
+it('steers a running turn and tells when none runs', async () => {
   const session = await opened();
   const running = session.startTurn({ text: 'stream-sleep 1000 working' });
   await streaming(running);
-  expect(await session.steer({ text: 'use pnpm' })).toBeUndefined();
+  expect(await session.steer({ text: 'use pnpm' })).toBe(true);
   expect(await answer(running)).toBe('workingsteered: use pnpm');
-  const started = await session.steer({ text: 'echo idle' });
-  expect(started && (await answer(started))).toBe('idle');
+  expect(await session.steer({ text: 'echo idle' })).toBe(false);
 });
 
 it('asks the user what the agent asks and answers with what the user chose', async () => {

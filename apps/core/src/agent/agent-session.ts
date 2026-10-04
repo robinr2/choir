@@ -3,7 +3,6 @@ import {
   methods,
   type NewSessionRequest,
   type SessionConfigOption,
-  type SessionUpdate,
   type SetSessionConfigOptionRequest,
 } from '@agentclientprotocol/sdk';
 import {
@@ -17,11 +16,7 @@ import {
 } from 'rxjs';
 import { AgentConnection } from './agent-connection.js';
 import type { AgentLaunch } from './agent-process.js';
-import {
-  type AgentUpdate,
-  isSessionUpdate,
-  sessionUpdates,
-} from './agent-updates.js';
+import { type AgentUpdate, isSessionUpdate } from './agent-updates.js';
 import {
   type InteractionAnswer,
   type InteractionEvent,
@@ -40,7 +35,20 @@ export type SessionSetup = NewSessionRequest;
 
 export type SessionStart = { sessionId: string } | { mode?: string };
 
-export type AgentConversation = Pick<AgentSession, 'rootHistory' | 'startTurn'>;
+export type SessionHandle = Pick<
+  AgentSession,
+  | 'id'
+  | 'cwd'
+  | 'updates'
+  | 'interactions'
+  | 'configOptions'
+  | 'startTurn'
+  | 'steer'
+  | 'cancel'
+  | 'respond'
+  | 'setConfigOption'
+  | 'close'
+>;
 
 type Steering = { outcome: string };
 
@@ -59,7 +67,7 @@ export class AgentSession {
   private readonly options = new BehaviorSubject<SessionConfigOption[]>([]);
   private readonly family = new SessionFamily();
   private turn?: PromptTurn;
-  private queue = Promise.resolve();
+  private folder = '';
 
   constructor(launch: AgentLaunch) {
     this.connection = new AgentConnection(launch, {
@@ -78,8 +86,8 @@ export class AgentSession {
     return [...this.log];
   }
 
-  get rootHistory(): SessionUpdate[] {
-    return sessionUpdates(this.log, this.id);
+  get cwd(): string {
+    return this.folder;
   }
 
   get updates(): Observable<AgentUpdate> {
@@ -99,6 +107,7 @@ export class AgentSession {
   }
 
   async start(setup: SessionSetup, start: SessionStart = {}): Promise<void> {
+    this.folder = setup.cwd;
     const { agentCapabilities } = await this.connection.initialize();
     if (!('sessionId' in start)) {
       await this.create(setup, start.mode);
@@ -111,17 +120,17 @@ export class AgentSession {
 
   startTurn(content: PromptContent): AgentTurn {
     const turn = new PromptTurn(() => this.cancel());
-    this.queue = this.queue.then(() => this.run(turn, content));
+    this.turn = turn;
+    void this.run(turn, content);
     return turn;
   }
 
-  async steer(content: PromptContent): Promise<AgentTurn | undefined> {
+  async steer(content: PromptContent): Promise<boolean> {
     const { outcome } = await this.agent.request<Steering>(
       '_session/steering',
       { sessionId: this.id, prompt: promptBlocks(content), _meta: STEERING },
     );
-    if (outcome !== 'promptRequired') return undefined;
-    return this.startTurn(content);
+    return outcome === 'injected';
   }
 
   async cancel(): Promise<void> {
@@ -185,8 +194,6 @@ export class AgentSession {
   }
 
   private async run(turn: PromptTurn, content: PromptContent): Promise<void> {
-    if (!turn.start()) return;
-    this.turn = turn;
     try {
       const sessionId = this.id;
       const prompt = promptBlocks(content);

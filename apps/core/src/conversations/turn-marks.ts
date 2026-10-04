@@ -1,9 +1,6 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import { Inject, Injectable } from '@nestjs/common';
 import { z } from 'zod';
-import { CHOIR_CONFIG, type ChoirConfig } from '../choir/choir-config.js';
-import type { TurnMark } from './transcript.js';
 
 const marksSchema = z.record(
   z.string(),
@@ -16,14 +13,15 @@ const marksSchema = z.record(
   }),
 );
 
+type TurnMark = z.infer<typeof marksSchema>[string];
+
 function missing(error: NodeJS.ErrnoException): string {
   if (error.code !== 'ENOENT') throw error;
   return '{}';
 }
 
-@Injectable()
-export class TurnMarksService {
-  constructor(@Inject(CHOIR_CONFIG) private readonly config: ChoirConfig) {}
+export class TurnMarks {
+  constructor(private readonly dir: string) {}
 
   async load(conversationId: string): Promise<Map<string, TurnMark>> {
     const saved = await readFile(this.file(conversationId), 'utf8').catch(
@@ -44,10 +42,6 @@ export class TurnMarksService {
   }
 
   private file(conversationId: string): string {
-    return path.join(
-      this.config.dataDir,
-      'turn-marks',
-      `${conversationId}.json`,
-    );
+    return path.join(this.dir, `${conversationId}.json`);
   }
 }

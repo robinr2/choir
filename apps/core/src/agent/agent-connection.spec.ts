@@ -41,7 +41,9 @@ it('declines what the agent asks and ignores what it tells when nobody listens',
     await readFile(path.join(sessions, `${sessionId}.json`), 'utf8'),
   );
   expect(
-    saved.updates.map(({ content }: { content: object }) => content),
+    saved.updates.flatMap(({ update }: { update: { content?: object } }) =>
+      update.content ? [update.content] : [],
+    ),
   ).toEqual([
     { type: 'text', text: 'ask-permission allow_once' },
     { type: 'text', text: '{"outcome":"cancelled"}' },
