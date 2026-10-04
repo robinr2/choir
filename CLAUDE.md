@@ -18,6 +18,7 @@ Do all work based on the documentation of the tools the current task involves. O
 - Agent Client Protocol and its TypeScript SDK: https://agentclientprotocol.com/llms.txt
 - Electron: https://www.electronjs.org/docs/latest/
 - Electron Forge: https://www.electronforge.io/llms.txt
+- WebdriverIO: https://webdriver.io/llms.txt
 
 ## Development
 
