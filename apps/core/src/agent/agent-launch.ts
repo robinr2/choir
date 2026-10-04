@@ -1,9 +1,12 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { ChoirConfig } from '../choir/choir-config.js';
+import type { ClaudeOptions } from './agent-links.js';
 import type { AgentLaunch } from './agent-process.js';
 
 const SETTING_SOURCES = ['project', 'local'];
+
+const THINKING = { type: 'adaptive', display: 'summarized' };
 
 export function claudeAgentPath(): string {
   const library = fileURLToPath(
@@ -27,6 +30,7 @@ export function agentLaunch(
       CLAUDE_CODE_PLUGIN_DIRS: profile,
       CHOIR_CORE_URL: config.coreUrl,
       CHOIR_CONVERSATION_ID: conversationId,
+      CLAUDE_CODE_FORK_SUBAGENT: '1',
       ...(config.claudeExecutable && {
         CLAUDE_CODE_EXECUTABLE: config.claudeExecutable,
       }),
@@ -35,10 +39,17 @@ export function agentLaunch(
 }
 
 export function sessionMeta(
+  options: ClaudeOptions = {},
   extra: Record<string, unknown> = {},
 ): Record<string, unknown> {
   return {
-    claudeCode: { options: { settingSources: SETTING_SOURCES } },
+    claudeCode: {
+      options: {
+        settingSources: SETTING_SOURCES,
+        thinking: THINKING,
+        ...options,
+      },
+    },
     ...extra,
   };
 }

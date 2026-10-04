@@ -13,9 +13,18 @@ import {
   excalidrawMcpEnvironment,
   excalidrawMcpPath,
 } from '../canvas/excalidraw.js';
+import { AgentCatalogService } from './agent-catalog.service.js';
 import { agentLaunch, sessionMeta } from './agent-launch.js';
+import {
+  type AgentLink,
+  type ClaudeOptions,
+  claudeOptions,
+  type Launch,
+  newSessionLink,
+  sessionLink,
+} from './agent-links.js';
+import { AgentLinksStore } from './agent-links.store.js';
 import { AgentSession, type SessionSetup } from './agent-session.js';
-import { AgentSessionsStore } from './agent-sessions.store.js';
 
 function excalidrawMcpServer(config: ChoirConfig) {
   return {
@@ -34,22 +43,44 @@ export class AgentService implements BeforeApplicationShutdown {
 
   constructor(
     @Inject(CHOIR_CONFIG) private readonly config: ChoirConfig,
-    @Inject(AgentSessionsStore)
-    private readonly links: Pick<AgentSessionsStore, 'find' | 'save'>,
+    @Inject(AgentLinksStore)
+    private readonly links: Pick<AgentLinksStore, 'find' | 'save'>,
+    @Inject(AgentCatalogService)
+    private readonly catalog: Pick<AgentCatalogService, 'fork'>,
   ) {}
 
+  async launch(conversationId: string, launch: Launch): Promise<void> {
+    if (!('resume' in launch)) {
+      await this.links.save(newSessionLink(conversationId, launch));
+      return;
+    }
+    const { resume, cwd, fork } = launch;
+    const sessionId = fork ? await this.catalog.fork(resume, cwd) : resume;
+    await this.link(conversationId, sessionId, cwd);
+  }
+
+  async link(
+    conversationId: string,
+    sessionId: string,
+    cwd: string,
+  ): Promise<void> {
+    await this.links.save(sessionLink(conversationId, sessionId, cwd));
+  }
+
   async open(conversationId: string): Promise<AgentSession> {
-    const cwd = sessionFolder(this.config);
+    const link =
+      (await this.links.find(conversationId)) ??
+      newSessionLink(conversationId, { cwd: sessionFolder(this.config) });
     const session = new AgentSession(
       agentLaunch(this.config, {
         profile: profileDir(this.config),
-        cwd,
+        cwd: link.cwd,
         conversationId,
       }),
     );
     this.sessions.add(session);
     try {
-      await this.start(session, conversationId, cwd);
+      await this.start(session, link);
     } catch (error) {
       await this.close(session);
       throw error;
@@ -66,21 +97,23 @@ export class AgentService implements BeforeApplicationShutdown {
     await Promise.all([...this.sessions].map((session) => this.close(session)));
   }
 
-  private async start(
-    session: AgentSession,
-    conversationId: string,
-    cwd: string,
-  ): Promise<void> {
-    const saved = await this.links.find(conversationId);
-    await session.start(this.setup(cwd), saved);
-    if (!saved) await this.links.save(conversationId, session.id);
+  private async start(session: AgentSession, link: AgentLink): Promise<void> {
+    const { sessionId, cwd, mode } = link;
+    if (sessionId !== null) {
+      await session.start(this.setup(cwd), { sessionId });
+      return;
+    }
+    await session.start(this.setup(cwd, claudeOptions(link)), {
+      ...(mode !== null && { mode }),
+    });
+    await this.links.save({ ...link, sessionId: session.id });
   }
 
-  private setup(cwd: string): SessionSetup {
+  private setup(cwd: string, options: ClaudeOptions = {}): SessionSetup {
     return {
       cwd,
       mcpServers: [excalidrawMcpServer(this.config)],
-      _meta: sessionMeta(),
+      _meta: sessionMeta(options),
     };
   }
 }

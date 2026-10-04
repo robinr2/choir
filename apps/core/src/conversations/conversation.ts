@@ -1,5 +1,5 @@
 import { BehaviorSubject } from 'rxjs';
-import type { AgentConversation } from '../agent/prompt-turn.js';
+import type { AgentConversation } from '../agent/agent-session.js';
 import type {
   HistoryEntry,
   TranscriptMessage,

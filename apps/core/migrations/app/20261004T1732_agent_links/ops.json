@@ -1,0 +1,78 @@
+[
+  {
+    "id": "dropTable.AgentSession",
+    "label": "Drop table \"AgentSession\"",
+    "operationClass": "destructive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "table",
+        "name": "AgentSession"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"AgentSession\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"AgentSession\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "drop table \"AgentSession\"",
+        "sql": "DROP TABLE \"public\".\"AgentSession\""
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"AgentSession\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"AgentSession\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "table.AgentLink",
+    "label": "Create table \"AgentLink\"",
+    "summary": "Creates table \"AgentLink\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "table",
+        "name": "AgentLink"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"AgentLink\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"AgentLink\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"AgentLink\"",
+        "sql": "CREATE TABLE \"public\".\"AgentLink\" (\n  \"conversationId\" uuid NOT NULL,\n  \"cwd\" text NOT NULL,\n  \"effort\" text,\n  \"mode\" text,\n  \"model\" text,\n  \"sessionId\" text,\n  PRIMARY KEY (\"conversationId\")\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"AgentLink\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"AgentLink\""
+        ]
+      }
+    ]
+  }
+]

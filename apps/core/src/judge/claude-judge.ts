@@ -54,12 +54,18 @@ export class ClaudeJudge implements BeforeApplicationShutdown {
     notificationId: string,
   ): Promise<void> {
     const append = await this.profile.systemPrompt();
+    session.interactions.subscribe((event) => {
+      if (event.type === 'requested') {
+        session.respond(event.interaction.id, { action: 'cancel' });
+      }
+    });
     await session.start({
       cwd,
       mcpServers: [],
-      _meta: sessionMeta({ systemPrompt: { append } }),
+      _meta: sessionMeta({}, { systemPrompt: { append } }),
     });
-    const turn = session.startTurn(`Judge the notification ${notificationId}.`);
+    const text = `Judge the notification ${notificationId}.`;
+    const turn = session.startTurn({ text });
     const result = await turn.result;
     if (result?.stopReason !== 'end_turn') {
       throw new Error(`The judge ended: ${JSON.stringify(result)}`);

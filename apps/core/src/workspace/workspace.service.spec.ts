@@ -1,4 +1,5 @@
 import { Logger } from '@nestjs/common';
+import type { AgentService } from '../agent/agent.service.js';
 import { BehaviorSubject } from 'rxjs';
 import type { ConversationsService } from '../conversations/conversations.service.js';
 import { LayoutService } from '../layout/layout.service.js';
@@ -23,6 +24,7 @@ it('logs a message it could not deliver', async () => {
     layout,
     conversations,
     new VoiceService(),
+    { launch: vi.fn<AgentService['launch']>() },
   );
   const [first] = Object.keys(layout.current.panes);
   const second = await layout.openPane({ kind: 'agent' });

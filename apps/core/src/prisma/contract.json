@@ -4,8 +4,8 @@
   "target": "postgres",
   "profileHash": "3916f444a8a17ad749191acf9e08dad97d1a327b88c2f1d45d12f240296aa8b2",
   "roots": {
-    "AgentSession": {
-      "model": "AgentSession",
+    "AgentLink": {
+      "model": "AgentLink",
       "namespace": "public"
     },
     "Attachment": {
@@ -68,7 +68,7 @@
           }
         },
         "models": {
-          "AgentSession": {
+          "AgentLink": {
             "fields": {
               "conversationId": {
                 "nullable": false,
@@ -77,8 +77,36 @@
                   "kind": "scalar"
                 }
               },
-              "sessionId": {
+              "cwd": {
                 "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "effort": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "mode": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "model": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "sessionId": {
+                "nullable": true,
                 "type": {
                   "codecId": "pg/text@1",
                   "kind": "scalar"
@@ -91,12 +119,24 @@
                 "conversationId": {
                   "column": "conversationId"
                 },
+                "cwd": {
+                  "column": "cwd"
+                },
+                "effort": {
+                  "column": "effort"
+                },
+                "mode": {
+                  "column": "mode"
+                },
+                "model": {
+                  "column": "model"
+                },
                 "sessionId": {
                   "column": "sessionId"
                 }
               },
               "namespaceId": "public",
-              "table": "AgentSession"
+              "table": "AgentLink"
             }
           },
           "Attachment": {
@@ -928,17 +968,37 @@
       "public": {
         "entries": {
           "table": {
-            "AgentSession": {
+            "AgentLink": {
               "columns": {
                 "conversationId": {
                   "codecId": "pg/uuid@1",
                   "nativeType": "uuid",
                   "nullable": false
                 },
-                "sessionId": {
+                "cwd": {
                   "codecId": "pg/text@1",
                   "nativeType": "text",
                   "nullable": false
+                },
+                "effort": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": true
+                },
+                "mode": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": true
+                },
+                "model": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": true
+                },
+                "sessionId": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": true
                 }
               },
               "foreignKeys": [],
@@ -1542,7 +1602,7 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "825a10801284527cfba4f5629e05842fbbe00a7817c266b58ae6ff12ae3261cf"
+    "storageHash": "dba37070cc32be9a890e3d4beb96e86db37a219d6006d9789b57b6c380f8338b"
   },
   "execution": {
     "executionHash": "6fbf7e6aa536b6a88fb41180e2ff8f5785b32cd18c8a889ca136ade2902944a9",

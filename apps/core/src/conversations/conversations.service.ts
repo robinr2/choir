@@ -3,7 +3,7 @@ import { from, type Observable, switchMap } from 'rxjs';
 import { AgentService } from '../agent/agent.service.js';
 import { ProfileService } from '../agent/profile.service.js';
 import { VoiceService } from '../voice/voice.service.js';
-import type { AgentConversation } from '../agent/prompt-turn.js';
+import type { AgentConversation } from '../agent/agent-session.js';
 import { type Conversation, newConversation } from './conversation.js';
 import {
   ConversationTurn,
@@ -134,7 +134,7 @@ export class ConversationsService {
   private async open(conversation: Conversation): Promise<AgentConversation> {
     const session = await this.agent.open(conversation.id);
     conversation.marks = await this.turnMarks.load(conversation.id);
-    conversation.history = historyOf(session.history);
+    conversation.history = historyOf(session.rootHistory);
     this.publish(conversation);
     return session;
   }
@@ -145,7 +145,7 @@ export class ConversationsService {
     request: TurnRequest,
   ): Promise<Observable<string>> {
     const turn = new ConversationTurn(
-      session.startTurn(request.prompt),
+      session.startTurn({ text: request.prompt }),
       request,
       () => this.publish(conversation),
     );

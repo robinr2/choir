@@ -47,6 +47,18 @@ export function openPane(layout: Layout, paneId: string): Layout {
   );
 }
 
+export function openPaneNextTo(
+  layout: Layout,
+  paneId: string,
+  nextTo: string,
+): Layout {
+  const { workspace, column } = findPane(layout, nextTo);
+  const opened = updateSpace(layout, workspace, (space) =>
+    addPane(space, paneId, { index: column + 1, size: NEW_PANE }),
+  );
+  return activateWorkspace(opened, workspace);
+}
+
 export function removePane(layout: Layout, paneId: string): Layout {
   const { workspace, ...place } = findPane(layout, paneId);
   const removed = updateSpace(

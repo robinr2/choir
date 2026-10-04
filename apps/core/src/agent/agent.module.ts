@@ -1,10 +1,18 @@
 import { Module } from '@nestjs/common';
+import { AgentCatalogController } from './agent-catalog.controller.js';
+import { AgentCatalogService } from './agent-catalog.service.js';
 import { AgentService } from './agent.service.js';
-import { AgentSessionsStore } from './agent-sessions.store.js';
+import { AgentLinksStore } from './agent-links.store.js';
 import { ProfileService } from './profile.service.js';
 
 @Module({
-  providers: [ProfileService, AgentSessionsStore, AgentService],
+  controllers: [AgentCatalogController],
+  providers: [
+    ProfileService,
+    AgentLinksStore,
+    AgentCatalogService,
+    AgentService,
+  ],
   exports: [AgentService, ProfileService],
 })
 export class AgentModule {}

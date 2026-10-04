@@ -1,4 +1,5 @@
 import { Global, Module } from '@nestjs/common';
+import { AgentModule } from '../agent/agent.module.js';
 import { ConversationsModule } from '../conversations/conversations.module.js';
 import { LayoutService } from '../layout/layout.service.js';
 import { LayoutStore } from '../layout/layout.store.js';
@@ -8,7 +9,7 @@ import { WORKSPACE } from './workspace.port.js';
 
 @Global()
 @Module({
-  imports: [ConversationsModule],
+  imports: [AgentModule, ConversationsModule],
   controllers: [WorkspaceController],
   providers: [LayoutStore, LayoutService, WorkspaceService, workspaceProvider],
   exports: [WORKSPACE],

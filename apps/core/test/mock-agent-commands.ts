@@ -4,18 +4,12 @@ import { setTimeout as sleep } from 'node:timers/promises';
 import {
   type AgentContext,
   methods,
-  type NewSessionRequest,
   type PermissionOptionKind,
   type RequestPermissionRequest,
   type SessionUpdate,
 } from '@agentclientprotocol/sdk';
-
-export type Session = {
-  updates: SessionUpdate[];
-  setup: NewSessionRequest;
-  mode?: string;
-  running?: AbortController;
-};
+import { configOptions } from './mock-agent-config.js';
+import type { Session } from './mock-agent-sessions.js';
 
 type Emit = (update: SessionUpdate) => Promise<void>;
 
@@ -25,6 +19,7 @@ export type Turn = {
   client: AgentContext;
   emit: Emit;
   signal: AbortSignal;
+  capabilities: unknown;
 };
 
 type Command = (words: string[], turn: Turn) => Promise<void>;
@@ -35,6 +30,10 @@ const PERMISSION_KINDS: PermissionOptionKind[] = [
   'reject_once',
   'reject_always',
 ];
+
+const WITHDRAWAL = 200;
+
+const UPDATE: string = methods.client.session.update;
 
 export function said(text: string): SessionUpdate {
   return {
@@ -77,25 +76,108 @@ async function askPermission(
       kind,
     })),
   };
+  const withdrawal = names.includes('withdraw') ? WITHDRAWAL : undefined;
   const { outcome } = await client.request(
     methods.client.session.requestPermission,
     request,
+    { cancellationSignal: withdrawal && AbortSignal.timeout(withdrawal) },
   );
   await emit(said(JSON.stringify(outcome)));
+}
+
+async function elicit(
+  [mode = 'form']: string[],
+  { sessionId, client, emit }: Turn,
+): Promise<void> {
+  const elicitationId = randomUUID();
+  const response = await client.request(
+    methods.client.elicitation.create,
+    mode === 'url'
+      ? {
+          sessionId,
+          mode: 'url',
+          elicitationId,
+          url: 'https://example.com',
+          message: 'Sign in',
+        }
+      : {
+          sessionId,
+          mode: 'form',
+          message: 'Pick',
+          requestedSchema: { type: 'object', properties: {} },
+        },
+  );
+  if (mode === 'url') {
+    await client.notify(methods.client.elicitation.complete, { elicitationId });
+  }
+  await emit(said(JSON.stringify(response)));
+}
+
+async function subagent(words: string[], { sessionId, client, emit }: Turn) {
+  const subagentSessionId = randomUUID();
+  const name = words.join(' ');
+  await client.notify(UPDATE, {
+    sessionId,
+    update: {
+      sessionUpdate: 'subagent_spawned',
+      subagentSessionId,
+      name,
+      task: `Do ${name}`,
+    },
+  });
+  await client.notify(methods.client.session.update, {
+    sessionId: subagentSessionId,
+    update: said(`${name} done`),
+  });
+  await client.notify(UPDATE, {
+    sessionId,
+    update: {
+      sessionUpdate: 'subagent_state_update',
+      subagentSessionId,
+      state: 'completed',
+    },
+  });
+  await client.notify(methods.client.session.update, {
+    sessionId: randomUUID(),
+    update: said('stranger'),
+  });
+  await emit(said(`${name} reported`));
+}
+
+async function pushConfig(_: string[], { session, emit }: Turn): Promise<void> {
+  session.config = { ...session.config, mode: 'plan', model: 'opus' };
+  await emit({
+    sessionUpdate: 'config_option_update',
+    configOptions: configOptions(session.config),
+  });
+  session.config = { ...session.config, mode: 'default' };
+  await emit({
+    sessionUpdate: 'current_mode_update',
+    currentModeId: 'default',
+  });
 }
 
 export const commands: Record<string, Command> = {
   echo: (words, { emit }) => emit(said(words.join(' '))),
   env: ([name = ''], { emit }) => emit(said(process.env[name] ?? '')),
+  cwd: (_, { emit }) => emit(said(process.cwd())),
   'read-tool': (words, { emit }) => readTool(words.join(' '), emit),
   'stream-sleep': async ([ms, ...words], { emit, signal }) => {
     await emit(said(words.join(' ')));
     await sleep(Number(ms), undefined, { signal });
   },
   'ask-permission': askPermission,
-  mode: (_, { session, emit }) => emit(said(session.mode ?? 'default')),
+  elicit,
+  subagent,
+  'push-config': pushConfig,
+  mode: (_, { session, emit }) => emit(said(session.config.mode)),
+  config: (_, { session, emit }) => emit(said(JSON.stringify(session.config))),
   'session-setup': (_, { session, emit }) =>
     emit(said(JSON.stringify(session.setup))),
+  'prompt-blocks': (_, { session, emit }) =>
+    emit(said(JSON.stringify(session.prompt))),
+  capabilities: (_, { capabilities, emit }) =>
+    emit(said(JSON.stringify(capabilities))),
   fail: async () => {
     throw new Error('The prompt failed');
   },

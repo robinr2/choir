@@ -1,11 +1,9 @@
-import { randomUUID } from 'node:crypto';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
-import path from 'node:path';
 import { Writable } from 'node:stream';
 import { parseArgs } from 'node:util';
 import {
   agent,
   type AgentContext,
+  type ContentBlock,
   methods,
   type LoadSessionRequest,
   ndJsonStream,
@@ -13,16 +11,13 @@ import {
   PROTOCOL_VERSION,
   type PromptRequest,
   type PromptResponse,
-  type SessionUpdate,
-  type SetSessionModeRequest,
+  type SetSessionConfigOptionRequest,
   type StopReason,
 } from '@agentclientprotocol/sdk';
-import {
-  commands,
-  said,
-  type Session,
-  type Turn,
-} from './mock-agent-commands.js';
+import { z } from 'zod';
+import { commands, said, type Turn } from './mock-agent-commands.js';
+import { type Config, configOptions, configured } from './mock-agent-config.js';
+import { MockSessions } from './mock-agent-sessions.js';
 import { readableStream } from '../src/agent/agent-process.js';
 
 const STOP_REASONS: StopReason[] = [
@@ -36,50 +31,56 @@ const STOP_REASONS: StopReason[] = [
 const { values: flags } = parseArgs({
   options: {
     sessions: { type: 'string', default: '' },
-    'set-session-mode-fails': { type: 'boolean', default: false },
+    'set-config-fails': { type: 'boolean', default: false },
     'no-load-session': { type: 'boolean', default: false },
+    'no-config-options': { type: 'boolean', default: false },
     respond: { type: 'string' },
     'stop-reason': { type: 'string', default: 'end_turn' },
   },
 });
 
-const sessions = new Map<string, Session>();
+const steeringSchema = z
+  .object({
+    sessionId: z.string(),
+    prompt: z.array(z.object({ text: z.string() })),
+    _meta: z.object({
+      steering: z.object({ idleBehavior: z.string() }),
+    }),
+  })
+  .transform(({ _meta: meta, ...steering }) => ({
+    ...steering,
+    idleBehavior: meta.steering.idleBehavior,
+  }));
 
-function file(sessionId: string): string {
-  return path.join(flags.sessions, `${sessionId}.json`);
+const sessions = new MockSessions(flags.sessions);
+
+let capabilities: unknown;
+
+function offered(config: Config) {
+  return flags['no-config-options']
+    ? {}
+    : { configOptions: configOptions(config) };
 }
 
-async function save(sessionId: string, session: Session): Promise<void> {
-  await mkdir(flags.sessions, { recursive: true });
-  const { setup, updates } = session;
-  await writeFile(file(sessionId), JSON.stringify({ setup, updates }));
+function text(blocks: ContentBlock[]): string {
+  return blocks.map((block) => ('text' in block ? block.text : '')).join('');
 }
 
-function sessionOf(sessionId: string): Session {
-  const session = sessions.get(sessionId);
-  if (!session) throw new Error(`Unknown session ${sessionId}`);
-  return session;
-}
-
-async function respond(text: string, turn: Turn): Promise<PromptResponse> {
-  const [name = '', ...words] = (flags.respond ?? text).split(' ');
+async function respond(words: string, turn: Turn): Promise<PromptResponse> {
+  const [name = '', ...rest] = (flags.respond ?? words).split(' ');
   const command = commands[name];
-  if (command) await command(words, turn);
-  else await turn.emit(said(`unrecognized prompt: ${text}`));
+  if (command) await command(rest, turn);
+  else await turn.emit(said(`unrecognized prompt: ${words}`));
   const stopReason = STOP_REASONS.find(
     (reason) => reason === flags['stop-reason'],
   );
   return { stopReason: stopReason ?? 'end_turn' };
 }
 
-function emitter(
-  sessionId: string,
-  session: Session,
-  client: AgentContext,
-): Turn['emit'] {
+function emitter(sessionId: string, client: AgentContext): Turn['emit'] {
   return async (update) => {
-    session.updates.push(update);
-    await save(sessionId, session);
+    sessions.get(sessionId).updates.push(update);
+    await sessions.save(sessionId);
     await client.notify(methods.client.session.update, { sessionId, update });
   };
 }
@@ -88,80 +89,120 @@ async function prompt(
   { sessionId, prompt: blocks }: PromptRequest,
   client: AgentContext,
 ): Promise<PromptResponse> {
-  const session = sessionOf(sessionId);
-  const text = blocks
-    .map((block) => ('text' in block ? block.text : ''))
-    .join('');
+  const session = sessions.get(sessionId);
   const running = new AbortController();
-  session.running = running;
+  Object.assign(session, { running, prompt: blocks });
+  const words = text(blocks);
   session.updates.push({
     sessionUpdate: 'user_message_chunk',
-    content: { type: 'text', text },
+    content: { type: 'text', text: words },
   });
-  await save(sessionId, session);
-  const turn = {
-    sessionId,
-    session,
-    client,
-    emit: emitter(sessionId, session, client),
-    signal: running.signal,
-  };
-  return respond(text, turn).catch((error: unknown) => {
-    if (running.signal.aborted) return { stopReason: 'cancelled' };
-    throw error;
-  });
+  await sessions.save(sessionId);
+  const { signal } = running;
+  const emit = emitter(sessionId, client);
+  const turn = { sessionId, session, client, emit, signal, capabilities };
+  return respond(words, turn)
+    .catch((error: unknown) => {
+      if (running.signal.aborted) return { stopReason: 'cancelled' as const };
+      throw error;
+    })
+    .finally(() => {
+      session.running = undefined;
+    });
+}
+
+function announceCommands(sessionId: string, client: AgentContext): void {
+  setTimeout(() => {
+    void client.notify(methods.client.session.update, {
+      sessionId,
+      update: {
+        sessionUpdate: 'available_commands_update',
+        availableCommands: [{ name: 'compact', description: 'Compact' }],
+      },
+    });
+  }, 0);
+}
+
+async function create(setup: NewSessionRequest, client: AgentContext) {
+  const sessionId = await sessions.create(setup);
+  announceCommands(sessionId, client);
+  return { sessionId, ...offered(sessions.get(sessionId).config) };
 }
 
 async function load(
   { sessionId, ...setup }: LoadSessionRequest,
   client: AgentContext,
 ): Promise<object> {
-  const saved: { updates: SessionUpdate[] } = JSON.parse(
-    await readFile(file(sessionId), 'utf8'),
-  );
-  const { updates } = saved;
-  sessions.set(sessionId, { updates, setup });
+  const session = await sessions.load(sessionId, setup);
   await Promise.all(
-    updates.map((update) =>
+    session.updates.map((update) =>
       client.notify(methods.client.session.update, { sessionId, update }),
     ),
   );
-  return {};
+  return offered(session.config);
 }
 
-async function create(
-  setup: NewSessionRequest,
-): Promise<{ sessionId: string }> {
-  const sessionId = randomUUID();
-  const session = { updates: [], setup };
-  sessions.set(sessionId, session);
-  await save(sessionId, session);
-  return { sessionId };
+function setConfigOption(request: SetSessionConfigOptionRequest) {
+  if (flags['set-config-fails']) throw new Error('The option cannot be set');
+  const session = sessions.get(request.sessionId);
+  session.config = configured(session.config, request);
+  return { configOptions: [], ...offered(session.config) };
 }
 
-function setMode({ sessionId, modeId }: SetSessionModeRequest): object {
-  if (flags['set-session-mode-fails']) {
-    throw new Error('The mode cannot be set');
+async function steer(
+  params: z.infer<typeof steeringSchema>,
+  client: AgentContext,
+) {
+  const session = sessions.get(params.sessionId);
+  if (!session.running) {
+    const required = params.idleBehavior === 'promptRequired';
+    return { outcome: required ? 'promptRequired' : 'startedNewTurn' };
   }
-  sessionOf(sessionId).mode = modeId;
-  return {};
+  const steered = params.prompt.map((block) => block.text).join('');
+  const update = said(`steered: ${steered}`);
+  await emitter(params.sessionId, client)(update);
+  return { outcome: 'injected' };
 }
 
 agent({ name: 'mock-agent' })
-  .onRequest(methods.agent.initialize, () => ({
-    protocolVersion: PROTOCOL_VERSION,
-    agentCapabilities: { loadSession: !flags['no-load-session'] },
-  }))
-  .onRequest(methods.agent.session.new, ({ params }) => create(params))
+  .onRequest(methods.agent.initialize, ({ params }) => {
+    capabilities = params.clientCapabilities;
+    return {
+      protocolVersion: PROTOCOL_VERSION,
+      agentCapabilities: { loadSession: !flags['no-load-session'] },
+    };
+  })
+  .onRequest(methods.agent.session.new, ({ params, client }) =>
+    create(params, client),
+  )
   .onRequest(methods.agent.session.load, ({ params, client }) =>
     load(params, client),
   )
-  .onRequest(methods.agent.session.setMode, ({ params }) => setMode(params))
+  .onRequest(methods.agent.session.setConfigOption, ({ params }) =>
+    setConfigOption(params),
+  )
+  .onRequest(methods.agent.session.list, ({ params }) =>
+    sessions.list(params.cursor),
+  )
+  .onRequest(methods.agent.session.fork, async ({ params }) => ({
+    sessionId: await sessions.fork(params.sessionId, params.cwd),
+  }))
+  .onRequest(methods.agent.session.close, ({ params }) => {
+    sessions.close(params.sessionId);
+    return {};
+  })
+  .onRequest(methods.agent.session.delete, async ({ params }) => {
+    await sessions.delete(params.sessionId);
+    return {};
+  })
   .onRequest(methods.agent.session.prompt, ({ params, client }) =>
     prompt(params, client),
   )
+  .onRequest('_session/steering', steeringSchema, ({ params, client }) =>
+    steer(params, client),
+  )
   .onNotification(methods.agent.session.cancel, ({ params }) => {
-    sessions.get(params.sessionId)?.running?.abort();
+    sessions.find(params.sessionId)?.running?.abort();
   })
   .connect(
     ndJsonStream(Writable.toWeb(process.stdout), readableStream(process.stdin)),

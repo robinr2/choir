@@ -9,6 +9,7 @@ import {
 } from 'rxjs';
 import type { MockInstance } from 'vitest';
 import type { AgentTurn } from '../agent/prompt-turn.js';
+import type { PromptContent } from '../agent/session-content.js';
 import {
   type ConversationAgent,
   ConversationsService,
@@ -68,8 +69,8 @@ function agentSays(text: string): SessionUpdate {
 
 let turns: ScriptedTurn[];
 const session = {
-  history: [] as SessionUpdate[],
-  startTurn: vi.fn<(text: string) => AgentTurn>(() => {
+  rootHistory: [] as SessionUpdate[],
+  startTurn: vi.fn<(content: PromptContent) => AgentTurn>(() => {
     const turn = new ScriptedTurn();
     turns.push(turn);
     return turn;
@@ -118,14 +119,14 @@ async function finished(times: number): Promise<void> {
 }
 
 function prompts(): string[] {
-  return session.startTurn.mock.calls.map(([text]) => text);
+  return session.startTurn.mock.calls.map(([{ text }]) => text);
 }
 
 beforeEach(() => {
   vi.clearAllMocks();
   log = vi.spyOn(Logger.prototype, 'log').mockReturnValue();
   logError = vi.spyOn(Logger.prototype, 'error').mockReturnValue();
-  session.history = [userSays('hi'), agentSays('Hello.')];
+  session.rootHistory = [userSays('hi'), agentSays('Hello.')];
   turns = [];
   savedMarks = [];
   voiceAgent = undefined;

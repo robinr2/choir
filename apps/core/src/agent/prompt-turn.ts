@@ -7,11 +7,6 @@ export type AgentTurn = {
   cancel(): Promise<void>;
 };
 
-export type AgentConversation = {
-  readonly history: SessionUpdate[];
-  startTurn(text: string): AgentTurn;
-};
-
 export class PromptTurn implements AgentTurn {
   private readonly stream = new ReplaySubject<SessionUpdate>();
   private readonly ended = Promise.withResolvers<PromptResponse | undefined>();
