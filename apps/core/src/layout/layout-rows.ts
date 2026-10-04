@@ -7,7 +7,7 @@ import type {
   Tile,
 } from './layout.schemas.js';
 
-export const STATE_ID = 1;
+const STATE_ID = 1;
 
 export type StateRow = {
   id: number;
