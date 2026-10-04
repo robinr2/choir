@@ -27,10 +27,6 @@
     "playwright": {
       "command": "npx",
       "args": ["@playwright/mcp@0.0.82"]
-    },
-    "webdriverio": {
-      "command": "npx",
-      "args": ["@wdio/mcp@3.14.0"]
     }
   }
 }
