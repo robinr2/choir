@@ -82,5 +82,5 @@ async function drawAndSave(box: number, last: number): Promise<void> {
 
 it('keeps the last ten versions of the canvas', async () => {
   await drawAndSave(1, 11);
-  expect(await versions()).toHaveLength(10);
+  await vi.waitFor(async () => expect(await versions()).toHaveLength(10));
 });
