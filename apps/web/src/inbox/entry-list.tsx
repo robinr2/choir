@@ -5,7 +5,7 @@ import {
   useMemo,
   useState,
 } from 'react';
-import { leftFor } from '@/panes/pane-swap';
+import { leftFor } from '@/lib/left-for';
 import type { ListKind } from './core-inbox';
 import { useInbox } from './inbox-context';
 import { type DraggedTodo, TODO_TYPE } from './todo-reference';
@@ -41,7 +41,6 @@ function accepted(
   if (!enabled || !event.dataTransfer.types.includes(entryType(kind)))
     return false;
   event.preventDefault();
-  event.stopPropagation();
   return true;
 }
 

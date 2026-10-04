@@ -8,8 +8,20 @@
       "model": "Attachment",
       "namespace": "public"
     },
+    "LayoutColumn": {
+      "model": "LayoutColumn",
+      "namespace": "public"
+    },
+    "LayoutState": {
+      "model": "LayoutState",
+      "namespace": "public"
+    },
     "Notification": {
       "model": "Notification",
+      "namespace": "public"
+    },
+    "Pane": {
+      "model": "Pane",
       "namespace": "public"
     },
     "QueueItem": {
@@ -23,11 +35,34 @@
     "TodoNotification": {
       "model": "TodoNotification",
       "namespace": "public"
+    },
+    "Workspace": {
+      "model": "Workspace",
+      "namespace": "public"
     }
   },
   "domain": {
     "namespaces": {
       "public": {
+        "enum": {
+          "PaneKind": {
+            "codecId": "pg/text@1",
+            "members": [
+              {
+                "name": "empty",
+                "value": "empty"
+              },
+              {
+                "name": "agent",
+                "value": "agent"
+              },
+              {
+                "name": "excalidraw",
+                "value": "excalidraw"
+              }
+            ]
+          }
+        },
         "models": {
           "Attachment": {
             "fields": {
@@ -115,6 +150,150 @@
               },
               "namespaceId": "public",
               "table": "Attachment"
+            }
+          },
+          "LayoutColumn": {
+            "fields": {
+              "activeTile": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/int4@1",
+                  "kind": "scalar"
+                }
+              },
+              "fullWidth": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/bool@1",
+                  "kind": "scalar"
+                }
+              },
+              "id": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/uuid@1",
+                  "kind": "scalar"
+                }
+              },
+              "position": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/int4@1",
+                  "kind": "scalar"
+                }
+              },
+              "width": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/float8@1",
+                  "kind": "scalar"
+                }
+              },
+              "workspaceId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/uuid@1",
+                  "kind": "scalar"
+                }
+              }
+            },
+            "relations": {
+              "panes": {
+                "cardinality": "1:N",
+                "on": {
+                  "localFields": [
+                    "id"
+                  ],
+                  "targetFields": [
+                    "columnId"
+                  ]
+                },
+                "to": {
+                  "model": "Pane",
+                  "namespace": "public"
+                }
+              },
+              "workspace": {
+                "cardinality": "N:1",
+                "nullable": false,
+                "on": {
+                  "localFields": [
+                    "workspaceId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "Workspace",
+                  "namespace": "public"
+                }
+              }
+            },
+            "storage": {
+              "fields": {
+                "activeTile": {
+                  "column": "activeTile"
+                },
+                "fullWidth": {
+                  "column": "fullWidth"
+                },
+                "id": {
+                  "column": "id"
+                },
+                "position": {
+                  "column": "position"
+                },
+                "width": {
+                  "column": "width"
+                },
+                "workspaceId": {
+                  "column": "workspaceId"
+                }
+              },
+              "namespaceId": "public",
+              "table": "LayoutColumn"
+            }
+          },
+          "LayoutState": {
+            "fields": {
+              "activeWorkspace": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/int4@1",
+                  "kind": "scalar"
+                }
+              },
+              "id": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/int4@1",
+                  "kind": "scalar"
+                }
+              },
+              "nextNumber": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/int4@1",
+                  "kind": "scalar"
+                }
+              }
+            },
+            "relations": {},
+            "storage": {
+              "fields": {
+                "activeWorkspace": {
+                  "column": "activeWorkspace"
+                },
+                "id": {
+                  "column": "id"
+                },
+                "nextNumber": {
+                  "column": "nextNumber"
+                }
+              },
+              "namespaceId": "public",
+              "table": "LayoutState"
             }
           },
           "Notification": {
@@ -273,6 +452,110 @@
               },
               "namespaceId": "public",
               "table": "Notification"
+            }
+          },
+          "Pane": {
+            "fields": {
+              "autoHeight": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/float8@1",
+                  "kind": "scalar"
+                }
+              },
+              "columnId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/uuid@1",
+                  "kind": "scalar"
+                }
+              },
+              "fixedHeight": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/float8@1",
+                  "kind": "scalar"
+                }
+              },
+              "id": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/uuid@1",
+                  "kind": "scalar"
+                }
+              },
+              "kind": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                },
+                "valueSet": {
+                  "entityKind": "enum",
+                  "entityName": "PaneKind",
+                  "namespaceId": "public",
+                  "plane": "domain"
+                }
+              },
+              "name": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "position": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/int4@1",
+                  "kind": "scalar"
+                }
+              }
+            },
+            "relations": {
+              "column": {
+                "cardinality": "N:1",
+                "nullable": false,
+                "on": {
+                  "localFields": [
+                    "columnId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "LayoutColumn",
+                  "namespace": "public"
+                }
+              }
+            },
+            "storage": {
+              "fields": {
+                "autoHeight": {
+                  "column": "autoHeight"
+                },
+                "columnId": {
+                  "column": "columnId"
+                },
+                "fixedHeight": {
+                  "column": "fixedHeight"
+                },
+                "id": {
+                  "column": "id"
+                },
+                "kind": {
+                  "column": "kind"
+                },
+                "name": {
+                  "column": "name"
+                },
+                "position": {
+                  "column": "position"
+                }
+              },
+              "namespaceId": "public",
+              "table": "Pane"
             }
           },
           "QueueItem": {
@@ -533,6 +816,73 @@
               "namespaceId": "public",
               "table": "TodoNotification"
             }
+          },
+          "Workspace": {
+            "fields": {
+              "activeColumn": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/int4@1",
+                  "kind": "scalar"
+                }
+              },
+              "id": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/uuid@1",
+                  "kind": "scalar"
+                }
+              },
+              "position": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/int4@1",
+                  "kind": "scalar"
+                }
+              },
+              "restoresPrevious": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/bool@1",
+                  "kind": "scalar"
+                }
+              }
+            },
+            "relations": {
+              "columns": {
+                "cardinality": "1:N",
+                "on": {
+                  "localFields": [
+                    "id"
+                  ],
+                  "targetFields": [
+                    "workspaceId"
+                  ]
+                },
+                "to": {
+                  "model": "LayoutColumn",
+                  "namespace": "public"
+                }
+              }
+            },
+            "storage": {
+              "fields": {
+                "activeColumn": {
+                  "column": "activeColumn"
+                },
+                "id": {
+                  "column": "id"
+                },
+                "position": {
+                  "column": "position"
+                },
+                "restoresPrevious": {
+                  "column": "restoresPrevious"
+                }
+              },
+              "namespaceId": "public",
+              "table": "Workspace"
+            }
           }
         }
       }
@@ -618,6 +968,102 @@
                 }
               ]
             },
+            "LayoutColumn": {
+              "columns": {
+                "activeTile": {
+                  "codecId": "pg/int4@1",
+                  "nativeType": "int4",
+                  "nullable": false
+                },
+                "fullWidth": {
+                  "codecId": "pg/bool@1",
+                  "nativeType": "bool",
+                  "nullable": false
+                },
+                "id": {
+                  "codecId": "pg/uuid@1",
+                  "nativeType": "uuid",
+                  "nullable": false
+                },
+                "position": {
+                  "codecId": "pg/int4@1",
+                  "nativeType": "int4",
+                  "nullable": false
+                },
+                "width": {
+                  "codecId": "pg/float8@1",
+                  "nativeType": "float8",
+                  "nullable": false
+                },
+                "workspaceId": {
+                  "codecId": "pg/uuid@1",
+                  "nativeType": "uuid",
+                  "nullable": false
+                }
+              },
+              "foreignKeys": [
+                {
+                  "onDelete": "cascade",
+                  "source": {
+                    "columns": [
+                      "workspaceId"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "LayoutColumn"
+                  },
+                  "target": {
+                    "columns": [
+                      "id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "Workspace"
+                  }
+                }
+              ],
+              "indexes": [
+                {
+                  "columns": [
+                    "workspaceId"
+                  ],
+                  "name": "LayoutColumn_workspaceId_idx_ba65f874",
+                  "prefix": "LayoutColumn_workspaceId_idx",
+                  "unique": false
+                }
+              ],
+              "primaryKey": {
+                "columns": [
+                  "id"
+                ]
+              },
+              "uniques": []
+            },
+            "LayoutState": {
+              "columns": {
+                "activeWorkspace": {
+                  "codecId": "pg/int4@1",
+                  "nativeType": "int4",
+                  "nullable": false
+                },
+                "id": {
+                  "codecId": "pg/int4@1",
+                  "nativeType": "int4",
+                  "nullable": false
+                },
+                "nextNumber": {
+                  "codecId": "pg/int4@1",
+                  "nativeType": "int4",
+                  "nullable": false
+                }
+              },
+              "foreignKeys": [],
+              "indexes": [],
+              "primaryKey": {
+                "columns": [
+                  "id"
+                ]
+              },
+              "uniques": []
+            },
             "Notification": {
               "columns": {
                 "archivedAt": {
@@ -690,6 +1136,93 @@
                   ]
                 }
               ]
+            },
+            "Pane": {
+              "checks": [
+                {
+                  "expression": "\"kind\" IN ('empty', 'agent', 'excalidraw')",
+                  "name": "Pane_kind_check_36d7f133",
+                  "prefix": "Pane_kind_check"
+                }
+              ],
+              "columns": {
+                "autoHeight": {
+                  "codecId": "pg/float8@1",
+                  "nativeType": "float8",
+                  "nullable": true
+                },
+                "columnId": {
+                  "codecId": "pg/uuid@1",
+                  "nativeType": "uuid",
+                  "nullable": false
+                },
+                "fixedHeight": {
+                  "codecId": "pg/float8@1",
+                  "nativeType": "float8",
+                  "nullable": true
+                },
+                "id": {
+                  "codecId": "pg/uuid@1",
+                  "nativeType": "uuid",
+                  "nullable": false
+                },
+                "kind": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false,
+                  "valueSet": {
+                    "entityKind": "valueSet",
+                    "entityName": "PaneKind",
+                    "namespaceId": "public",
+                    "plane": "storage"
+                  }
+                },
+                "name": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": true
+                },
+                "position": {
+                  "codecId": "pg/int4@1",
+                  "nativeType": "int4",
+                  "nullable": false
+                }
+              },
+              "foreignKeys": [
+                {
+                  "onDelete": "cascade",
+                  "source": {
+                    "columns": [
+                      "columnId"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "Pane"
+                  },
+                  "target": {
+                    "columns": [
+                      "id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "LayoutColumn"
+                  }
+                }
+              ],
+              "indexes": [
+                {
+                  "columns": [
+                    "columnId"
+                  ],
+                  "name": "Pane_columnId_idx_728f084b",
+                  "prefix": "Pane_columnId_idx",
+                  "unique": false
+                }
+              ],
+              "primaryKey": {
+                "columns": [
+                  "id"
+                ]
+              },
+              "uniques": []
             },
             "QueueItem": {
               "columns": {
@@ -903,6 +1436,48 @@
                 ]
               },
               "uniques": []
+            },
+            "Workspace": {
+              "columns": {
+                "activeColumn": {
+                  "codecId": "pg/int4@1",
+                  "nativeType": "int4",
+                  "nullable": false
+                },
+                "id": {
+                  "codecId": "pg/uuid@1",
+                  "nativeType": "uuid",
+                  "nullable": false
+                },
+                "position": {
+                  "codecId": "pg/int4@1",
+                  "nativeType": "int4",
+                  "nullable": false
+                },
+                "restoresPrevious": {
+                  "codecId": "pg/bool@1",
+                  "nativeType": "bool",
+                  "nullable": false
+                }
+              },
+              "foreignKeys": [],
+              "indexes": [],
+              "primaryKey": {
+                "columns": [
+                  "id"
+                ]
+              },
+              "uniques": []
+            }
+          },
+          "valueSet": {
+            "PaneKind": {
+              "kind": "valueSet",
+              "values": [
+                "empty",
+                "agent",
+                "excalidraw"
+              ]
             }
           }
         },
@@ -910,7 +1485,7 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "18a19b223620a30c64bea0cff90529bfa1e50363a9ed2f99afdd9588cbb43bdb"
+    "storageHash": "4761329d57fc1d1743f690d6dd94919d7666f59c315fa4571b498afa7fbfb05b"
   },
   "execution": {
     "executionHash": "6fbf7e6aa536b6a88fb41180e2ff8f5785b32cd18c8a889ca136ade2902944a9",

@@ -16,9 +16,8 @@ async function toolsOfFirstAgent() {
 it('gives every agent the orchestration tools', async () => {
   const { tools } = await toolsOfFirstAgent();
   const { tools: listed } = await tools.listTools();
-  expect(listed.map(({ name }) => name).slice(0, 5)).toEqual([
-    'split_pane',
-    'add_pane_at_edge',
+  expect(listed.map(({ name }) => name).slice(0, 4)).toEqual([
+    'open_agent',
     'send_message',
     'close_agent',
     'list_agents',
@@ -30,57 +29,46 @@ it('gives every agent the orchestration tools', async () => {
     name: 'choir',
     version: '1.0.0',
   });
-  expect(tools.getInstructions()).toMatch(
-    /new agent.*split_pane or add_pane_at_edge/,
-  );
+  expect(tools.getInstructions()).toMatch(/new agent.*with open_agent/);
   await tools.close();
 });
 
-it('splits panes and adds rows and columns as a click does', async () => {
+it('opens agents as new columns right after the focused column and focuses them', async () => {
   const { id, tools } = await toolsOfFirstAgent();
-  const right = await callForJson<Created>(tools, 'split_pane', {
-    direction: 'vertical',
-  });
-  const below = await callForJson<Created>(tools, 'split_pane', {
-    direction: 'horizontal',
-    agentId: right.id,
+  const second = await callForJson<Created>(tools, 'open_agent', {});
+  const third = await callForJson<Created>(tools, 'open_agent', {
     name: 'tester',
   });
-  const left = await callForJson<Created>(tools, 'add_pane_at_edge', {
-    edge: 'left',
-  });
-  expect([right.name, below.name, left.name]).toEqual([
-    'agent 2',
-    'tester',
-    'agent 4',
-  ]);
-  expect((await testApp.workspace.view()).layout).toEqual({
-    type: 'split',
-    direction: 'row',
-    children: [
-      left.id,
-      id,
-      {
-        type: 'split',
-        direction: 'column',
-        children: [right.id, below.id],
-        splitPercentages: [50, 50],
-      },
-    ],
-    splitPercentages: [100 / 3, (50 * 2) / 3, (50 * 2) / 3],
-  });
+  expect([second.name, third.name]).toEqual(['agent 2', 'tester']);
+  const view = await testApp.workspace.view();
+  const [first, empty] = view.workspaces;
+  expect(empty.columns).toEqual([]);
+  expect(view.activeWorkspace).toBe(0);
+  expect(first.activeColumn).toBe(2);
+  expect(first.restoresPrevious).toBe(true);
+  expect(
+    first.columns.map(({ width, fullWidth, tiles }) => ({
+      width,
+      fullWidth,
+      tiles,
+    })),
+  ).toEqual(
+    [id, second.id, third.id].map((paneId) => ({
+      width: 0.5,
+      fullWidth: false,
+      tiles: [{ paneId, height: { auto: 1 } }],
+    })),
+  );
   await tools.close();
 });
 
 it('lists the agents, which of them is calling, the other panes and the layout', async () => {
   const { id, tools } = await toolsOfFirstAgent();
-  const other = await callForJson<Created>(tools, 'add_pane_at_edge', {
-    edge: 'right',
+  const other = await callForJson<Created>(tools, 'open_agent', {
     name: 'writer',
   });
-  const canvas = (
-    await testApp.workspace.send('post', 'edges', { edge: 'left' }).expect(201)
-  ).body.id;
+  const canvas = (await testApp.workspace.send('post', 'panes').expect(201))
+    .body.id;
   await testApp.workspace
     .send('put', `panes/${canvas}/content`, { kind: 'excalidraw' })
     .expect(200);
@@ -93,7 +81,10 @@ it('lists the agents, which of them is calling, the other panes and the layout',
       { id: other.id, name: 'writer', status: 'working', you: false },
     ],
     otherPanes: [{ id: canvas, kind: 'excalidraw' }],
-    layout: (await testApp.workspace.view()).layout,
+    layout: {
+      workspaces: (await testApp.workspace.view()).workspaces,
+      activeWorkspace: 0,
+    },
   });
   await running;
   await tools.close();
@@ -101,9 +92,7 @@ it('lists the agents, which of them is calling, the other panes and the layout',
 
 it('closes agents', async () => {
   const { tools } = await toolsOfFirstAgent();
-  const other = await callForJson<Created>(tools, 'add_pane_at_edge', {
-    edge: 'top',
-  });
+  const other = await callForJson<Created>(tools, 'open_agent', {});
   expect(
     await callForJson(tools, 'close_agent', { agentId: other.id }),
   ).toEqual({ closed: true });
@@ -117,9 +106,7 @@ it('closes agents', async () => {
 
 it('delivers a message into the chat of another agent, from the sender', async () => {
   const { id, tools } = await toolsOfFirstAgent();
-  const other = await callForJson<Created>(tools, 'split_pane', {
-    direction: 'vertical',
-  });
+  const other = await callForJson<Created>(tools, 'open_agent', {});
   expect(
     await callForJson(tools, 'send_message', {
       agentId: other.id,

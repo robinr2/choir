@@ -12,7 +12,9 @@ import { InboxContext } from '@/inbox/inbox-context';
 import { InboxPanel } from '@/inbox/inbox-panel';
 import { NotificationList } from '@/inbox/notification-list';
 import { TodoList } from '@/inbox/todo-list';
-import { PanesView } from '@/panes/panes-view';
+import { Strip } from '@/strip/strip';
+import { StripContext } from '@/strip/strip-context';
+import { ViewStore } from '@/strip/view-store';
 import { VoiceSession } from '@/voice/voice-session';
 import type { CoreWorkspace } from '@/workspace/core-workspace';
 import { WorkspaceContext } from '@/workspace/workspace-context';
@@ -57,8 +59,20 @@ function flip(open: boolean): boolean {
   return !open;
 }
 
-function App({ client, workspace, canvas, inbox }: Readonly<AppProps>) {
+function Screen() {
   const [inboxOpen, toggleInbox] = useReducer(flip, false);
+  return (
+    <div className="flex h-dvh">
+      <Sidebar inboxOpen={inboxOpen} toggleInbox={toggleInbox} />
+      <main className="min-w-0 flex-1 overflow-clip">
+        <Strip />
+      </main>
+      {inboxOpen && <InboxPanel lists={INBOX_LISTS} />}
+    </div>
+  );
+}
+
+function App({ client, workspace, canvas, inbox }: Readonly<AppProps>) {
   const voice = useMemo(
     () => new VoiceSession(client, workspace),
     [client, workspace],
@@ -67,20 +81,17 @@ function App({ client, workspace, canvas, inbox }: Readonly<AppProps>) {
     () => ({ workspace, voice, canvas }),
     [workspace, voice, canvas],
   );
+  const strip = useMemo(() => new ViewStore(workspace), [workspace]);
   useEffect(() => voice.follow(), [voice]);
 
   return (
     <PipecatClientProvider client={client}>
       <WorkspaceContext value={context}>
-        <InboxContext value={inbox}>
-          <div className="flex h-dvh">
-            <Sidebar inboxOpen={inboxOpen} toggleInbox={toggleInbox} />
-            <main className="min-w-0 flex-1">
-              <PanesView />
-            </main>
-            {inboxOpen && <InboxPanel lists={INBOX_LISTS} />}
-          </div>
-        </InboxContext>
+        <StripContext value={strip}>
+          <InboxContext value={inbox}>
+            <Screen />
+          </InboxContext>
+        </StripContext>
       </WorkspaceContext>
       <PipecatClientAudio />
     </PipecatClientProvider>

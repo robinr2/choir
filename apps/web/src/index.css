@@ -127,42 +127,18 @@
   --inactive-foreground: oklch(0.971 0.013 17.38);
 }
 
-.choir-mosaic .mosaic-root {
-  inset: 0;
-}
-
-.choir-mosaic .mosaic-split:hover {
-  background: transparent;
-}
-
-.choir-mosaic .mosaic-split:hover .mosaic-split-line {
-  border-radius: 9999px;
-  background: var(--ring);
-}
-
-.choir-mosaic .mosaic-split.-row .mosaic-split-line {
-  left: 2px;
-  right: 2px;
-}
-
-.choir-mosaic .mosaic-split.-column .mosaic-split-line {
-  top: 2px;
-  bottom: 2px;
-}
-
-.choir-mosaic .drop-target-container {
-  display: none;
-}
-
 @layer base {
   * {
     @apply border-border outline-ring/50;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground overflow-hidden;
   }
   html {
-    @apply font-sans;
+    @apply font-sans overflow-hidden;
+  }
+  [data-slot='pane'] * {
+    overscroll-behavior: contain;
   }
 }
 

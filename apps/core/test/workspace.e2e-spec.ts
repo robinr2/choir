@@ -7,54 +7,60 @@ const UNKNOWN = '7d1e5a2b-9c4f-4e8a-b6d3-1f2a3b4c5d6e';
 
 const testApp = TestApp.use();
 
-function split(children: unknown[], splitPercentages: number[]) {
-  return { type: 'split', direction: 'row', children, splitPercentages };
-}
-
-async function emptyPaneAt(edge: string): Promise<string> {
-  const response = await testApp.workspace
-    .send('post', 'edges', { edge })
-    .expect(201);
+async function emptyPane(): Promise<string> {
+  const response = await testApp.workspace.send('post', 'panes').expect(201);
   return response.body.id;
 }
 
-it('starts with one idle agent and no voice', async () => {
+function act(action: string, fields: object = {}) {
+  return testApp.workspace.send('post', 'actions', { action, ...fields });
+}
+
+function column(paneId: string, width = 0.5) {
+  return {
+    id: expect.any(String),
+    width,
+    fullWidth: false,
+    activeTile: 0,
+    tiles: [{ paneId, height: { auto: 1 } }],
+  };
+}
+
+function strip(columns: unknown[], activeColumn = 0) {
+  return {
+    id: expect.any(String),
+    columns,
+    activeColumn,
+    restoresPrevious: false,
+  };
+}
+
+it('starts with one idle agent in a half-wide column above an empty workspace and no voice', async () => {
   const id = await testApp.workspace.firstAgent();
   expect(await testApp.workspace.view()).toEqual({
-    layout: id,
+    workspaces: [strip([column(id)]), strip([])],
+    activeWorkspace: 0,
     panes: [{ id, kind: 'agent', name: 'agent 1', working: false }],
     voiceAgentId: null,
   });
 });
-
-it('adds empty panes by splitting panes or at the outer edges', async () => {
-  const { workspace } = testApp;
-  const first = await workspace.firstAgent();
-  const right = await workspace
-    .send('post', 'splits', { paneId: first, direction: 'vertical' })
-    .expect(201);
+it('opens empty panes as half-wide columns right after the focused column and focuses them', async () => {
+  const first = await testApp.workspace.firstAgent();
+  const right = await testApp.workspace.send('post', 'panes').expect(201);
   expect(right.body).toEqual({ id: expect.any(String), kind: 'empty' });
-  const top = await workspace
-    .send('post', 'edges', { edge: 'top' })
-    .expect(201);
-  expect(top.body.kind).toBe('empty');
-  const view = await workspace.view();
-  expect(view.layout).toEqual({
-    type: 'split',
-    direction: 'column',
-    children: [top.body.id, split([first, right.body.id], [50, 50])],
-    splitPercentages: [50, 50],
+  await act('focusColumnLeft').expect(204);
+  const middle = await emptyPane();
+  const [shown] = (await testApp.workspace.view()).workspaces;
+  expect(shown).toEqual({
+    ...strip([column(first), column(middle), column(right.body.id)], 1),
+    restoresPrevious: true,
   });
-  expect(view.panes.slice(1)).toEqual([
-    { id: right.body.id, kind: 'empty' },
-    { id: top.body.id, kind: 'empty' },
-  ]);
 });
 
 it('opens an agent or Excalidraw in an empty pane', async () => {
   const { workspace } = testApp;
-  const left = await emptyPaneAt('left');
-  const right = await emptyPaneAt('right');
+  const left = await emptyPane();
+  const right = await emptyPane();
   const agent = await workspace
     .send('put', `panes/${left}/content`, { kind: 'agent' })
     .expect(200);
@@ -70,8 +76,8 @@ it('opens an agent or Excalidraw in an empty pane', async () => {
 
 it('keeps Excalidraw to one pane until that pane closes', async () => {
   const { workspace } = testApp;
-  const first = await emptyPaneAt('left');
-  const second = await emptyPaneAt('right');
+  const first = await emptyPane();
+  const second = await emptyPane();
   await workspace
     .send('put', `panes/${first}/content`, { kind: 'excalidraw' })
     .expect(200);
@@ -90,32 +96,43 @@ it('keeps Excalidraw to one pane until that pane closes', async () => {
     .expect(200);
 });
 
-it('swaps, resizes, renames and closes panes and keeps them across restarts', async () => {
-  const { workspace } = testApp;
-  const first = await workspace.firstAgent();
-  const second = await emptyPaneAt('right');
-  await workspace
-    .send('put', `panes/${second}/content`, { kind: 'agent' })
-    .expect(200);
-  await workspace.send('post', 'swaps', { first, second }).expect(204);
-  const layout = split([second, first], [30, 70]);
-  await workspace.send('put', 'layout', { layout }).expect(204);
-  await workspace
-    .send('patch', `panes/${second}`, { name: ' reviewer ' })
+it('changes the layout and keeps it, the focus and the panes across restarts', async () => {
+  const first = await testApp.workspace.firstAgent();
+  const second = await emptyPane();
+  const third = await emptyPane();
+  await testApp.workspace
+    .send('patch', `panes/${first}`, { name: ' reviewer ' })
     .expect(204);
+  await act('consumeOrExpelWindowLeft').expect(204);
+  await act('setWindowHeight', { change: 10 }).expect(204);
+  await act('focusColumnLeft').expect(204);
+  await act('maximizeColumn').expect(204);
+  await act('moveColumnToWorkspaceDown').expect(204);
+  await act('setColumnWidth', { change: -20 }).expect(204);
+  const before = await testApp.workspace.view();
+  expect(before.activeWorkspace).toBe(1);
+  expect(before.workspaces).toEqual([
+    strip([
+      {
+        ...column(second),
+        activeTile: 1,
+        tiles: [
+          { paneId: second, height: { auto: 1 } },
+          { paneId: third, height: { fixed: 0.6 } },
+        ],
+      },
+    ]),
+    strip([{ ...column(first), width: 0.8, fullWidth: false }]),
+    strip([]),
+  ]);
   await testApp.reopen();
-  expect(await testApp.workspace.view()).toEqual({
-    layout,
-    panes: [
-      { id: first, kind: 'agent', name: 'agent 1', working: false },
-      { id: second, kind: 'agent', name: 'reviewer', working: false },
-    ],
-    voiceAgentId: null,
-  });
-  await testApp.workspace.send('delete', `panes/${first}`).expect(204);
-  expect((await testApp.workspace.view()).layout).toBe(second);
+  expect(await testApp.workspace.view()).toEqual(before);
+  expect(before.panes).toEqual([
+    { id: second, kind: 'empty' },
+    { id: third, kind: 'empty' },
+    { id: first, kind: 'agent', name: 'reviewer', working: false },
+  ]);
 });
-
 it('ends the session of a closed agent', async () => {
   const close = vi.spyOn(AcpxRuntime.prototype, 'close');
   const id = await testApp.workspace.firstAgent();
@@ -129,7 +146,8 @@ it('ends the session of a closed agent', async () => {
     }),
   );
   expect(await testApp.workspace.view()).toEqual({
-    layout: null,
+    workspaces: [strip([]), strip([])],
+    activeWorkspace: 0,
     panes: [],
     voiceAgentId: null,
   });
@@ -154,7 +172,7 @@ it('shows which agents are working until their prompt ends', async () => {
 it('turns voice on for one agent at a time and off when that agent closes', async () => {
   const { workspace } = testApp;
   const first = await workspace.firstAgent();
-  const second = await emptyPaneAt('left');
+  const second = await emptyPane();
   await workspace.send('put', 'voice', { agentId: second }).expect(404);
   await workspace
     .send('put', `panes/${second}/content`, { kind: 'agent' })
@@ -174,57 +192,24 @@ it('streams every change of the workspace', async () => {
   const events = await EventStream.open(testApp.app, '/workspace/events');
   try {
     await events.until('"name":"agent 1"');
-    const id = await emptyPaneAt('bottom');
+    const id = await emptyPane();
     await events.until(`{"id":"${id}","kind":"empty"}`);
   } finally {
     events.close();
   }
 });
 
-it('checks the panes and percentages of a resized layout', async () => {
-  const { workspace } = testApp;
-  const first = await workspace.firstAgent();
-  const second = await emptyPaneAt('right');
-  const third = await emptyPaneAt('right');
-  const panes = [first, second, third];
-  await workspace
-    .send('put', 'layout', { layout: split(panes, [20, 30, 50]) })
-    .expect(204);
-  const unequal = await workspace
-    .send('put', 'layout', { layout: split(panes, [50, 50]) })
-    .expect(400);
-  expect(JSON.stringify(unequal.body)).toContain(
-    'A split needs two or more panes and one percentage per pane, adding up to 100',
-  );
-  await workspace
-    .send('put', 'layout', { layout: split(panes, [20, 30, 60]) })
-    .expect(400);
-  await workspace
-    .send('put', 'layout', { layout: split(panes, [20, 30, 49.6]) })
-    .expect(204);
-});
-
 it('rejects workspace changes it cannot understand', async () => {
   const { app, workspace } = testApp;
   const id = await workspace.firstAgent();
-  await workspace
-    .send('post', 'splits', { paneId: id, direction: 'diagonal' })
-    .expect(400);
-  await workspace
-    .send('post', 'splits', { paneId: UNKNOWN, direction: 'vertical' })
-    .expect(404);
-  await workspace.send('post', 'edges', { edge: 'middle' }).expect(400);
-  await workspace.send('post', 'swaps', { first: id }).expect(400);
-  await workspace.send('put', 'layout', { layout: UNKNOWN }).expect(400);
-  await workspace
-    .send('put', 'layout', { layout: split([id, id], [60, 60]) })
-    .expect(400);
-  await workspace
-    .send('put', 'layout', { layout: split([id, id], [100]) })
-    .expect(400);
-  await workspace
-    .send('put', 'layout', { layout: split([id], [100]) })
-    .expect(400);
+  await act('flipColumn').expect(400);
+  await act('setColumnWidth').expect(400);
+  await act('focusPane', { paneId: UNKNOWN }).expect(404);
+  await act('focusColumn', { columnId: UNKNOWN }).expect(404);
+  await act('focusWorkspace', { workspaceId: UNKNOWN }).expect(404);
+  await act('movePane', { paneId: id, column: 2 }).expect(400);
+  await act('movePane', { paneId: id, column: 0, tile: -1 }).expect(400);
+  await act('resizePane', { paneId: id, height: 1.5 }).expect(400);
   await workspace.send('patch', `panes/${id}`, { name: '' }).expect(400);
   await workspace
     .send('patch', `panes/${id}`, { name: 'x'.repeat(41) })

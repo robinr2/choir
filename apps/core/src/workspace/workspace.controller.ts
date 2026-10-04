@@ -14,7 +14,12 @@ import {
   Sse,
 } from '@nestjs/common';
 import { map, type Observable } from 'rxjs';
-import { type Pane, paneIdSchema } from '../layout/layout.schemas.js';
+import {
+  type LayoutAction,
+  layoutActionSchema,
+  type Pane,
+  paneIdSchema,
+} from '../layout/layout.schemas.js';
 import {
   WORKSPACE,
   type Workspace,
@@ -23,16 +28,8 @@ import {
 import {
   type ContentRequest,
   contentRequestSchema,
-  type EdgeRequest,
-  edgeRequestSchema,
-  type LayoutRequest,
-  layoutRequestSchema,
   type RenameRequest,
   renameRequestSchema,
-  type SplitRequest,
-  splitRequestSchema,
-  type SwapRequest,
-  swapRequestSchema,
   type VoiceRequest,
   voiceRequestSchema,
 } from './workspace.schemas.js';
@@ -55,18 +52,9 @@ export class WorkspaceController {
     return this.workspace.changes.pipe(map((data) => ({ data })));
   }
 
-  @Post('splits')
-  split(
-    @Body({ schema: splitRequestSchema }) { paneId, direction }: SplitRequest,
-  ): Promise<Pane> {
-    return this.workspace.split(paneId, direction, EMPTY);
-  }
-
-  @Post('edges')
-  addAtEdge(
-    @Body({ schema: edgeRequestSchema }) { edge }: EdgeRequest,
-  ): Promise<Pane> {
-    return this.workspace.addAtEdge(edge, EMPTY);
+  @Post('panes')
+  openPane(): Promise<Pane> {
+    return this.workspace.openPane(EMPTY);
   }
 
   @Put('panes/:id/content')
@@ -77,20 +65,12 @@ export class WorkspaceController {
     return this.workspace.open(id, kind);
   }
 
-  @Post('swaps')
+  @Post('actions')
   @HttpCode(HttpStatus.NO_CONTENT)
-  swap(
-    @Body({ schema: swapRequestSchema }) { first, second }: SwapRequest,
+  act(
+    @Body({ schema: layoutActionSchema }) action: LayoutAction,
   ): Promise<void> {
-    return this.workspace.swap(first, second);
-  }
-
-  @Put('layout')
-  @HttpCode(HttpStatus.NO_CONTENT)
-  resize(
-    @Body({ schema: layoutRequestSchema }) { layout }: LayoutRequest,
-  ): Promise<void> {
-    return this.workspace.resize(layout);
+    return this.workspace.act(action);
   }
 
   @Patch('panes/:id')

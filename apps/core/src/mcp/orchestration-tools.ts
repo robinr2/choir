@@ -1,47 +1,17 @@
 import { z } from 'zod';
-import {
-  paneIdSchema,
-  agentNameSchema,
-  edgeSchema,
-  splitKindSchema,
-} from '../layout/layout.schemas.js';
+import { paneIdSchema, agentNameSchema } from '../layout/layout.schemas.js';
 import { reply, type Tool } from './tools.js';
 
-const splitPane: Tool = (server, { workspace, callerId }) => {
+const openAgent: Tool = (server, { workspace }) => {
   server.registerTool(
-    'split_pane',
+    'open_agent',
     {
       description:
-        "Split an agent's pane in half and start a new, empty agent in the new half: vertical puts it to the right, horizontal below. Splits your own pane unless agentId names another. Returns the new agent's ID and name.",
-      inputSchema: z.object({
-        direction: splitKindSchema,
-        agentId: paneIdSchema.optional(),
-        name: agentNameSchema.optional(),
-      }),
+        "Open a new, empty agent in a new pane, as its own column right after the focused column, and focus it. Returns the new agent's ID and name.",
+      inputSchema: z.object({ name: agentNameSchema.optional() }),
     },
-    async ({ direction, agentId, name }) =>
-      reply(
-        await workspace.split(agentId ?? callerId, direction, {
-          kind: 'agent',
-          name,
-        }),
-      ),
-  );
-};
-
-const addPaneAtEdge: Tool = (server, { workspace }) => {
-  server.registerTool(
-    'add_pane_at_edge',
-    {
-      description:
-        "Add a new column (left or right edge) or row (top or bottom edge) across the whole agent area, with a new, empty agent in it. Returns the new agent's ID and name.",
-      inputSchema: z.object({
-        edge: edgeSchema,
-        name: agentNameSchema.optional(),
-      }),
-    },
-    async ({ edge, name }) =>
-      reply(await workspace.addAtEdge(edge, { kind: 'agent', name })),
+    async ({ name }) =>
+      reply(await workspace.openPane({ kind: 'agent', name })),
   );
 };
 
@@ -82,7 +52,7 @@ const listAgents: Tool = (server, { workspace, callerId }) => {
     'list_agents',
     {
       description:
-        'List every agent with its name, ID and whether it is working or idle, mark which one is you, list the panes that hold no agent, such as the Excalidraw canvas, and give the pane layout.',
+        'List every agent with its name, ID and whether it is working or idle, mark which one is you, list the panes that hold no agent, such as the Excalidraw canvas, and give the pane layout: workspaces from top to bottom, each a strip of columns from left to right, each column a stack of panes from top to bottom.',
       inputSchema: z.object({}),
     },
     async () => reply(await workspace.list(callerId)),
@@ -90,8 +60,7 @@ const listAgents: Tool = (server, { workspace, callerId }) => {
 };
 
 export const ORCHESTRATION_TOOLS = [
-  splitPane,
-  addPaneAtEdge,
+  openAgent,
   sendMessage,
   closeAgent,
   listAgents,

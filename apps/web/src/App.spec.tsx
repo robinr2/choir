@@ -2,12 +2,16 @@ import { RTVIEvent } from '@pipecat-ai/client-js';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import {
   A,
+  agent,
   B,
+  column,
   coreShowsChat,
   coreShowsWorkspace,
   fakeCore,
   said,
+  strip,
   twoAgents,
+  viewOf,
 } from './test/fake-core';
 import { requests } from './test/fake-event-source';
 import {
@@ -112,11 +116,9 @@ test('turns voice off when core closes the voice agent', async () => {
   const { disconnect } = stubVoice();
   const screen = await renderApp();
   await micOf(screen, 'agent 1').click();
-  coreShowsWorkspace({
-    layout: B,
-    panes: [{ id: B, kind: 'agent', name: 'agent 2', working: false }],
-    voiceAgentId: null,
-  });
+  coreShowsWorkspace(
+    viewOf([strip('first', [column('right', [B])])], [agent(B, 'agent 2')]),
+  );
   await vi.waitFor(() => expect(disconnect).toHaveBeenCalledOnce());
   await expect
     .element(micOf(screen, 'agent 2'))

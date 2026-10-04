@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
-import { A, B } from '@/test/fake-core';
+import { A, agent, B, column, strip, viewOf } from '@/test/fake-core';
 import {
   FakeEventSource,
   fakeEventSources,
@@ -7,11 +7,10 @@ import {
 } from '@/test/fake-event-source';
 import { agentOf, CoreWorkspace, type WorkspaceView } from './core-workspace';
 
-const view: Omit<WorkspaceView, 'loaded'> = {
-  layout: A,
-  panes: [{ id: A, kind: 'agent', name: 'agent 1', working: false }],
-  voiceAgentId: null,
-};
+const view: Omit<WorkspaceView, 'loaded'> = viewOf(
+  [strip('first', [column('only', [A])])],
+  [agent(A, 'agent 1')],
+);
 
 beforeEach(() => {
   fakeEventSources();
@@ -29,7 +28,8 @@ test('follows the workspace core streams', () => {
   const workspace = new CoreWorkspace();
   expect(workspace.getSnapshot()).toEqual({
     loaded: false,
-    layout: null,
+    workspaces: [],
+    activeWorkspace: 0,
     panes: [],
     voiceAgentId: null,
   });
@@ -45,17 +45,15 @@ test('follows the workspace core streams', () => {
 
 test('asks core to change the layout', async () => {
   const workspace = new CoreWorkspace();
-  await workspace.split(A, 'vertical');
-  await workspace.addAtEdge('top');
+  await workspace.openPane();
   await workspace.open(B, 'excalidraw');
-  await workspace.swap(A, B);
+  await workspace.act({ action: 'focusColumnRight' });
   await workspace.rename(A, 'planner');
   await workspace.close(B);
   expect(requests()).toEqual([
-    ['/workspace/splits', 'POST', { paneId: A, direction: 'vertical' }],
-    ['/workspace/edges', 'POST', { edge: 'top' }],
+    ['/workspace/panes', 'POST', undefined],
     [`/workspace/panes/${B}/content`, 'PUT', { kind: 'excalidraw' }],
-    ['/workspace/swaps', 'POST', { first: A, second: B }],
+    ['/workspace/actions', 'POST', { action: 'focusColumnRight' }],
     [`/workspace/panes/${A}`, 'PATCH', { name: 'planner' }],
     [`/workspace/panes/${B}`, 'DELETE', undefined],
   ]);
@@ -64,24 +62,34 @@ test('asks core to change the layout', async () => {
   });
 });
 
-test('shows a resize and a voice change before core confirms them', async () => {
+test('sends layout actions one after another, even after a refusal', async () => {
+  const replies: ((response: Response) => void)[] = [];
+  vi.mocked(window.fetch).mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        replies.push(resolve);
+      }),
+  );
   const workspace = new CoreWorkspace();
-  const layout = {
-    type: 'split' as const,
-    direction: 'row' as const,
-    children: [A, B],
-    splitPercentages: [30, 70],
-  };
-  const resized = workspace.resize(layout);
-  expect(workspace.getSnapshot().layout).toEqual(layout);
-  await resized;
+  const first = workspace.act({ action: 'focusWindowUp' });
+  const second = workspace.act({ action: 'focusWindowDown' });
+  await new Promise((resolve) => setTimeout(resolve, 50));
+  expect(requests()).toHaveLength(1);
+  replies[0](new Response(null, { status: 500 }));
+  await expect(first).rejects.toThrow('replied with status 500');
+  await second;
+  expect(requests()).toEqual([
+    ['/workspace/actions', 'POST', { action: 'focusWindowUp' }],
+    ['/workspace/actions', 'POST', { action: 'focusWindowDown' }],
+  ]);
+});
+
+test('shows a voice change before core confirms it', async () => {
+  const workspace = new CoreWorkspace();
   const voiced = workspace.setVoice(B);
   expect(workspace.getSnapshot().voiceAgentId).toBe(B);
   await voiced;
-  expect(requests()).toEqual([
-    ['/workspace/layout', 'PUT', { layout }],
-    ['/workspace/voice', 'PUT', { agentId: B }],
-  ]);
+  expect(requests()).toEqual([['/workspace/voice', 'PUT', { agentId: B }]]);
 });
 
 test('fails when core refuses a change', async () => {
@@ -94,13 +102,13 @@ test('fails when core refuses a change', async () => {
 });
 
 test('finds only agents by their ID', () => {
-  const agent = { id: A, kind: 'agent' as const, name: 'a', working: false };
+  const found = { id: A, kind: 'agent' as const, name: 'a', working: false };
   const both = {
     ...view,
     loaded: true,
-    panes: [agent, { id: B, kind: 'excalidraw' as const }],
+    panes: [found, { id: B, kind: 'excalidraw' as const }],
   };
-  expect(agentOf(both, A)).toBe(agent);
+  expect(agentOf(both, A)).toBe(found);
   expect(agentOf(both, B)).toBeNull();
   expect(agentOf(both, 'nobody')).toBeNull();
 });

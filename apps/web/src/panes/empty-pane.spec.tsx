@@ -1,5 +1,13 @@
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
-import { A, B, CANVAS_URL, fakeCore } from '@/test/fake-core';
+import {
+  A,
+  B,
+  CANVAS_URL,
+  column,
+  fakeCore,
+  strip,
+  viewOf,
+} from '@/test/fake-core';
 import { requests } from '@/test/fake-event-source';
 import { pane, renderApp } from '@/test/render-app';
 import type { WorkspaceView } from '@/workspace/core-workspace';
@@ -9,22 +17,14 @@ const C = '3c9a1f7e-5b2d-4e6f-8a1c-9d0e2f3a4b5c';
 function panes(
   ...kinds: ('empty' | 'excalidraw')[]
 ): Omit<WorkspaceView, 'loaded'> {
-  const ids = [B, C];
-  return {
-    layout: {
-      type: 'split',
-      direction: 'column',
-      children: [A, ...ids.slice(0, kinds.length)],
-      splitPercentages: kinds
-        .map(() => 100 / (kinds.length + 1))
-        .concat(100 / (kinds.length + 1)),
-    },
-    panes: [
+  const ids = [B, C].slice(0, kinds.length);
+  return viewOf(
+    [strip('first', [column('only', [A, ...ids])])],
+    [
       { id: A, kind: 'agent', name: 'agent 1', working: false },
-      ...kinds.map((kind, index) => ({ id: ids[index] ?? '', kind })),
+      ...kinds.map((kind, index) => ({ id: ids[index], kind })),
     ],
-    voiceAgentId: null,
-  };
+  );
 }
 
 function contentRequests() {

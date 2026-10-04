@@ -1,13 +1,12 @@
 import { type DragEvent, type ReactNode, useMemo, useState } from 'react';
 import { useAui } from '@assistant-ui/react';
-import { leftFor } from '@/panes/pane-swap';
+import { leftFor } from '@/lib/left-for';
 import { useInbox } from './inbox-context';
 import { type DraggedTodo, TODO_TYPE, todoReference } from './todo-reference';
 
 function carriesTodo(event: DragEvent): boolean {
   if (!event.dataTransfer.types.includes(TODO_TYPE)) return false;
   event.preventDefault();
-  event.stopPropagation();
   return true;
 }
 

@@ -1,51 +1,46 @@
 import { randomUUID } from 'node:crypto';
 import {
-  BadRequestException,
   ConflictException,
+  Inject,
   Injectable,
   NotFoundException,
   type OnModuleInit,
 } from '@nestjs/common';
 import { BehaviorSubject, type Observable } from 'rxjs';
-import {
-  addAtEdge,
-  type Edge,
-  type LayoutNode,
-  normalizedLayout,
-  removeLeaf,
-  sameLeaves,
-  splitLeaf,
-  swapLeaves,
-} from './layout-tree.js';
+import { layoutChange } from './layout-actions.js';
 import type {
   Agent,
+  LayoutAction,
   NewPane,
   OpenableKind,
   Pane,
   PaneContent,
-  SplitKind,
   WorkspaceState,
 } from './layout.schemas.js';
 import { LayoutStore } from './layout.store.js';
-
-const DIRECTIONS = { vertical: 'row', horizontal: 'column' } as const;
+import { emptyLayout, updateActiveSpace } from './monitor.js';
+import { openPane, paneIds, removePane } from './monitor-panes.js';
+import { isSpaceAction, spaceChange } from './space-actions.js';
 
 type Filled = { content: PaneContent; nextNumber: number };
 
 @Injectable()
 export class LayoutService implements OnModuleInit {
   private readonly state = new BehaviorSubject<WorkspaceState>({
-    layout: null,
+    layout: emptyLayout(),
     panes: {},
     nextNumber: 1,
   });
 
-  constructor(private readonly store: LayoutStore) {}
+  constructor(
+    @Inject(LayoutStore)
+    private readonly store: Pick<LayoutStore, 'load' | 'save'>,
+  ) {}
 
   async onModuleInit(): Promise<void> {
     const saved = await this.store.load();
     if (saved === undefined) {
-      await this.addAtEdge('right', { kind: 'agent' });
+      await this.openPane({ kind: 'agent' });
       return;
     }
     this.state.next(saved);
@@ -73,15 +68,15 @@ export class LayoutService implements OnModuleInit {
     return { id, name: content.name };
   }
 
-  async split(id: string, kind: SplitKind, content: NewPane): Promise<Pane> {
-    this.pane(id);
-    return this.add(content, (layout, added) =>
-      splitLeaf(layout, id, added, DIRECTIONS[kind]),
-    );
-  }
-
-  async addAtEdge(edge: Edge, content: NewPane): Promise<Pane> {
-    return this.add(content, (layout, added) => addAtEdge(layout, added, edge));
+  async openPane(added: NewPane): Promise<Pane> {
+    const id = randomUUID();
+    const { content, nextNumber } = this.filled(added);
+    await this.commit({
+      layout: openPane(this.current.layout, id),
+      panes: { ...this.current.panes, [id]: content },
+      nextNumber,
+    });
+    return { id, ...content };
   }
 
   async open(id: string, kind: OpenableKind): Promise<Pane> {
@@ -97,20 +92,15 @@ export class LayoutService implements OnModuleInit {
     return { id, ...content };
   }
 
-  async swap(first: string, second: string): Promise<void> {
-    this.pane(first);
-    this.pane(second);
+  async act(action: LayoutAction): Promise<void> {
+    if ('paneId' in action) this.pane(action.paneId);
+    const { layout } = this.current;
     await this.commit({
       ...this.current,
-      layout: swapLeaves(this.current.layout, first, second),
+      layout: isSpaceAction(action)
+        ? updateActiveSpace(layout, spaceChange(action))
+        : layoutChange(layout, action),
     });
-  }
-
-  async resize(layout: LayoutNode | null): Promise<void> {
-    if (!sameLeaves(layout, this.current.layout)) {
-      throw new BadRequestException('The layout must hold the same panes');
-    }
-    await this.commit({ ...this.current, layout: normalizedLayout(layout) });
   }
 
   async rename(id: string, name: string): Promise<void> {
@@ -127,7 +117,7 @@ export class LayoutService implements OnModuleInit {
     const { [id]: _removed, ...panes } = this.current.panes;
     await this.commit({
       ...this.current,
-      layout: removeLeaf(this.current.layout, id),
+      layout: removePane(this.current.layout, id),
       panes,
     });
   }
@@ -145,21 +135,9 @@ export class LayoutService implements OnModuleInit {
     return { content: { kind: 'agent', name }, nextNumber: nextNumber + 1 };
   }
 
-  private async add(
-    added: NewPane,
-    place: (layout: LayoutNode | null, id: string) => LayoutNode,
-  ): Promise<Pane> {
-    const id = randomUUID();
-    const { content, nextNumber } = this.filled(added);
-    await this.commit({
-      layout: place(this.current.layout, id),
-      panes: { ...this.current.panes, [id]: content },
-      nextNumber,
-    });
-    return { id, ...content };
-  }
-
-  private commit(next: WorkspaceState): Promise<void> {
+  private commit({ layout, panes, nextNumber }: WorkspaceState) {
+    const ordered = paneIds(layout).map((id) => [id, panes[id]]);
+    const next = { layout, panes: Object.fromEntries(ordered), nextNumber };
     this.state.next(next);
     return this.store.save(next);
   }
