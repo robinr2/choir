@@ -44,6 +44,12 @@ test('opens a new pane, closes the focused one and sends layout actions', async 
   ]);
 });
 
+test('closes nothing before core shows any workspace', async () => {
+  const store = listening();
+  await run(store, 'close');
+  expect(requests()).toEqual([]);
+});
+
 const thirds = [0, 1, 2, 3].map((index) =>
   column(`c${index}`, [`p${index}`], { width: 0.3 }),
 );

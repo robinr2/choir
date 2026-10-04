@@ -113,6 +113,19 @@ test('does not resize from the middle or the top edge of the top pane', async ()
   expect(actions()).toEqual([]);
 });
 
+test('does not resize on a right drag without Alt', async () => {
+  const screen = await renderApp();
+  await measured(screen);
+  const first = pane(screen, 'agent 1').element();
+  press(first, { x: 500, y: 400 }, { button: 2 });
+  drag('pointermove', { x: 600, y: 400 });
+  drag('pointerup', { x: 600, y: 400 });
+  await new Promise((resolve) => setTimeout(resolve, 50));
+  expect(stripElement().dataset.gesture).toBe('false');
+  expect(boxOf(first).width).toBe(594);
+  expect(actions()).toEqual([]);
+});
+
 test('ends a resize without moving as nothing', async () => {
   const screen = await renderApp();
   await measured(screen);

@@ -135,6 +135,7 @@ test('recognizes a drag of exactly 8 pixels and takes a diagonal as vertical', a
   const first = pane(screen, 'agent 1').element();
   press(stripElement(), { x: 600, y: 400 }, MIDDLE);
   drag('pointermove', { x: 608, y: 400 });
+  await vi.waitFor(() => expect(boxOf(first).x).toBe(68));
   drag('pointermove', { x: 618, y: 400 });
   await vi.waitFor(() => expect(boxOf(first).x).toBe(78));
   drag('pointerup', { x: 618, y: 400 });

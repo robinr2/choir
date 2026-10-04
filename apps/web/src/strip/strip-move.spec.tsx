@@ -125,6 +125,16 @@ test('swallows the click after a short drag sideways on the title bar', async ()
   expect(actions()).toEqual([{ action: 'focusPane', paneId: B }]);
 });
 
+test('swallows the click after a short drag straight down on the title bar', async () => {
+  const screen = await renderApp();
+  await measured(screen);
+  const name = pane(screen, 'agent 2').getByRole('button', { name: 'agent 2' });
+  press(name.element(), { x: 700, y: 20 });
+  drag('pointermove', { x: 700, y: 30 });
+  drag('pointerup', { x: 700, y: 30 });
+  expect(click(name.element())).toBe(false);
+});
+
 test('starts moving exactly at the threshold, also straight down', async () => {
   const screen = await renderApp();
   await measured(screen);

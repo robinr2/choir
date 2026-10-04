@@ -40,14 +40,6 @@ function stripOf(snapshot: Snapshot, index: number) {
   return layout && snapshot.strips.get(layout.id);
 }
 
-function stripAt(snapshot: Snapshot, index: number): Strip | null {
-  const strip = stripOf(snapshot, index);
-  if (!strip) return null;
-  const active = index === snapshot.view.activeWorkspace;
-  const overlay = (active && snapshot.overlay) || {};
-  return overlaid(strip, overlay, snapshot.metrics);
-}
-
 export function pressed(snapshot: Snapshot, paneId: string) {
   const strip = activeStrip(snapshot);
   const location = strip && locate(strip.layout, paneId);
@@ -65,7 +57,9 @@ function rectOf(
 }
 
 export function activeStrip(snapshot: Snapshot): Strip | null {
-  return stripAt(snapshot, snapshot.view.activeWorkspace);
+  const strip = stripOf(snapshot, snapshot.view.activeWorkspace);
+  if (!strip) return null;
+  return overlaid(strip, snapshot.overlay ?? {}, snapshot.metrics);
 }
 
 export function columnRects(

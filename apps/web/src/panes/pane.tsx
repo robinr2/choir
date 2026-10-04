@@ -27,7 +27,7 @@ function focusInto(section: HTMLElement | null): void {
   if (!section || focusedElsewhere()) return;
   if (section.matches(':focus-within')) return;
   const target = section.querySelector('textarea') ?? section;
-  target.focus({ preventScroll: true });
+  target.focus();
 }
 
 function placed({ rect, dragged }: Placement): CSSProperties {

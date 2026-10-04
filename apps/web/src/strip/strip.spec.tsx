@@ -12,6 +12,7 @@ import {
 } from '@/test/fake-core';
 import { requests } from '@/test/fake-event-source';
 import { pane, renderApp } from '@/test/render-app';
+import { ViewStore } from './view-store';
 import {
   actions,
   boxOf,
@@ -59,6 +60,16 @@ test('marks the focused pane', async () => {
   await expect
     .element(pane(screen, 'agent 2'))
     .toHaveAttribute('data-focused', 'true');
+  coreShowsWorkspace(
+    viewOf([strip('first', [column('both', [A, B])])], twoAgents().panes),
+  );
+  await expect
+    .element(pane(screen, 'agent 1'))
+    .toHaveAttribute('data-focused', 'true');
+  await expect
+    .element(pane(screen, 'agent 2'))
+    .toHaveAttribute('data-focused', 'false');
+  expect(pane(screen, 'agent 2').element().style.opacity).toBe('');
 });
 
 test('shows only the empty background when nothing is open', async () => {
@@ -137,6 +148,24 @@ test('moves keyboard focus into the pane that gets focus', async () => {
   await expect.element(inbox).toHaveFocus();
 });
 
+function scrolled(element: Element | null): boolean {
+  if (!element) return false;
+  return element.scrollLeft !== 0 || scrolled(element.parentElement);
+}
+
+test('moves keyboard focus without scrolling the page', async () => {
+  const wide = strip(
+    'first',
+    [column('left', [A]), column('right', [B], { width: 1.5 })],
+    { activeColumn: 1 },
+  );
+  const screen = await renderApp();
+  coreShowsWorkspace(viewOf([wide], twoAgents().panes));
+  const second = pane(screen, 'agent 2').getByRole('textbox');
+  await expect.element(second).toHaveFocus();
+  expect(scrolled(second.element())).toBe(false);
+});
+
 test('focuses a pane without a text box as a whole', async () => {
   const screen = await renderApp(
     viewOf([strip('first', [column('only', [B])])], [{ id: B, kind: 'empty' }]),
@@ -166,4 +195,14 @@ test('focuses the canvas pane once its frame takes the focus', async () => {
   frame.element().focus();
   await new Promise((resolve) => setTimeout(resolve, 50));
   expect(actions()).toHaveLength(1);
+});
+
+test('stops measuring the strip once it is gone', async () => {
+  const measure = vi.spyOn(ViewStore.prototype, 'measure');
+  const screen = await renderApp();
+  await vi.waitFor(() => expect(measure).toHaveBeenCalled());
+  await screen.unmount();
+  measure.mockClear();
+  await new Promise((resolve) => setTimeout(resolve, 100));
+  expect(measure).not.toHaveBeenCalled();
 });

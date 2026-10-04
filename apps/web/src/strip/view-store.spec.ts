@@ -139,6 +139,9 @@ test('puts the leftmost visible column at the edge after expanding', () => {
   expect(viewX(store)).toBe(298.8 - 4);
   coreShowsWorkspace(viewOf([{ ...layout, columns: columns }], []));
   expect(viewX(store)).toBe(294.8);
+  store.commit({ ...layout, columns: wider }, 150);
+  coreShowsWorkspace(viewOf([{ ...layout, columns: wider }], []));
+  expect(viewX(store)).toBe(150);
 });
 
 test('forgets the anchor only once it moved the view', () => {
