@@ -46,12 +46,6 @@ jobs:
       - run: npx prisma contract emit -q
       - run: git diff --exit-code -- src/prisma
       - run: npx prisma migration check -q
-      - run: npx stryker run --concurrency 4
-      - if: ${{ !cancelled() }}
-        uses: actions/upload-artifact@v7
-        with:
-          name: mutation-report-core
-          path: apps/core/reports/mutation/mutation.json
 
   web:
     runs-on: ubuntu-latest
@@ -76,12 +70,77 @@ jobs:
       - run: npx tsc -b --noEmit
       - run: npx react-doctor . --no-score --no-supply-chain --blocking warning -y
       - run: npm run --silent test:cov
-      - run: npx stryker run --concurrency 4
+
+  core-mutation:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        slice: [1, 2, 3, 4, 5, 6]
+    defaults:
+      run:
+        working-directory: apps/core
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 26
+          cache: npm
+          cache-dependency-path: apps/core/package-lock.json
+      - run: npm ci
+      - run: |
+          files=$(node ../../scripts/mutation-slice.mjs core ${{ strategy.job-index }} ${{ strategy.job-total }})
+          npx stryker run --concurrency 4 --mutate "$files"
       - if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v7
         with:
-          name: mutation-report-web
+          name: mutation-report-core-${{ matrix.slice }}
+          path: apps/core/reports/mutation/mutation.json
+          if-no-files-found: error
+
+  web-mutation:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        slice: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+    defaults:
+      run:
+        working-directory: apps/web
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 26
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: |
+          files=$(node ../../scripts/mutation-slice.mjs web ${{ strategy.job-index }} ${{ strategy.job-total }})
+          npx stryker run --concurrency 4 --mutate "$files"
+      - if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: mutation-report-web-${{ matrix.slice }}
           path: apps/web/reports/mutation/mutation.json
+          if-no-files-found: error
+
+  mutation:
+    needs: [core-mutation, web-mutation]
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 26
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: mutation-report-*
+          path: reports
+      - run: node scripts/check-mutation-reports.mjs reports
+      - run: test "${{ needs.core-mutation.result }}" = success && test "${{ needs.web-mutation.result }}" = success
 
   voice:
     runs-on: ubuntu-latest
