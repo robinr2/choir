@@ -6,12 +6,12 @@
   "ignoreDependencies": [
     "nestjs-doctor",
     "jscpd",
-    "dependency-cruiser",
-    "acpx-mock-agent"
+    "dependency-cruiser"
   ],
   "entry": [
     "src/main.ts!",
-    ".dependency-cruiser-stability.cjs"
+    ".dependency-cruiser-stability.cjs",
+    "test/mock-agent.ts"
   ],
   "ignore": [
     ".claude/skills/**",

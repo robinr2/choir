@@ -109,3 +109,8 @@ model Pane {
 
   @@index([columnId])
 }
+
+model AgentSession {
+  conversationId Uuid   @id
+  sessionId      String
+}

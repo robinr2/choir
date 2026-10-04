@@ -12,7 +12,7 @@ describe('turnUsage', () => {
   it('reads the token count a turn reports', () => {
     expect(
       turnUsage({
-        status: 'completed',
+        stopReason: 'end_turn',
         _meta: { quota: { token_count: tokenCount } },
       }),
     ).toEqual({
@@ -24,10 +24,8 @@ describe('turnUsage', () => {
   });
 
   it('reads nothing from a turn without a token count', () => {
-    expect(turnUsage({ status: 'cancelled' })).toBeUndefined();
-    expect(
-      turnUsage({ status: 'failed', error: { message: 'agent exited' } }),
-    ).toBeUndefined();
+    expect(turnUsage({ stopReason: 'cancelled' })).toBeUndefined();
+    expect(turnUsage(undefined)).toBeUndefined();
   });
 });
 
@@ -36,7 +34,7 @@ describe('describeUsage', () => {
     expect(
       describeUsage(
         turnUsage({
-          status: 'completed',
+          stopReason: 'end_turn',
           _meta: { quota: { token_count: tokenCount } },
         }),
       ),

@@ -1,4 +1,4 @@
-import type { AcpRuntimeTurnResult } from 'acpx/runtime';
+import type { PromptResponse } from '@agentclientprotocol/sdk';
 import { z } from 'zod';
 
 const tokenCountSchema = z.object({
@@ -16,7 +16,9 @@ const resultSchema = z
 
 export type TurnUsage = z.infer<typeof tokenCountSchema>;
 
-export function turnUsage(result: AcpRuntimeTurnResult): TurnUsage | undefined {
+export function turnUsage(
+  result: PromptResponse | undefined,
+): TurnUsage | undefined {
   return resultSchema.safeParse(result).data;
 }
 

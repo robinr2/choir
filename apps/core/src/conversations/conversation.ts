@@ -1,22 +1,26 @@
-import type { AcpRuntimeHandle, AcpSessionRecord } from 'acpx/runtime';
 import { BehaviorSubject } from 'rxjs';
-import type { TranscriptMessage, TurnMark } from './transcript.js';
+import type { AgentConversation } from '../agent/prompt-turn.js';
+import type {
+  HistoryEntry,
+  TranscriptMessage,
+  TurnMark,
+} from './transcript.js';
 import { TurnGate } from './turn-gate.js';
 
 export type Conversation = {
   id: string;
   snapshot: BehaviorSubject<TranscriptMessage[]>;
-  record: Pick<AcpSessionRecord, 'messages'>;
+  history: HistoryEntry[];
   marks: Map<string, TurnMark>;
   gate: TurnGate;
-  opened?: Promise<AcpRuntimeHandle>;
+  opened?: Promise<AgentConversation>;
 };
 
 export function newConversation(id: string): Conversation {
   return {
     id,
     snapshot: new BehaviorSubject<TranscriptMessage[]>([]),
-    record: { messages: [] },
+    history: [],
     marks: new Map(),
     gate: new TurnGate(),
   };

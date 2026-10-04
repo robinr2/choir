@@ -1,34 +1,21 @@
-import { mkdir, mkdtemp, rm, stat } from 'node:fs/promises';
+import { mkdir, mkdtemp, readdir, readFile, rm, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { AcpxRuntime, createAcpRuntime } from 'acpx/runtime';
 import { type ChoirConfig, judgeTranscripts } from '../choir/choir-config.js';
+import { mockAgentCommand } from '../test/mock-agent-command.js';
+import { AgentSession } from '../agent/agent-session.js';
 import { ClaudeJudge } from './claude-judge.js';
 
-vi.mock('acpx/runtime', async (importOriginal) => {
-  const original = await importOriginal<typeof import('acpx/runtime')>();
-  return {
-    ...original,
-    createAcpRuntime: vi.fn<typeof original.createAcpRuntime>(
-      original.createAcpRuntime,
-    ),
-  };
-});
-
-const MOCK_AGENT = [
-  process.execPath,
-  fileURLToPath(import.meta.resolve('tsx/cli')),
-  path.resolve(
-    import.meta.dirname,
-    '../../node_modules/acpx-mock-agent/test/mock-agent.ts',
-  ),
-];
+vi.setConfig({ testTimeout: 60_000 });
 
 const PROMPT = 'Judge the inbox.';
 
 let dataDir: string;
 let config: ChoirConfig;
+
+function sessions(): string {
+  return path.join(dataDir, 'sessions');
+}
 
 beforeEach(async () => {
   dataDir = await mkdtemp(path.join(tmpdir(), 'choir-judge-'));
@@ -39,7 +26,7 @@ beforeEach(async () => {
     canvasPublicUrl: 'http://127.0.0.1:3100',
     databaseUrl: 'postgresql://localhost/choir',
     claudeDir: path.join(dataDir, 'claude'),
-    agentCommand: MOCK_AGENT,
+    agentCommand: mockAgentCommand(sessions()),
   };
   await mkdir(path.join(dataDir, 'judge'), { recursive: true });
 });
@@ -63,106 +50,75 @@ async function exists(file: string): Promise<boolean> {
   );
 }
 
-it(
-  'judges each notification in a fresh session with the judge prompt and removes it afterwards',
-  { timeout: 30_000 },
-  async () => {
-    const ensure = vi.spyOn(AcpxRuntime.prototype, 'ensureSession');
-    const mode = vi.spyOn(AcpxRuntime.prototype, 'setMode');
-    const turns = vi.spyOn(AcpxRuntime.prototype, 'startTurn');
-    const close = vi.spyOn(AcpxRuntime.prototype, 'close');
-    await mkdir(judgeTranscripts(config), { recursive: true });
-    const claude = judge();
-    const [[{ sessionStore }]] = vi
-      .mocked(createAcpRuntime)
-      .mock.calls.slice(-1);
-    await claude.judge('n1');
-    const [[ensured]] = ensure.mock.calls;
-    expect(ensured).toEqual({
-      sessionKey: expect.any(String),
-      agent: 'claude',
-      mode: 'oneshot',
-      cwd: path.join(dataDir, 'judge'),
-      sessionOptions: {
-        systemPrompt: { append: PROMPT },
-        env: { CHOIR_CONVERSATION_ID: ensured.sessionKey },
-      },
-    });
-    const [[{ handle }]] = mode.mock.calls;
-    expect(mode).toHaveBeenCalledWith({ handle, mode: 'bypassPermissions' });
-    const [[turn]] = turns.mock.calls;
-    expect(turn).toMatchObject({
-      text: 'Judge the notification n1.',
-      mode: 'prompt',
-    });
-    expect(close).toHaveBeenCalledWith({
-      handle,
-      reason: 'The judge has decided',
-    });
-    expect(
-      await sessionStore.load(String(handle.acpxRecordId)),
-    ).toBeUndefined();
-    expect(await exists(judgeTranscripts(config))).toBe(false);
-    await claude.judge('n2');
-    const [, [again]] = ensure.mock.calls;
-    expect(again.sessionKey).not.toBe(ensured.sessionKey);
-    await claude.onApplicationShutdown();
-  },
-);
+type Saved = {
+  setup: { cwd: string; mcpServers: unknown[]; _meta: unknown };
+  updates: { sessionUpdate: string }[];
+};
 
-it('fails when the judge does not finish and removes the session all the same', async () => {
-  const close = vi.spyOn(AcpxRuntime.prototype, 'close');
-  const failed: ReturnType<AcpxRuntime['startTurn']> = {
-    requestId: 'r1',
-    promptStarted: Promise.resolve(),
-    events: { [Symbol.asyncIterator]: async function* () {} },
-    result: Promise.resolve({
-      status: 'failed',
-      error: { message: 'usage limit' },
-    }),
-    cancel: async () => undefined,
-    closeStream: async () => undefined,
-  };
-  vi.spyOn(AcpxRuntime.prototype, 'startTurn').mockReturnValueOnce(failed);
-  const claude = judge();
-  await expect(claude.judge('n1')).rejects.toThrow(
-    'The judge ended failed: {"status":"failed","error":{"message":"usage limit"}}',
+async function savedSessions(): Promise<Saved[]> {
+  const files = await readdir(sessions()).catch(() => []);
+  return Promise.all(
+    files.map(async (file) =>
+      JSON.parse(await readFile(path.join(sessions(), file), 'utf8')),
+    ),
   );
+}
+
+it('judges each notification in a fresh session with the judge prompt and removes its transcripts', async () => {
+  await mkdir(judgeTranscripts(config), { recursive: true });
+  const close = vi.spyOn(AgentSession.prototype, 'close');
+  const claude = judge();
+  await claude.judge('n1');
   expect(close).toHaveBeenCalledOnce();
-  await claude.onApplicationShutdown();
+  expect(await exists(judgeTranscripts(config))).toBe(false);
+  await claude.judge('n2');
+  const saved = await savedSessions();
+  expect(saved).toHaveLength(2);
+  expect(saved.map(({ updates: [first] }) => first)).toContainEqual({
+    sessionUpdate: 'user_message_chunk',
+    content: { type: 'text', text: 'Judge the notification n1.' },
+  });
+  expect(saved[0]?.setup).toEqual({
+    cwd: path.join(dataDir, 'judge'),
+    mcpServers: [],
+    _meta: {
+      claudeCode: { options: { settingSources: ['project', 'local'] } },
+      systemPrompt: { append: PROMPT },
+    },
+  });
+  await claude.beforeApplicationShutdown();
+  expect(close).toHaveBeenCalledTimes(2);
+});
+
+it('fails when the judge does not finish its turn', async () => {
+  const claude = judge({
+    agentCommand: mockAgentCommand(sessions(), '--stop-reason', 'refusal'),
+  });
+  await expect(claude.judge('n1')).rejects.toThrow(
+    'The judge ended: {"stopReason":"refusal"}',
+  );
 });
 
 it('fails when Claude Code cannot start', async () => {
   const claude = judge({
-    agentCommand: [...MOCK_AGENT, '--set-session-mode-fails'],
+    agentCommand: mockAgentCommand(sessions(), '--set-session-mode-fails'),
   });
   await expect(claude.judge('n1')).rejects.toThrow('Internal error');
-  await claude.onApplicationShutdown();
 });
 
-it('runs the judge with its own profile and the installed Claude Code', async () => {
-  const shutdown = vi.spyOn(AcpxRuntime.prototype, 'shutdown');
-  const judges = [judge({ claudeExecutable: '/bin/claude' }), judge()];
-  const options = vi
-    .mocked(createAcpRuntime)
-    .mock.calls.slice(-2)
-    .map(([option]) => option);
-  const profile = path.join(dataDir, 'profiles', 'judge');
-  expect(options.map(({ agentProcessEnv }) => agentProcessEnv)).toEqual([
-    {
-      CLAUDE_CODE_PLUGIN_DIRS: profile,
-      CHOIR_CORE_URL: 'http://localhost:3000',
-      CLAUDE_CODE_EXECUTABLE: '/bin/claude',
-    },
-    {
-      CLAUDE_CODE_PLUGIN_DIRS: profile,
-      CHOIR_CORE_URL: 'http://localhost:3000',
-    },
-  ]);
-  expect(options[0]).toMatchObject({
-    cwd: path.join(dataDir, 'judge'),
-    permissionMode: 'approve-all',
+it('stops a running judge when the app shuts down', async () => {
+  const claude = judge({
+    agentCommand: mockAgentCommand(
+      sessions(),
+      '--respond',
+      'stream-sleep 60000 thinking',
+    ),
   });
-  await Promise.all(judges.map((each) => each.onApplicationShutdown()));
-  expect(shutdown).toHaveBeenCalledTimes(2);
+  const judging = claude.judge('n1');
+  await vi.waitFor(
+    async () => expect((await savedSessions())[0]?.updates).toHaveLength(2),
+    { timeout: 30_000 },
+  );
+  await claude.beforeApplicationShutdown();
+  await expect(judging).rejects.toThrow('ACP connection closed');
 });

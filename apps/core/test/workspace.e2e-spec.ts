@@ -1,5 +1,5 @@
-import { AcpxRuntime } from 'acpx/runtime';
 import request from 'supertest';
+import { AgentSession } from '../src/agent/agent-session.js';
 import { EventStream } from './event-stream.js';
 import { TestApp } from './test-app.js';
 
@@ -134,17 +134,12 @@ it('changes the layout and keeps it, the focus and the panes across restarts', a
   ]);
 });
 it('ends the session of a closed agent', async () => {
-  const close = vi.spyOn(AcpxRuntime.prototype, 'close');
+  const close = vi.spyOn(AgentSession.prototype, 'close');
   const id = await testApp.workspace.firstAgent();
   await testApp.workspace.send('delete', `panes/${UNKNOWN}`).expect(404);
   await testApp.talkTo(id).say('echo hi');
   await testApp.workspace.send('delete', `panes/${id}`).expect(204);
-  expect(close).toHaveBeenCalledExactlyOnceWith(
-    expect.objectContaining({
-      handle: expect.objectContaining({ sessionKey: id }),
-      reason: 'The agent was closed',
-    }),
-  );
+  expect(close).toHaveBeenCalledOnce();
   expect(await testApp.workspace.view()).toEqual({
     workspaces: [strip([]), strip([])],
     activeWorkspace: 0,
