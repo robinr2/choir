@@ -17,6 +17,8 @@ Do all work based on the documentation of the tools the current task involves. O
 - niri: https://niri-wm.github.io/niri/
 - Agent Client Protocol and its TypeScript SDK: https://agentclientprotocol.com/llms.txt
 - Electron: https://www.electronjs.org/docs/latest/
+- Electron security checklist: https://www.electronjs.org/docs/latest/tutorial/security
+- Electron performance: https://www.electronjs.org/docs/latest/tutorial/performance. The app must stay fast and light; follow this guide for every Electron change.
 - Electron Forge: https://www.electronforge.io/llms.txt
 - WebdriverIO: https://webdriver.io/llms.txt
 
