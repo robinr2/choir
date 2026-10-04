@@ -47,6 +47,11 @@ jobs:
       - run: git diff --exit-code -- src/prisma
       - run: npx prisma migration check -q
       - run: npx stryker run --concurrency 4
+      - if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: mutation-report-core
+          path: apps/core/reports/mutation/mutation.json
 
   web:
     runs-on: ubuntu-latest
@@ -72,6 +77,11 @@ jobs:
       - run: npx react-doctor . --no-score --no-supply-chain --blocking warning -y
       - run: npm run --silent test:cov
       - run: npx stryker run --concurrency 4
+      - if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: mutation-report-web
+          path: apps/web/reports/mutation/mutation.json
 
   voice:
     runs-on: ubuntu-latest

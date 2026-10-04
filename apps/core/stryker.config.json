@@ -19,7 +19,8 @@
   "incremental": true,
   "reporters": [
     "clear-text",
-    "progress"
+    "progress",
+    "json"
   ],
   "thresholds": {
     "high": 100,
