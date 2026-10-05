@@ -152,7 +152,7 @@ test('sends a typed message to the agent of its pane', async () => {
     .click();
   await vi.waitFor(() =>
     expect(requests()).toContainEqual([
-      `/conversations/${B}/user-turns`,
+      `/conversations/${B}/queue`,
       'POST',
       { text: 'hello choir', images: [] },
     ]),

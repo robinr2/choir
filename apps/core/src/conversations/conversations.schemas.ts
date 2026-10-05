@@ -25,11 +25,11 @@ function hasContent({
 
 const SAYS_NOTHING = { message: 'Send text or an image' };
 
-export const steeringSchema = z
+export const promptSchema = z
   .object(contentShape)
   .refine(hasContent, SAYS_NOTHING);
 
-export type Steering = z.infer<typeof steeringSchema>;
+export type Prompt = z.infer<typeof promptSchema>;
 
 export const userTurnSchema = z
   .object({

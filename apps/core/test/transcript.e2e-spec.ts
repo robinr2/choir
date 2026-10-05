@@ -177,8 +177,9 @@ it('changes the model, effort and mode of a running session', async () => {
 });
 
 it('keeps the latest rate limits of every session', async () => {
-  const events = await EventStream.open(testApp.app, '/rate-limits/events');
+  const events = await EventStream.page(testApp.app);
   try {
+    await events.until('event: rate-limits\n');
     await events.until('data: {"windows":[]}');
     await testApp.conversation.say('usage');
     const { body } = await request(testApp.app.getHttpServer())

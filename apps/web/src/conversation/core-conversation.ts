@@ -1,5 +1,5 @@
 import type { CatalogChoice, CatalogModel } from '@/agents/core-agents';
-import { LiveStore, send } from '@/lib/live-store';
+import { type Feed, LiveStore, send } from '@/lib/live-store';
 import type { TranscriptMessage } from './transcript';
 
 export type StatusState =
@@ -70,8 +70,8 @@ export type Turn = { text: string; images: Image[] };
 export class CoreConversation extends LiveStore<ConversationSnapshot> {
   readonly id: string;
 
-  constructor(id: string) {
-    super(`/conversations/${id}/events`, {
+  constructor(id: string, feed: Feed) {
+    super(feed, {
       messages: [],
       session: null,
       status: { state: 'starting', since: 0 },
@@ -87,8 +87,7 @@ export class CoreConversation extends LiveStore<ConversationSnapshot> {
   }
 
   async send(turn: Turn): Promise<void> {
-    const response = await send('POST', this.#path('user-turns'), turn);
-    await response.text();
+    await send('POST', this.#path('queue'), turn);
   }
 
   async steer(turn: Turn): Promise<void> {

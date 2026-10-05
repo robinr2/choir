@@ -1,10 +1,13 @@
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { CoreConversation } from '@/conversation/core-conversation';
+import { CoreEvents } from '@/lib/core-events';
 import { fakeCore } from '@/test/fake-core';
 import { requests } from '@/test/fake-event-source';
 import { chatAnswersOf } from './chat-answers';
 
-const answers = chatAnswersOf(new CoreConversation('c1'));
+const answers = chatAnswersOf(
+  new CoreConversation('c1', new CoreEvents().conversation('c1')),
+);
 
 beforeEach(() => {
   fakeCore();

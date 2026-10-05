@@ -4,6 +4,7 @@ import { CoreRateLimits } from '@/agents/core-rate-limits';
 import App from '@/App';
 import { CoreCanvas } from '@/canvas/core-canvas';
 import { CoreInbox } from '@/inbox/core-inbox';
+import { CoreEvents } from '@/lib/core-events';
 import {
   A,
   B,
@@ -20,18 +21,20 @@ async function swapWorkspace(
   screen: Screen,
   view: Omit<WorkspaceView, 'loaded'> = twoAgents(),
 ) {
-  const workspace = new CoreWorkspace();
+  const events = new CoreEvents();
+  const workspace = new CoreWorkspace(events.feed('workspace'));
   const client = createPipecatClient();
   const stop = workspace.subscribe(() => undefined);
   coreShowsWorkspace(view);
   await screen.rerender(
     <App
       client={client}
+      events={events}
       workspace={workspace}
       canvas={new CoreCanvas()}
-      inbox={new CoreInbox()}
+      inbox={new CoreInbox(events.feed('inbox'))}
       agents={new CoreAgents()}
-      rateLimits={new CoreRateLimits()}
+      rateLimits={new CoreRateLimits(events.feed('rate-limits'))}
     />,
   );
   stop();

@@ -1,5 +1,5 @@
 import { DatabaseService } from '../src/database/database.service.js';
-import { EventStream } from './event-stream.js';
+import { EventStream, INBOX } from './event-stream.js';
 import { CLOUDEVENTS, notificationEvent } from './inbox-client.js';
 import { TestApp } from './test-app.js';
 
@@ -229,7 +229,7 @@ it('puts new notifications at the bottom and moves them where the user drops the
 
 it('streams the counts of active notifications and to-dos as they change', async () => {
   const { inbox } = testApp;
-  const stream = await EventStream.open(testApp.app, '/inbox/events');
+  const stream = await EventStream.page(testApp.app);
   await stream.until('"notifications":0,"todos":0');
   const id = await inbox.notify();
   await stream.until('"notifications":1,"todos":0');
@@ -354,13 +354,13 @@ it('moves among many notifications next to the neighbour and keeps new ones at t
 it('tells the app about every change, also when the counts stay', async () => {
   const { inbox } = testApp;
   const [first, second] = [await inbox.notify(), await inbox.notify()];
-  const stream = await EventStream.open(testApp.app, '/inbox/events');
-  await stream.until('id: 1\n');
+  const stream = await EventStream.page(testApp.app);
+  await stream.until(INBOX);
   await inbox.http
     .put(`/notifications/${second}/position`)
     .send({ before: first })
     .expect(204);
-  await stream.until('id: 2\n');
+  await stream.until(INBOX, 2);
   stream.close();
 });
 

@@ -43,7 +43,7 @@ test('sends a message with Enter while the agent is idle', async () => {
   await composer(screen).fill('hello');
   await userEvent.keyboard('{Enter}');
   await vi.waitFor(() =>
-    expect(sent('user-turns')).toEqual([{ text: 'hello', images: [] }]),
+    expect(sent('queue')).toEqual([{ text: 'hello', images: [] }]),
   );
   await expect.element(composer(screen)).toHaveValue('');
 });
@@ -53,11 +53,11 @@ test('queues a message while the agent works and lets it go or steer', async () 
   await composer(screen).fill('next');
   await chat(screen).getByRole('button', { name: 'Queue message' }).click();
   await vi.waitFor(() =>
-    expect(sent('user-turns')).toEqual([{ text: 'next', images: [] }]),
+    expect(sent('queue')).toEqual([{ text: 'next', images: [] }]),
   );
   await composer(screen).fill('and then');
   await userEvent.keyboard('{Enter}');
-  await vi.waitFor(() => expect(sent('user-turns')).toHaveLength(2));
+  await vi.waitFor(() => expect(sent('queue')).toHaveLength(2));
   expect(sent('steerings')).toEqual([]);
   coreShowsConversation(A, {
     ...WORKING,
@@ -100,7 +100,7 @@ test('steers into the running turn with Ctrl+Enter', async () => {
   await composer(screen).fill('not yet');
   await userEvent.keyboard('{Control>}b{/Control}');
   expect(sent('steerings')).toHaveLength(2);
-  expect(sent('user-turns')).toEqual([]);
+  expect(sent('queue')).toEqual([]);
 });
 
 test('starts a turn by steering when the agent is idle', async () => {
@@ -110,7 +110,7 @@ test('starts a turn by steering when the agent is idle', async () => {
   await vi.waitFor(() =>
     expect(sent('steerings')).toEqual([{ text: 'go', images: [] }]),
   );
-  expect(sent('user-turns')).toEqual([]);
+  expect(sent('queue')).toEqual([]);
 });
 
 test('steers the first queued message with Ctrl+Enter in an empty composer', async () => {
@@ -159,8 +159,8 @@ test('sends pasted images with the message after showing them', async () => {
     .toBeVisible();
   await composer(screen).fill('what is this');
   await userEvent.keyboard('{Enter}');
-  await vi.waitFor(() => expect(sent('user-turns')).toHaveLength(1));
-  expect(sent('user-turns')).toEqual([
+  await vi.waitFor(() => expect(sent('queue')).toHaveLength(1));
+  expect(sent('queue')).toEqual([
     {
       text: 'what is this',
       images: [{ mimeType: 'image/png', data: 'cG5n' }],

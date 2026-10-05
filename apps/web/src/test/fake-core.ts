@@ -7,7 +7,7 @@ import type {
   StripLayout,
   WorkspaceView,
 } from '@/workspace/core-workspace';
-import { fakeEventSources, streamOf } from './fake-event-source';
+import { coreSends, fakeEventSources } from './fake-event-source';
 import { agentsResponse, coreHasSessions } from './fake-agents';
 import { coreHasInbox, inboxResponse } from './fake-inbox';
 
@@ -36,7 +36,7 @@ export function fakeCore(): void {
 }
 
 export function coreShowsWorkspace(view: Omit<WorkspaceView, 'loaded'>): void {
-  streamOf('/workspace/events')?.receive(view);
+  coreSends('workspace', view);
 }
 
 export function said(
@@ -69,9 +69,10 @@ export function coreShowsConversation(
   agentId: string,
   change: Partial<ConversationState> = {},
 ): void {
-  streamOf(`/conversations/${agentId}/events`)?.receive(
-    conversationState(change),
-  );
+  coreSends('conversation', {
+    id: agentId,
+    state: conversationState(change),
+  });
 }
 
 export function coreShowsChat(

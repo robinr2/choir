@@ -6,14 +6,11 @@ import {
   HttpCode,
   HttpStatus,
   Inject,
-  type MessageEvent,
   Param,
   Patch,
   Post,
   Put,
-  Sse,
 } from '@nestjs/common';
-import { map, type Observable } from 'rxjs';
 import {
   type LayoutAction,
   layoutActionSchema,
@@ -47,11 +44,6 @@ export class WorkspaceController {
   @Get()
   view(): Promise<WorkspaceView> {
     return this.workspace.view();
-  }
-
-  @Sse('events')
-  events(): Observable<MessageEvent> {
-    return this.workspace.changes.pipe(map((data) => ({ data })));
   }
 
   @Post('panes')

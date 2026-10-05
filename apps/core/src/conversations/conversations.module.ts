@@ -19,6 +19,6 @@ import {
     ConversationCommandsService,
     conversationsProvider,
   ],
-  exports: [conversationsProvider, VoiceModule],
+  exports: [conversationsProvider, VoiceModule, RateLimitsModule],
 })
 export class ConversationsModule {}

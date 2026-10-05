@@ -1,5 +1,5 @@
 import { DatabaseService } from '../src/database/database.service.js';
-import { EventStream } from './event-stream.js';
+import { EventStream, INBOX } from './event-stream.js';
 import { TestApp } from './test-app.js';
 
 const UNKNOWN = '7d1e5a2b-9c4f-4e8a-b6d3-1f2a3b4c5d6e';
@@ -342,20 +342,20 @@ it('tells the app about every change to a to-do', async () => {
     await inbox.todo({ title: 'a' }),
     await inbox.todo({ title: 'b' }),
   ];
-  const stream = await EventStream.open(testApp.app, '/inbox/events');
-  await stream.until('id: 1\n');
+  const stream = await EventStream.page(testApp.app);
+  await stream.until(INBOX);
   await inbox.http.patch(`/todos/${first}`).send({ title: 'c' }).expect(200);
-  await stream.until('id: 2\n');
+  await stream.until(INBOX, 2);
   await inbox.http
     .post(`/todos/${first}/notifications`)
     .send({ notificationId: down })
     .expect(201);
-  await stream.until('id: 3\n');
+  await stream.until(INBOX, 3);
   await inbox.http
     .put(`/todos/${second}/position`)
     .send({ before: first })
     .expect(204);
-  await stream.until('id: 4\n');
+  await stream.until(INBOX, 4);
   stream.close();
 });
 

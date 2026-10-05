@@ -72,21 +72,44 @@ it('shows the tool calls of a turn and their results', async () => {
   ]);
 });
 
-it('streams every change of the conversation', async () => {
+it('streams every change of the conversations the page watches', async () => {
   const { app, conversation } = testApp;
-  const events = await EventStream.open(
-    app,
-    `/conversations/${conversation.id}/events`,
-  );
+  const events = await EventStream.page(app);
   try {
-    await events.until('data: {"messages":[],');
-    await conversation.say('echo hi');
+    const watched = `/events/${await events.connection()}/conversations/${conversation.id}`;
+    const http = request(app.getHttpServer());
+    await http.put(watched).expect(204);
+    await events.until(`event: conversation\n`);
+    await events.until(
+      `data: {"id":"${conversation.id}","state":{"messages":[],`,
+    );
+    await conversation.post('queue', { text: 'echo hi' }).expect(202);
     await events.until(
       '{"id":"m1","role":"assistant","parts":[{"type":"text","text":"hi"}]}',
     );
+    await http.delete(watched).expect(204);
+    await conversation.say('echo again');
+    await http.put(watched).expect(204);
+    await events.until('"text":"again"');
+    expect(events.text.split('"text":"again"')).toHaveLength(2);
   } finally {
     events.close();
   }
+});
+
+it('queues a chat message without waiting for its answer', async () => {
+  const { conversation } = testApp;
+  await conversation
+    .post('queue', { text: 'stream-sleep 20000 slowly' })
+    .expect(202);
+  await conversation.until(({ status }) => status.state === 'working');
+  const decision = await conversation.post('tool-calls').expect(200);
+  expect(decision.body).toEqual({});
+  await conversation.post('queue', { text: 'echo next' }).expect(202);
+  await conversation.until(({ queue }) => queue.length === 1);
+  await conversation.post('queue', { text: ' ' }).expect(400);
+  await conversation.post('cancellation').expect(204);
+  await conversation.waitForAnswer('next');
 });
 
 it('loads the session and its transcript from the agent when the conversation is reopened', async () => {

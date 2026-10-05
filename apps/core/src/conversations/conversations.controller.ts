@@ -32,10 +32,10 @@ import {
   interactionAnswerSchema,
   type Interruption,
   interruptionSchema,
+  type Prompt,
+  promptSchema,
   type SettingsRequest,
   settingsSchema,
-  type Steering,
-  steeringSchema,
   type SubmittedPrompt,
   submittedPromptSchema,
   type UserTurn,
@@ -75,9 +75,17 @@ export class ConversationsController {
     return this.conversations.state(id);
   }
 
-  @Sse('events')
-  events(@Param('id', ID) id: string): Observable<MessageEvent> {
-    return this.conversations.changes(id).pipe(map((data) => ({ data })));
+  @Post('queue')
+  @HttpCode(HttpStatus.ACCEPTED)
+  async enqueue(
+    @Param('id', ID) id: string,
+    @Body({ schema: promptSchema }) { text, images }: Prompt,
+  ): Promise<void> {
+    await this.commands.addUserTurn(
+      id,
+      { text, images },
+      { early: false, voice: false },
+    );
   }
 
   @Sse('user-turns', { method: RequestMethod.POST })
@@ -98,7 +106,7 @@ export class ConversationsController {
   @HttpCode(HttpStatus.NO_CONTENT)
   steer(
     @Param('id', ID) id: string,
-    @Body({ schema: steeringSchema }) content: Steering,
+    @Body({ schema: promptSchema }) content: Prompt,
   ): Promise<void> {
     return this.conversations.steer(id, content);
   }

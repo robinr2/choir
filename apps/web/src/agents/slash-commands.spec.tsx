@@ -30,7 +30,7 @@ function sent(path: string) {
 }
 
 function turns() {
-  return sent('user-turns');
+  return sent('queue');
 }
 
 async function showChat(change: Partial<ConversationState> = {}) {

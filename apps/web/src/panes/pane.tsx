@@ -3,6 +3,7 @@ import { AgentChat } from '@/agents/agent-chat';
 import { LaunchForm } from '@/agents/launch-form';
 import { ExcalidrawCanvas } from '@/canvas/excalidraw-canvas';
 import { CoreConversation } from '@/conversation/core-conversation';
+import { useEvents } from '@/lib/events-context';
 import type { Placement } from '@/strip/placements';
 import type { AgentView, PaneView } from '@/workspace/core-workspace';
 import { useWorkspace } from '@/workspace/workspace-context';
@@ -58,7 +59,10 @@ function AgentBody({
   agent,
   isVoice,
 }: Readonly<{ agent: AgentView; isVoice: boolean }>) {
-  const [conversation] = useState(() => new CoreConversation(agent.id));
+  const events = useEvents();
+  const [conversation] = useState(
+    () => new CoreConversation(agent.id, events.conversation(agent.id)),
+  );
   return (
     <>
       <PaneTitleBar pane={agent}>

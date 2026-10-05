@@ -4,7 +4,7 @@ import type {
   TodoDetail,
   TodoSummary,
 } from '@/inbox/core-inbox';
-import { streamOf } from './fake-event-source';
+import { coreSends } from './fake-event-source';
 
 export const N1 = '1d2c3b4a-5f6e-4d7c-8b9a-0f1e2d3c4b5a';
 export const N2 = '2e3d4c5b-6a7f-4e8d-9c0b-1a2f3e4d5c6b';
@@ -94,5 +94,5 @@ export function inboxResponse(
 }
 
 export function coreCounts(notifications: number, todos: number): void {
-  streamOf('/inbox/events')?.receive({ notifications, todos });
+  coreSends('inbox', { notifications, todos });
 }

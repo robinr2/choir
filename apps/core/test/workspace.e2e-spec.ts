@@ -184,8 +184,9 @@ it('turns voice on for one agent at a time and off when that agent closes', asyn
 });
 
 it('streams every change of the workspace', async () => {
-  const events = await EventStream.open(testApp.app, '/workspace/events');
+  const events = await EventStream.page(testApp.app);
   try {
+    await events.until('event: workspace\n');
     await events.until('"name":"agent 1"');
     const id = await emptyPane();
     await events.until(`{"id":"${id}","kind":"empty"}`);

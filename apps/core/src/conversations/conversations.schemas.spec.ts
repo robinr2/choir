@@ -1,7 +1,7 @@
 import {
   interactionAnswerSchema,
   settingsSchema,
-  steeringSchema,
+  promptSchema,
   userTurnSchema,
 } from './conversations.schemas.js';
 
@@ -32,14 +32,14 @@ it('takes text with images and refuses anything else as an image', () => {
     'Send text or an image',
   );
   expect(
-    steeringSchema.safeParse({
+    promptSchema.safeParse({
       text: '',
       images: [{ data: 'aGk=', mimeType: 'image/png' }],
     }).success,
   ).toBe(true);
-  expect(steeringSchema.safeParse({ text: ' ' }).success).toBe(false);
+  expect(promptSchema.safeParse({ text: ' ' }).success).toBe(false);
   expect(turn({ text: 'hi', voice: 'yes' })).toBe(false);
-  expect(steeringSchema.parse({ text: ' hi ' })).toEqual({ text: 'hi' });
+  expect(promptSchema.parse({ text: ' hi ' })).toEqual({ text: 'hi' });
 });
 
 it('takes an option, an action with content, or a plain action as an answer', () => {

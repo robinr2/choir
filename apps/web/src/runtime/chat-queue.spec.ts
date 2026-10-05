@@ -1,6 +1,7 @@
 import type { AppendMessage } from '@assistant-ui/react';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { CoreConversation } from '@/conversation/core-conversation';
+import { CoreEvents } from '@/lib/core-events';
 import { fakeCore } from '@/test/fake-core';
 import { requests } from '@/test/fake-event-source';
 import { chatQueueOf, turnOf } from './chat-queue';
@@ -23,7 +24,10 @@ function message(
   };
 }
 
-const conversation = new CoreConversation('c1');
+const conversation = new CoreConversation(
+  'c1',
+  new CoreEvents().conversation('c1'),
+);
 const onResume = vi.fn<(open: true) => void>();
 
 beforeEach(() => {
@@ -103,11 +107,11 @@ test('queues, steers, unqueues and steers queued turns in core', async () => {
   await vi.waitFor(() =>
     expect(requests()).toEqual(
       expect.arrayContaining([
-        ['/conversations/c1/user-turns', 'POST', { text: 'later', images: [] }],
+        ['/conversations/c1/queue', 'POST', { text: 'later', images: [] }],
         ['/conversations/c1/steerings', 'POST', { text: 'now', images: [] }],
         ['/conversations/c1/queue/q1/steering', 'POST', undefined],
         ['/conversations/c1/queue/q2', 'DELETE', undefined],
-        ['/conversations/c1/user-turns', 'POST', { text: 'also', images: [] }],
+        ['/conversations/c1/queue', 'POST', { text: 'also', images: [] }],
       ]),
     ),
   );

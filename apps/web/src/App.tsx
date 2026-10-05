@@ -16,6 +16,8 @@ import { InboxContext } from '@/inbox/inbox-context';
 import { InboxPanel } from '@/inbox/inbox-panel';
 import { NotificationList } from '@/inbox/notification-list';
 import { TodoList } from '@/inbox/todo-list';
+import type { CoreEvents } from '@/lib/core-events';
+import { EventsContext } from '@/lib/events-context';
 import { Strip } from '@/strip/strip';
 import { StripContext } from '@/strip/strip-context';
 import { ViewStore } from '@/strip/view-store';
@@ -54,6 +56,7 @@ const INBOX_LISTS = {
 
 type AppProps = {
   client: PipecatClient;
+  events: CoreEvents;
   workspace: CoreWorkspace;
   canvas: CoreCanvas;
   inbox: CoreInbox;
@@ -93,7 +96,7 @@ function AgentServices({
 }
 
 function App(props: Readonly<AppProps>) {
-  const { client, workspace, canvas, inbox } = props;
+  const { client, events, workspace, canvas, inbox } = props;
   const voice = useMemo(
     () => new VoiceSession(client, workspace),
     [client, workspace],
@@ -111,7 +114,9 @@ function App(props: Readonly<AppProps>) {
         <StripContext value={strip}>
           <InboxContext value={inbox}>
             <AgentServices agents={props.agents} rateLimits={props.rateLimits}>
-              <Screen />
+              <EventsContext value={events}>
+                <Screen />
+              </EventsContext>
             </AgentServices>
           </InboxContext>
         </StripContext>

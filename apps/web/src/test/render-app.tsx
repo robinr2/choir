@@ -7,6 +7,7 @@ import { CoreRateLimits } from '@/agents/core-rate-limits';
 import App from '@/App';
 import { CoreCanvas } from '@/canvas/core-canvas';
 import { CoreInbox } from '@/inbox/core-inbox';
+import { CoreEvents } from '@/lib/core-events';
 import { createPipecatClient } from '@/voice/create-pipecat-client';
 import { CoreWorkspace } from '@/workspace/core-workspace';
 import { coreShowsWorkspace, twoAgents } from './fake-core';
@@ -16,14 +17,16 @@ export type Screen = Awaited<ReturnType<typeof render>>;
 export const client = createPipecatClient();
 
 export async function renderApp(view = twoAgents()): Promise<Screen> {
+  const events = new CoreEvents();
   const screen = await render(
     <App
       client={client}
-      workspace={new CoreWorkspace()}
+      events={events}
+      workspace={new CoreWorkspace(events.feed('workspace'))}
       canvas={new CoreCanvas()}
-      inbox={new CoreInbox()}
+      inbox={new CoreInbox(events.feed('inbox'))}
       agents={new CoreAgents()}
-      rateLimits={new CoreRateLimits()}
+      rateLimits={new CoreRateLimits(events.feed('rate-limits'))}
     />,
   );
   coreShowsWorkspace(view);

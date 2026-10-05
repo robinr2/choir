@@ -5,6 +5,7 @@ import { CoreRateLimits } from '@/agents/core-rate-limits';
 import App from '@/App';
 import { CoreCanvas } from '@/canvas/core-canvas';
 import { CoreInbox } from '@/inbox/core-inbox';
+import { CoreEvents } from '@/lib/core-events';
 import {
   coreHasSessions,
   coreHoldsFolder,
@@ -59,18 +60,20 @@ function indentOf(screen: Screen, folder: string): number {
 }
 
 async function swapServices(screen: Screen) {
-  const workspace = new CoreWorkspace();
+  const events = new CoreEvents();
+  const workspace = new CoreWorkspace(events.feed('workspace'));
   const agents = new CoreAgents();
   const stop = workspace.subscribe(() => undefined);
   coreShowsWorkspace(emptyPane());
   await screen.rerender(
     <App
       client={client}
+      events={events}
       workspace={workspace}
       canvas={new CoreCanvas()}
-      inbox={new CoreInbox()}
+      inbox={new CoreInbox(events.feed('inbox'))}
       agents={agents}
-      rateLimits={new CoreRateLimits()}
+      rateLimits={new CoreRateLimits(events.feed('rate-limits'))}
     />,
   );
   stop();

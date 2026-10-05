@@ -2,6 +2,7 @@ import { RTVIEvent } from '@pipecat-ai/client-js';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { page } from 'vitest/browser';
 import { render } from 'vitest-browser-react';
+import { CoreEvents } from '@/lib/core-events';
 import {
   A,
   B,
@@ -16,7 +17,7 @@ import {
   session,
 } from '@/test/fake-agents';
 import { CoreConversation } from '@/conversation/core-conversation';
-import { requests, streamOf } from '@/test/fake-event-source';
+import { requests, watchedConversations } from '@/test/fake-event-source';
 import { client } from '@/test/render-app';
 import { chatOf } from '@/test/render-chat';
 
@@ -30,11 +31,13 @@ afterEach(() => {
 });
 
 test('follows the agent it was last given', async () => {
-  const screen = await render(chatOf(new CoreConversation(A)));
-  await screen.rerender(chatOf(new CoreConversation(B)));
-  await vi.waitFor(() =>
-    expect(streamOf(`/conversations/${B}/events`)).toBeDefined(),
+  const screen = await render(
+    chatOf(new CoreConversation(A, new CoreEvents().conversation(A))),
   );
+  await screen.rerender(
+    chatOf(new CoreConversation(B, new CoreEvents().conversation(B))),
+  );
+  await vi.waitFor(() => expect(watchedConversations()).toContain(B));
   client.emit(RTVIEvent.UserTranscript, {
     text: 'hi',
     final: true,
@@ -73,15 +76,17 @@ test('changes the settings of the conversation it was last given', async () => {
     models: CATALOG.models,
     modes: CATALOG.modes,
   };
-  const screen = await render(chatOf(new CoreConversation(A)));
+  const screen = await render(
+    chatOf(new CoreConversation(A, new CoreEvents().conversation(A))),
+  );
   coreShowsConversation(A, { settings });
   await expect
     .element(screen.getByRole('combobox', { name: 'Mode', exact: true }))
     .toBeVisible();
-  await screen.rerender(chatOf(new CoreConversation(B)));
-  await vi.waitFor(() =>
-    expect(streamOf(`/conversations/${B}/events`)).toBeDefined(),
+  await screen.rerender(
+    chatOf(new CoreConversation(B, new CoreEvents().conversation(B))),
   );
+  await vi.waitFor(() => expect(watchedConversations()).toContain(B));
   coreShowsConversation(B, { settings });
   await screen.getByRole('combobox', { name: 'Mode', exact: true }).click();
   await page.getByRole('option', { name: 'Plan' }).click();
@@ -94,11 +99,13 @@ test('changes the settings of the conversation it was last given', async () => {
 
 test('resumes a session in the conversation it was last given', async () => {
   coreHasSessions([session({ sessionId: OTHER_SESSION, title: 'Older work' })]);
-  const screen = await render(chatOf(new CoreConversation(A)));
-  await screen.rerender(chatOf(new CoreConversation(B)));
-  await vi.waitFor(() =>
-    expect(streamOf(`/conversations/${B}/events`)).toBeDefined(),
+  const screen = await render(
+    chatOf(new CoreConversation(A, new CoreEvents().conversation(A))),
   );
+  await screen.rerender(
+    chatOf(new CoreConversation(B, new CoreEvents().conversation(B))),
+  );
+  await vi.waitFor(() => expect(watchedConversations()).toContain(B));
   coreShowsConversation(B, {});
   await screen.getByRole('textbox').fill('/resume');
   await screen.getByRole('button', { name: 'Send message' }).click();
@@ -106,9 +113,9 @@ test('resumes a session in the conversation it was last given', async () => {
   await dialog.getByRole('button', { name: /Older work/ }).click();
   await expect.element(dialog).not.toBeInTheDocument();
   await vi.waitFor(() =>
-    expect(requests().filter(([url]) => url.endsWith('/user-turns'))).toEqual([
+    expect(requests().filter(([url]) => url.endsWith('/queue'))).toEqual([
       [
-        `/conversations/${B}/user-turns`,
+        `/conversations/${B}/queue`,
         'POST',
         { text: `/resume ${OTHER_SESSION}`, images: [] },
       ],
@@ -117,11 +124,13 @@ test('resumes a session in the conversation it was last given', async () => {
 });
 
 test('sends a chosen command to the conversation it was last given', async () => {
-  const screen = await render(chatOf(new CoreConversation(A)));
-  await screen.rerender(chatOf(new CoreConversation(B)));
-  await vi.waitFor(() =>
-    expect(streamOf(`/conversations/${B}/events`)).toBeDefined(),
+  const screen = await render(
+    chatOf(new CoreConversation(A, new CoreEvents().conversation(A))),
   );
+  await screen.rerender(
+    chatOf(new CoreConversation(B, new CoreEvents().conversation(B))),
+  );
+  await vi.waitFor(() => expect(watchedConversations()).toContain(B));
   coreShowsConversation(B, {
     commands: [
       { name: 'compact', description: 'Compact the conversation', hint: null },
@@ -130,12 +139,8 @@ test('sends a chosen command to the conversation it was last given', async () =>
   await screen.getByRole('textbox').fill('/');
   await screen.getByRole('option', { name: /compact/ }).click();
   await vi.waitFor(() =>
-    expect(requests().filter(([url]) => url.endsWith('/user-turns'))).toEqual([
-      [
-        `/conversations/${B}/user-turns`,
-        'POST',
-        { text: '/compact ', images: [] },
-      ],
+    expect(requests().filter(([url]) => url.endsWith('/queue'))).toEqual([
+      [`/conversations/${B}/queue`, 'POST', { text: '/compact ', images: [] }],
     ]),
   );
 });

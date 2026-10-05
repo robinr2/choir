@@ -4,7 +4,7 @@ import type {
   FolderListing,
 } from '@/agents/core-agents';
 import type { RateLimits } from '@/agents/core-rate-limits';
-import { streamOf } from './fake-event-source';
+import { coreSends } from './fake-event-source';
 
 export const SESSION = 'a1b2c3d4-0000-4000-8000-000000000001';
 export const OTHER_SESSION = 'b2c3d4e5-0000-4000-8000-000000000002';
@@ -113,5 +113,5 @@ export function agentsResponse(
 }
 
 export function coreShowsRateLimits(limits: RateLimits): void {
-  streamOf('/rate-limits/events')?.receive(limits);
+  coreSends('rate-limits', limits);
 }

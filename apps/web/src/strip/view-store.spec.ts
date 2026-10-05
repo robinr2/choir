@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
+import { CoreEvents } from '@/lib/core-events';
 import {
   agent,
   column,
@@ -13,7 +14,9 @@ import { viewXOf } from './geometry';
 import { ViewStore } from './view-store';
 
 function storeWithListener() {
-  const store = new ViewStore(new CoreWorkspace());
+  const store = new ViewStore(
+    new CoreWorkspace(new CoreEvents().feed('workspace')),
+  );
   const listener = vi.fn<() => void>();
   const stop = store.subscribe(listener);
   return { store, listener, stop };

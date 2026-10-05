@@ -3,6 +3,7 @@ import { CoreAgents } from '@/agents/core-agents';
 import { CoreRateLimits } from '@/agents/core-rate-limits';
 import App from '@/App';
 import { CoreCanvas } from '@/canvas/core-canvas';
+import { CoreEvents } from '@/lib/core-events';
 import { coreShowsWorkspace, twoAgents } from '@/test/fake-core';
 import { N1, notification, T1, T2, todo } from '@/test/fake-inbox';
 import {
@@ -22,18 +23,20 @@ const INBOX = {
 };
 
 async function swapInbox(screen: Screen) {
-  const inbox = new CoreInbox();
-  const workspace = new CoreWorkspace();
+  const events = new CoreEvents();
+  const inbox = new CoreInbox(events.feed('inbox'));
+  const workspace = new CoreWorkspace(events.feed('workspace'));
   const stop = workspace.subscribe(() => undefined);
   coreShowsWorkspace(twoAgents());
   await screen.rerender(
     <App
       client={client}
+      events={events}
       workspace={workspace}
       canvas={new CoreCanvas()}
       inbox={inbox}
       agents={new CoreAgents()}
-      rateLimits={new CoreRateLimits()}
+      rateLimits={new CoreRateLimits(events.feed('rate-limits'))}
     />,
   );
   stop();

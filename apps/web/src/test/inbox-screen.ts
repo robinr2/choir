@@ -58,7 +58,9 @@ export function agentZone(screen: Screen, name: string) {
 }
 
 export function changes() {
-  return requests().filter(([, method]) => method !== 'GET');
+  return requests().filter(
+    ([url, method]) => method !== 'GET' && !url.startsWith('/events/'),
+  );
 }
 
 export function settle(): Promise<void> {

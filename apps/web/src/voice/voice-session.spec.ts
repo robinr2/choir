@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
+import { CoreEvents } from '@/lib/core-events';
 import { A, B } from '@/test/fake-core';
 import { fakeEventSources } from '@/test/fake-event-source';
 import { CoreWorkspace } from '@/workspace/core-workspace';
@@ -21,7 +22,7 @@ beforeEach(() => {
     new Response(null, { status: 204 }),
   );
   fakeEventSources();
-  workspace = new CoreWorkspace();
+  workspace = new CoreWorkspace(new CoreEvents().feed('workspace'));
   session = new VoiceSession(client, workspace);
 });
 

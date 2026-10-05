@@ -9,6 +9,7 @@ import { CoreCanvas } from '@/canvas/core-canvas';
 import { CoreConversation } from '@/conversation/core-conversation';
 import { CoreInbox } from '@/inbox/core-inbox';
 import { InboxContext } from '@/inbox/inbox-context';
+import { CoreEvents } from '@/lib/core-events';
 import { VoiceSession } from '@/voice/voice-session';
 import { CoreWorkspace } from '@/workspace/core-workspace';
 import { WorkspaceContext } from '@/workspace/workspace-context';
@@ -17,10 +18,11 @@ import { coreShowsConversation, toolCall } from './fake-core';
 import { requests } from './fake-event-source';
 import { client } from './render-app';
 
-const workspace = new CoreWorkspace();
-const inbox = new CoreInbox();
+const events = new CoreEvents();
+const workspace = new CoreWorkspace(events.feed('workspace'));
+const inbox = new CoreInbox(events.feed('inbox'));
 const agents = new CoreAgents();
-const rateLimits = new CoreRateLimits();
+const rateLimits = new CoreRateLimits(events.feed('rate-limits'));
 const context = {
   workspace,
   voice: new VoiceSession(client, workspace),
@@ -44,7 +46,9 @@ export function chatOf(conversation: CoreConversation, isVoice = true) {
 }
 
 export function renderChat(id: string) {
-  return render(chatOf(new CoreConversation(id), false));
+  return render(
+    chatOf(new CoreConversation(id, events.conversation(id)), false),
+  );
 }
 
 export function coreReplied(id: string, ...parts: TranscriptPart[]): void {

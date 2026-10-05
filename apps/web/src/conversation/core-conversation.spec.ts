@@ -1,9 +1,11 @@
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
+import { CoreEvents } from '@/lib/core-events';
 import { conversationState } from '@/test/fake-core';
 import {
   FakeEventSource,
   fakeEventSources,
   requests,
+  stream,
 } from '@/test/fake-event-source';
 import { CoreConversation } from './core-conversation';
 
@@ -13,7 +15,10 @@ let conversation: CoreConversation;
 
 beforeEach(() => {
   fakeEventSources();
-  conversation = new CoreConversation('c1');
+  conversation = new CoreConversation(
+    'c1',
+    new CoreEvents().conversation('c1'),
+  );
 });
 
 afterEach(() => {
@@ -30,35 +35,33 @@ test('follows the state of the conversation while anyone listens', () => {
   });
   const stopFirst = conversation.subscribe(first);
   const stopSecond = conversation.subscribe(second);
-  const [source] = FakeEventSource.opened;
+  const source = stream();
   expect(FakeEventSource.opened).toHaveLength(1);
-  expect(source?.url).toBe('/conversations/c1/events');
+  expect(source.url).toBe('/events');
   const state = conversationState({
     status: { state: 'working', since: 5 },
     queue: [{ id: 'q1', text: 'next', images: 0 }],
   });
-  source?.receive(state);
+  source.emit('conversation', { id: 'c2', state: conversationState() });
+  source.emit('conversation', { id: 'c1', state });
   expect(conversation.getSnapshot()).toEqual({ ...state, loaded: true });
   expect(first).toHaveBeenCalledOnce();
   stopFirst();
-  expect(source?.closed).toBe(false);
+  expect(source.closed).toBe(false);
   stopSecond();
-  expect(source?.closed).toBe(true);
+  expect(source.closed).toBe(true);
 });
 
-test('sends a turn with its images and reads its answer to the end', async () => {
+test('queues a turn with its images without waiting for its answer', async () => {
   const fetch = vi
     .spyOn(window, 'fetch')
-    .mockResolvedValue(new Response('data: {"text":"Hi"}\n\n'));
+    .mockResolvedValue(new Response(null, { status: 202 }));
   await conversation.send({ text: 'look', images: [IMAGE] });
-  expect(fetch).toHaveBeenCalledExactlyOnceWith(
-    '/conversations/c1/user-turns',
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text: 'look', images: [IMAGE] }),
-    },
-  );
+  expect(fetch).toHaveBeenCalledExactlyOnceWith('/conversations/c1/queue', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text: 'look', images: [IMAGE] }),
+  });
 });
 
 test('steers, unqueues, cancels, changes settings and answers in core', async () => {
@@ -88,6 +91,6 @@ test('fails a turn core rejects', async () => {
     new Response('', { status: 400 }),
   );
   await expect(conversation.send({ text: '', images: [] })).rejects.toThrow(
-    new Error('POST /conversations/c1/user-turns replied with status 400'),
+    new Error('POST /conversations/c1/queue replied with status 400'),
   );
 });

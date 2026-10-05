@@ -1,22 +1,24 @@
+export type Feed = (receive: (data: any) => void) => () => void;
+
 export abstract class LiveStore<T extends object> {
   #snapshot: T;
-  #source?: EventSource;
-  readonly #url: string;
+  #stop?: () => void;
+  readonly #feed: Feed;
   readonly #listeners = new Set<() => void>();
 
-  protected constructor(url: string, initial: T) {
-    this.#url = url;
+  protected constructor(feed: Feed, initial: T) {
+    this.#feed = feed;
     this.#snapshot = initial;
   }
 
   readonly subscribe = (listener: () => void): (() => void) => {
     this.#listeners.add(listener);
-    this.#source ??= this.#open();
+    this.#stop ??= this.#feed((data) => this.receive(data));
     return () => {
       this.#listeners.delete(listener);
       if (this.#listeners.size > 0) return;
-      this.#source?.close();
-      this.#source = undefined;
+      this.#stop?.();
+      this.#stop = undefined;
     };
   };
 
@@ -27,14 +29,6 @@ export abstract class LiveStore<T extends object> {
   protected update(change: Partial<T>): void {
     this.#snapshot = { ...this.#snapshot, ...change };
     for (const listener of this.#listeners) listener();
-  }
-
-  #open(): EventSource {
-    const source = new EventSource(this.#url);
-    source.addEventListener('message', ({ data }: MessageEvent<string>) => {
-      this.receive(JSON.parse(data));
-    });
-    return source;
   }
 }
 

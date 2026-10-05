@@ -1,4 +1,4 @@
-import { LiveStore, send } from '@/lib/live-store';
+import { type Feed, LiveStore, send } from '@/lib/live-store';
 
 export type Height = { auto: number } | { fixed: number };
 
@@ -87,8 +87,8 @@ export function agentOf(view: WorkspaceView, id: string): AgentView | null {
 export class CoreWorkspace extends LiveStore<WorkspaceView> {
   #acting: Promise<unknown> = Promise.resolve();
 
-  constructor() {
-    super(`${PATH}/events`, {
+  constructor(feed: Feed) {
+    super(feed, {
       loaded: false,
       workspaces: [],
       activeWorkspace: 0,

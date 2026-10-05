@@ -1,4 +1,4 @@
-import { LiveStore } from '@/lib/live-store';
+import { type Feed, LiveStore } from '@/lib/live-store';
 
 export type RateLimitWindow = {
   window: string;
@@ -10,8 +10,8 @@ export type RateLimitWindow = {
 export type RateLimits = { windows: RateLimitWindow[] };
 
 export class CoreRateLimits extends LiveStore<RateLimits> {
-  constructor() {
-    super('/rate-limits/events', { windows: [] });
+  constructor(feed: Feed) {
+    super(feed, { windows: [] });
   }
 
   protected receive(limits: RateLimits): void {
