@@ -58,7 +58,7 @@ const MIN_ZOOM = 0.5;
 
 function fitInto(room: number) {
   return (sheet: HTMLDivElement) => {
-    sheet.style.zoom = '1';
+    sheet.style.zoom = '';
     const natural = sheet.getBoundingClientRect().height;
     sheet.style.zoom = String(Math.max(MIN_ZOOM, Math.min(1, room / natural)));
     return () => {};
