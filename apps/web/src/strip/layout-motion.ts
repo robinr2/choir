@@ -108,7 +108,7 @@ export class LayoutMotion {
     this.#leave(frame, view);
     const renderIndex = this.#gaps.shown(frame.renderIndex);
     this.#stack.apply({ renderIndex, zoom: frame.zoom }, view);
-    if (free === 'animate') this.#rebaseDrops(frame);
+    this.#rebaseDrops(frame);
     frame.spaces.forEach((space) => this.#slide(space, view));
     frame.placements.forEach((placement) =>
       this.#place(placement, this.#modeOf(placement, frame, free)),
