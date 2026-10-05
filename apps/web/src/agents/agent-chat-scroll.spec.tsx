@@ -41,6 +41,32 @@ function viewportOf(screen: Screen, name: string): HTMLElement {
   return viewport;
 }
 
+function pause(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, 50));
+}
+
+async function settled(viewports: HTMLElement[]): Promise<void> {
+  const heights = () => viewports.map((viewport) => viewport.scrollHeight);
+  await vi.waitFor(async () => {
+    const before = heights();
+    await pause();
+    expect(heights()).toEqual(before);
+  });
+}
+
+async function scrollUp(viewports: HTMLElement[], distance: number) {
+  for (const viewport of viewports) {
+    const top = viewport.scrollHeight - viewport.clientHeight - distance;
+    viewport.scrollTo({ top, behavior: 'instant' });
+  }
+  await vi.waitFor(() =>
+    expect(viewports.map(distanceToBottom)).toEqual(
+      viewports.map(() => distance),
+    ),
+  );
+  await pause();
+}
+
 function distanceToBottom(viewport: HTMLElement): number {
   return viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight;
 }
@@ -82,14 +108,6 @@ function userSays(text: string): void {
     timestamp: '',
     user_id: '',
   });
-}
-
-function scrollUp(viewport: HTMLElement): Promise<Event> {
-  const scrolled = new Promise<Event>((resolve) => {
-    viewport.addEventListener('scroll', resolve, { once: true });
-  });
-  viewport.scrollTo({ top: viewport.scrollTop - 50, behavior: 'instant' });
-  return scrolled;
 }
 
 async function voiceAndTypedPanes() {
@@ -146,10 +164,9 @@ test('leaves every pane where the user scrolled up to when messages arrive', asy
     viewportOf(screen, 'agent 1'),
     viewportOf(screen, 'agent 2'),
   ];
-  await Promise.all(viewports.map(scrollUp));
-  await vi.waitFor(() =>
-    expect(viewports.map(distanceToBottom)).toEqual([50, 50]),
-  );
+  await settled(viewports);
+  await scrollUp(viewports, 25);
+  await scrollUp(viewports, 50);
   const scrolledTo = viewports.map((viewport) => viewport.scrollTop);
   const stays = (name: string) =>
     expect(viewportOf(screen, name).scrollTop).toBe(
