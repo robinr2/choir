@@ -1,5 +1,3 @@
-import type { ThreadMessageLike } from '@assistant-ui/react';
-
 type TextPart = { type: 'text'; text: string };
 
 type ImagePart = { type: 'image'; image: string };
@@ -12,7 +10,7 @@ type ApprovalOption = {
   label: string;
 };
 
-type Approval = {
+export type Approval = {
   id: string;
   prompt?: string;
   options: ApprovalOption[];
@@ -21,7 +19,7 @@ type Approval = {
   resolution?: 'cancelled';
 };
 
-type QuestionItem = {
+export type QuestionItem = {
   id: string;
   header: string;
   prompt: string;
@@ -30,14 +28,14 @@ type QuestionItem = {
   freeform: string | null;
 };
 
-type Question = {
+export type Question = {
   id: string;
   questions: QuestionItem[];
   answers?: Record<string, string | string[]>;
   resolution?: 'declined' | 'cancelled';
 };
 
-type ToolCallPart = {
+export type ToolCallPart = {
   type: 'tool-call';
   toolCallId: string;
   toolName: string;
@@ -54,7 +52,7 @@ type ToolCallPart = {
   messages?: TranscriptMessage[];
 };
 
-type ElicitationPart = {
+export type ElicitationPart = {
   type: 'elicitation';
   id: string;
   server: string | null;
@@ -71,14 +69,14 @@ type ElicitationPart = {
   state: 'request' | 'accepted' | 'declined' | 'cancelled';
 };
 
-type CompactionPart = {
+export type CompactionPart = {
   type: 'compaction';
   id: string;
   status: 'in_progress' | 'completed' | 'failed' | 'cancelled';
   summary: string;
 };
 
-type TranscriptPart =
+export type TranscriptPart =
   | TextPart
   | ImagePart
   | ReasoningPart
@@ -99,8 +97,6 @@ export type TranscriptMessage = {
 };
 
 export type ShownMessage = TranscriptMessage & { spokenUpTo?: number };
-
-type ThreadPart = Exclude<ThreadMessageLike['content'], string>[number];
 
 const NO_SENDER: Sender = { id: '', name: '' };
 
@@ -144,35 +140,4 @@ export function spokenTextsOf({ parts }: TranscriptMessage): string[] {
   return parts.flatMap((part) =>
     part.type === 'text' && part.text.trim() ? [part.text] : [],
   );
-}
-
-function threadParts(part: TranscriptPart): ThreadPart[] {
-  if (part.type === 'elicitation' || part.type === 'compaction') return [];
-  if (part.type !== 'tool-call') return [part];
-  return [
-    {
-      type: 'tool-call',
-      toolCallId: part.toolCallId,
-      toolName: part.toolName,
-      argsText: JSON.stringify(part.args ?? {}),
-      result: part.result,
-      isError: part.isError,
-    },
-  ];
-}
-
-export function threadMessageOf(message: ShownMessage): ThreadMessageLike {
-  return {
-    id: message.id,
-    role: message.role,
-    content: message.parts.flatMap(threadParts),
-    metadata: {
-      custom: {
-        ...(message.spokenUpTo !== undefined && {
-          spokenUpTo: message.spokenUpTo,
-        }),
-        ...(message.from && { from: message.from }),
-      },
-    },
-  };
 }

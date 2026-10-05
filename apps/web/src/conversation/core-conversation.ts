@@ -27,6 +27,28 @@ type Usage = { used: number; size: number; cost: number | null };
 
 export type QueuedTurn = { id: string; text: string; images: number };
 
+type PlanEntry = {
+  content: string;
+  status: 'pending' | 'in_progress' | 'completed';
+};
+
+export type Fork = {
+  id: string;
+  sessionId: string;
+  title: string;
+  state: 'running' | 'ready' | 'failed';
+  startedAt: number;
+  endedAt: number | null;
+};
+
+export type Answer =
+  | { optionId: string }
+  | {
+      action: 'accept';
+      content?: Record<string, string | string[] | boolean | number>;
+    }
+  | { action: 'decline' | 'cancel' };
+
 export type ConversationState = {
   messages: TranscriptMessage[];
   session: { id: string; title: string | null; cwd: string } | null;
@@ -35,6 +57,8 @@ export type ConversationState = {
   settings: Settings | null;
   usage: Usage | null;
   commands: Command[];
+  plan: PlanEntry[];
+  forks: Fork[];
 };
 
 export type ConversationSnapshot = ConversationState & { loaded: boolean };
@@ -55,6 +79,8 @@ export class CoreConversation extends LiveStore<ConversationSnapshot> {
       settings: null,
       usage: null,
       commands: [],
+      plan: [],
+      forks: [],
       loaded: false,
     });
     this.id = id;
@@ -83,6 +109,10 @@ export class CoreConversation extends LiveStore<ConversationSnapshot> {
 
   async change(settings: SettingsChange): Promise<void> {
     await send('PUT', this.#path('settings'), settings);
+  }
+
+  async answer(interactionId: string, answer: Answer): Promise<void> {
+    await send('POST', this.#path(`interactions/${interactionId}`), answer);
   }
 
   protected receive(state: ConversationState): void {

@@ -1,5 +1,9 @@
 import { useState } from 'react';
-import { Thread } from '@/components/assistant-ui/elements/thread.aui';
+import { TaskGroup } from '@/components/assistant-ui/elements/task-card.aui';
+import {
+  Thread,
+  type ThreadComponents,
+} from '@/components/assistant-ui/elements/thread.aui';
 import { ConversationContext } from '@/conversation/conversation-context';
 import type { CoreConversation } from '@/conversation/core-conversation';
 import { ChatRuntimeProvider } from '@/runtime/chat-runtime-provider';
@@ -8,6 +12,10 @@ import { SpokenReply } from '@/voice/spoken-reply';
 import { SpokenReplyFollower } from '@/voice/spoken-reply-follower';
 import { AgentContext } from '@/workspace/workspace-context';
 import { ResumeDialog } from './resume-dialog';
+
+const THREAD_COMPONENTS: ThreadComponents = {
+  TaskGroup,
+};
 
 export function AgentChat({
   conversation,
@@ -27,7 +35,7 @@ export function AgentChat({
           {isVoice && (
             <SpokenReplyFollower conversation={conversation} reply={reply} />
           )}
-          <Thread autoFocus={false} />
+          <Thread components={THREAD_COMPONENTS} autoFocus={false} />
           <ResumeDialog open={resuming} onOpenChange={setResuming} />
         </ChatRuntimeProvider>
       </ConversationContext>

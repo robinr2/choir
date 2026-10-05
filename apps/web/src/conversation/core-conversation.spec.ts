@@ -61,7 +61,7 @@ test('sends a turn with its images and reads its answer to the end', async () =>
   );
 });
 
-test('steers, unqueues, cancels and changes settings in core', async () => {
+test('steers, unqueues, cancels, changes settings and answers in core', async () => {
   vi.spyOn(window, 'fetch').mockImplementation(
     async () => new Response(null, { status: 204 }),
   );
@@ -70,12 +70,16 @@ test('steers, unqueues, cancels and changes settings in core', async () => {
   await conversation.unqueue('q2');
   await conversation.cancel();
   await conversation.change({ model: 'haiku' });
+  await conversation.answer('i1', { optionId: 'allow' });
+  await conversation.answer('i2', { action: 'decline' });
   expect(requests()).toEqual([
     ['/conversations/c1/steerings', 'POST', { text: 'faster', images: [] }],
     ['/conversations/c1/queue/q1/steering', 'POST', undefined],
     ['/conversations/c1/queue/q2', 'DELETE', undefined],
     ['/conversations/c1/cancellation', 'POST', undefined],
     ['/conversations/c1/settings', 'PUT', { model: 'haiku' }],
+    ['/conversations/c1/interactions/i1', 'POST', { optionId: 'allow' }],
+    ['/conversations/c1/interactions/i2', 'POST', { action: 'decline' }],
   ]);
 });
 

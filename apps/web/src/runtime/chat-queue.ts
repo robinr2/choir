@@ -35,8 +35,22 @@ export type ChatQueue = ExternalThreadQueueAdapter & {
   submit: (message: AppendMessage) => Promise<void>;
 };
 
-function itemOf({ id, text }: QueuedTurn): QueueItemState {
-  return { id, prompt: text, parts: [{ type: 'text', text }] };
+const QUEUED_IMAGE = {
+  type: 'file',
+  filename: 'image',
+  data: '',
+  mimeType: 'image/*',
+} as const;
+
+function itemOf({ id, text, images }: QueuedTurn): QueueItemState {
+  return {
+    id,
+    prompt: text,
+    parts: [
+      { type: 'text', text },
+      ...Array.from({ length: images }, () => QUEUED_IMAGE),
+    ],
+  };
 }
 
 export function chatQueueOf(

@@ -6,14 +6,19 @@ import type {
 
 export const ConversationContext = createContext<CoreConversation | null>(null);
 
-export function useConversation(): {
-  conversation: CoreConversation;
-  state: ConversationSnapshot;
-} {
+export function useCoreConversation(): CoreConversation {
   const conversation = use(ConversationContext);
   if (!conversation) {
     throw new Error('useConversation needs a ConversationContext');
   }
+  return conversation;
+}
+
+export function useConversation(): {
+  conversation: CoreConversation;
+  state: ConversationSnapshot;
+} {
+  const conversation = useCoreConversation();
   const state = useSyncExternalStore(
     conversation.subscribe,
     conversation.getSnapshot,

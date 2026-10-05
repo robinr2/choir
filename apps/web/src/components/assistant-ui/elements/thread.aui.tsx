@@ -16,7 +16,6 @@ import {
   ReasoningText,
   ReasoningTrigger,
 } from "@/components/assistant-ui/elements/reasoning.aui";
-import { ToolFallback } from "@/components/assistant-ui/elements/tool-fallback.aui";
 import {
   ToolGroupContent,
   ToolGroupRoot,
@@ -28,6 +27,11 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { MessageQueue } from "@/components/assistant-ui/elements/message-queue";
 import { AgentMessage } from "@/components/agents/agent-message";
 import { useComposerKeys } from "@/agents/composer-keys";
+import { AgentToolCall } from "@/chat/agent-tool-call";
+import { ChatData } from "@/chat/chat-data";
+import { ConversationForks } from "@/chat/conversation-forks";
+import { ConversationPlan } from "@/chat/conversation-plan";
+import { standsAlone } from "@/chat/tool-groups";
 import { ComposerSettings, ContextRing } from "@/agents/composer-settings";
 import { Quota } from "@/agents/quota";
 import { SlashCommands } from "@/agents/slash-commands";
@@ -59,6 +63,7 @@ import {
   ChevronLeftIcon,
   ChevronRightIcon,
   CopyIcon,
+  CornerDownRightIcon,
   DownloadIcon,
   MicIcon,
   MoreHorizontalIcon,
@@ -121,6 +126,7 @@ const taskAwareGroupBy = (
   part: Parameters<typeof messageGroupBy>[0],
   context?: Parameters<typeof messageGroupBy>[1],
 ): readonly ThreadGroupKey[] => {
+  if (standsAlone(part)) return [];
   const path = messageGroupBy(part, context);
   return part.type === "tool-call" &&
     part.messages !== undefined &&
@@ -182,6 +188,7 @@ export const Thread: FC<ThreadProps> = ({
 
   return (
     <ThreadComponentsContext.Provider value={components}>
+      <ChatData />
       <ThreadRoot isEmpty={isEmpty} autoFocus={autoFocus} />
     </ThreadComponentsContext.Provider>
   );
@@ -240,6 +247,8 @@ const ThreadRoot: FC<{ isEmpty: boolean; autoFocus: boolean }> = ({
           >
             <ThreadScrollToBottom />
             <ThreadFollowupSuggestions />
+            <ConversationForks />
+            <ConversationPlan />
             <MessageQueue />
             <div className="flex flex-col gap-1.5">
               <Quota />
@@ -385,7 +394,7 @@ const MessageError: FC = () => {
 
 const AssistantMessage: FC = () => {
   const {
-    ToolFallback: ToolFallbackComponent = ToolFallback,
+    ToolFallback: ToolFallbackComponent = AgentToolCall,
     ToolGroup,
     ReasoningGroup,
     TaskGroup: TaskGroupComponent,
@@ -552,6 +561,13 @@ const UserMessage: FC = () => {
       className="fade-in slide-in-from-bottom-1 animate-in grid auto-rows-auto grid-cols-[minmax(72px,1fr)_auto] content-start gap-y-2 px-2 duration-150 [&:where(>*)]:col-start-2"
       data-role="user"
     >
+      <AuiIf condition={(s) => s.message.metadata.custom.steered === true}>
+        <span className="text-muted-foreground col-start-2 flex items-center justify-self-end gap-1 text-xs">
+          <CornerDownRightIcon aria-hidden className="size-3" />
+          steered into the running turn
+        </span>
+      </AuiIf>
+
       <UserMessageAttachments />
 
       <div className="aui-user-message-content-wrapper relative col-start-2 min-w-0">

@@ -294,3 +294,40 @@ test('deletes a session after asking', async () => {
     ['/agent-sessions', 'GET', undefined],
   ]);
 });
+
+test('shows the newest sessions first, more on demand and those a search finds', async () => {
+  coreHasSessions(
+    Array.from({ length: 150 }, (_, index) =>
+      session({
+        sessionId: `s${index}`,
+        title: `Session ${index}`,
+        cwd: index === 149 ? '/srv/Deploy' : '/home/sam',
+      }),
+    ),
+  );
+  const screen = await openLaunchForm();
+  const sessions = form(screen).getByRole('list', { name: 'Sessions' });
+  await expect.element(sessions.getByText('Session 49')).toBeVisible();
+  expect(sessions.getByRole('listitem').elements()).toHaveLength(50);
+  await form(screen)
+    .getByRole('button', { name: 'Show 50 more of 100' })
+    .click();
+  await form(screen)
+    .getByRole('button', { name: 'Show 50 more of 50' })
+    .click();
+  expect(sessions.getByRole('listitem').elements()).toHaveLength(150);
+  expect(
+    form(screen).getByRole('button', { name: /^Show/ }).elements(),
+  ).toEqual([]);
+  const search = form(screen).getByRole('searchbox', {
+    name: 'Search sessions',
+  });
+  await search.fill('  deploy ');
+  await expect
+    .element(sessions.getByRole('listitem'))
+    .toHaveTextContent(/Session 149/);
+  await search.fill('nothing like it');
+  await expect
+    .element(form(screen).getByText('No sessions match'))
+    .toBeVisible();
+});

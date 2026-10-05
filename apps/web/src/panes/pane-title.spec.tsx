@@ -97,9 +97,16 @@ test('shows the session of an agent and copies its id', async () => {
     session: { id: SESSION, title: 'Fix the login bug', cwd: '/home/sam' },
   });
   await expect.element(title).toHaveClass('truncate');
-  await expect
-    .element(pane(screen, 'agent 1').getByText('a1b2c3d4', { exact: true }))
-    .toHaveAttribute('title', SESSION);
+  await expect.element(title).toHaveAttribute('title', 'Fix the login bug');
+  const shortId = pane(screen, 'agent 1').getByText('a1b2c3d4', {
+    exact: true,
+  });
+  await expect.element(shortId).toHaveAttribute('title', SESSION);
+  await expect.element(shortId).toBeVisible();
+  await page.viewport(600, 800);
+  await expect.element(shortId).not.toBeVisible();
+  await expect.element(title).toBeVisible();
+  await page.viewport(1256, 800);
   await pane(screen, 'agent 1')
     .getByRole('button', { name: 'Copy session ID' })
     .click();

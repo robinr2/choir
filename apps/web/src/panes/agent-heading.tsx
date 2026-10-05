@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
+import { useCallback, useSyncExternalStore } from 'react';
 import { CheckIcon, CopyIcon } from 'lucide-react';
 import { AgentStatus } from '@/components/assistant-ui/elements/agent-status';
 import { TooltipIconButton } from '@/components/assistant-ui/elements/tooltip-icon-button';
@@ -7,22 +7,10 @@ import type {
   CoreConversation,
 } from '@/conversation/core-conversation';
 import { useCopyToClipboard } from '@/hooks/use-copy-to-clipboard';
+import { useNow } from '@/lib/use-now';
 import type { AgentView } from '@/workspace/core-workspace';
 import { elapsed, shortId, shownStatus } from './agent-status';
 import { PaneName } from './pane-name';
-
-const TICK = 1000;
-
-function tick(setNow: (now: number) => void): () => void {
-  const timer = setInterval(() => setNow(Date.now()), TICK);
-  return () => clearInterval(timer);
-}
-
-function useNow(ticking: boolean): number {
-  const [now, setNow] = useState(Date.now);
-  useEffect(() => (ticking ? tick(setNow) : undefined), [ticking]);
-  return now;
-}
 
 function StatusPill({
   status,
@@ -40,30 +28,37 @@ function StatusPill({
   );
 }
 
+function CopyId({ id }: Readonly<{ id: string }>) {
+  const { isCopied, copyToClipboard } = useCopyToClipboard();
+  const copy = useCallback(() => copyToClipboard(id), [copyToClipboard, id]);
+  return (
+    <TooltipIconButton
+      tooltip={isCopied ? 'Copied' : 'Copy session ID'}
+      className="text-muted-foreground/70 size-5 shrink-0"
+      onClick={copy}
+    >
+      {isCopied ? <CheckIcon /> : <CopyIcon />}
+    </TooltipIconButton>
+  );
+}
+
 function SessionLabel({
   session,
 }: Readonly<{ session: NonNullable<ConversationSnapshot['session']> }>) {
-  const { isCopied, copyToClipboard } = useCopyToClipboard();
-  const copy = useCallback(
-    () => copyToClipboard(session.id),
-    [copyToClipboard, session.id],
-  );
   return (
     <div className="text-muted-foreground flex min-w-0 items-center gap-1.5 text-xs">
-      {session.title && <span className="truncate">{session.title}</span>}
+      {session.title && (
+        <span className="min-w-0 truncate" title={session.title}>
+          {session.title}
+        </span>
+      )}
       <span
-        className="text-muted-foreground/70 shrink-0 font-mono"
+        className="text-muted-foreground/70 hidden shrink-0 font-mono @md:inline"
         title={session.id}
       >
         {shortId(session.id)}
       </span>
-      <TooltipIconButton
-        tooltip={isCopied ? 'Copied' : 'Copy session ID'}
-        className="text-muted-foreground/70 size-5 shrink-0"
-        onClick={copy}
-      >
-        {isCopied ? <CheckIcon /> : <CopyIcon />}
-      </TooltipIconButton>
+      <CopyId id={session.id} />
     </div>
   );
 }

@@ -11,7 +11,7 @@ export function PaneTitleBar({
   return (
     <div
       data-slot="pane-title"
-      className="border-border/60 flex h-9 shrink-0 cursor-grab items-center gap-1.5 border-b px-1.5 active:cursor-grabbing"
+      className="border-border/60 @container flex h-9 shrink-0 cursor-grab items-center gap-1.5 border-b px-1.5 active:cursor-grabbing"
     >
       <GripVerticalIcon
         className="text-muted-foreground/60 size-3.5 shrink-0"

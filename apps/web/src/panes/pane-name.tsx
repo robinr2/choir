@@ -64,7 +64,7 @@ export function PaneName({ id, name }: Readonly<{ id: string; name: string }>) {
     <button
       type="button"
       title="Rename"
-      className="hover:bg-accent/60 truncate rounded-md px-1.5 py-0.5 text-sm font-medium"
+      className="hover:bg-accent/60 max-w-[40%] shrink-0 truncate rounded-md px-1.5 py-0.5 text-sm font-medium"
       onClick={toggle}
     >
       {name}

@@ -101,6 +101,13 @@ export class CoreWorkspace extends LiveStore<WorkspaceView> {
     await send('POST', `${PATH}/panes`);
   }
 
+  async openConversation(
+    conversationId: string,
+    nextTo: string,
+  ): Promise<void> {
+    await send('POST', `${PATH}/panes`, { conversationId, nextTo });
+  }
+
   async openCanvas(paneId: string): Promise<void> {
     await send('PUT', `${PATH}/panes/${paneId}/content`, {
       kind: 'excalidraw',

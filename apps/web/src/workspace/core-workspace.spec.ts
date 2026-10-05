@@ -51,6 +51,7 @@ test('asks core to change the layout', async () => {
   await workspace.act({ action: 'focusColumnRight' });
   await workspace.rename(A, 'planner');
   await workspace.close(B);
+  await workspace.openConversation(B, A);
   expect(requests()).toEqual([
     ['/workspace/panes', 'POST', undefined],
     [`/workspace/panes/${B}/content`, 'PUT', { kind: 'excalidraw' }],
@@ -62,6 +63,7 @@ test('asks core to change the layout', async () => {
     ['/workspace/actions', 'POST', { action: 'focusColumnRight' }],
     [`/workspace/panes/${A}`, 'PATCH', { name: 'planner' }],
     [`/workspace/panes/${B}`, 'DELETE', undefined],
+    ['/workspace/panes', 'POST', { conversationId: B, nextTo: A }],
   ]);
   expect(vi.mocked(window.fetch).mock.calls[0]?.[1]?.headers).toEqual({
     'Content-Type': 'application/json',

@@ -36,3 +36,15 @@ export function sessionRows(
     time: lastChange(updatedAt, now),
   }));
 }
+
+export const SESSION_PAGE = 50;
+
+export function matchingRows(
+  rows: readonly ThreadItem[],
+  query: string,
+): ThreadItem[] {
+  const wanted = query.trim().toLocaleLowerCase();
+  return rows.filter(({ title, folder }) =>
+    `${title}\n${folder}`.toLocaleLowerCase().includes(wanted),
+  );
+}

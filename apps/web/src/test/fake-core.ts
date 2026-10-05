@@ -59,6 +59,8 @@ export function conversationState(
     settings: null,
     usage: null,
     commands: [],
+    plan: [],
+    forks: [],
     ...change,
   };
 }

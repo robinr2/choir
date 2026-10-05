@@ -77,7 +77,7 @@ function ModePill({
       <SelectTrigger
         size="sm"
         aria-label="Mode"
-        className="h-7 rounded-full px-2.5 text-xs"
+        className="h-7 min-w-0 shrink rounded-full px-2.5 text-xs"
       >
         <SelectValue />
       </SelectTrigger>

@@ -15,7 +15,7 @@ export function promptBlocks({
   images = [],
 }: PromptContent): ContentBlock[] {
   return [
-    { type: 'text', text },
+    ...(text ? [{ type: 'text' as const, text }] : []),
     ...images.map(({ data, mimeType }) => ({
       type: 'image' as const,
       data,

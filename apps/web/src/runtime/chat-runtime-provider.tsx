@@ -8,10 +8,12 @@ import type {
   CoreConversation,
   StatusState,
 } from '@/conversation/core-conversation';
-import { type ShownMessage, threadMessageOf } from '@/conversation/transcript';
+import { threadMessageOf } from '@/conversation/thread-message';
+import type { ShownMessage } from '@/conversation/transcript';
 import { TodoDropZone } from '@/inbox/todo-drop-zone';
 import { withSpeech } from '@/voice/spoken-messages';
 import type { SpokenReply } from '@/voice/spoken-reply';
+import { chatAnswersOf } from './chat-answers';
 import { chatQueueOf } from './chat-queue';
 
 const RUNNING: ReadonlySet<StatusState> = new Set(['working', 'waiting']);
@@ -33,6 +35,7 @@ function useChatRuntime({ conversation, reply, onResume }: ChatProps) {
     () => chatQueueOf(conversation, queue, onResume),
     [conversation, queue, onResume],
   );
+  const answers = useMemo(() => chatAnswersOf(conversation), [conversation]);
   const [attachments] = useState(() => new SimpleImageAttachmentAdapter());
   return useExternalStoreRuntime<ShownMessage>({
     messages: shown,
@@ -42,6 +45,7 @@ function useChatRuntime({ conversation, reply, onResume }: ChatProps) {
     onCancel: () => conversation.cancel(),
     queue: chatQueue,
     adapters: { attachments },
+    ...answers,
   });
 }
 

@@ -24,6 +24,20 @@ it('takes text with images and refuses anything else as an image', () => {
   expect(turn(image('aGk=', 'image/png x'))).toBe(false);
   expect(turn(image('aGk=', 'image/'))).toBe(false);
   expect(turn({ text: ' ', early: true })).toBe(false);
+  expect(turn({ text: '', images: [] })).toBe(false);
+  expect(
+    turn({ text: ' ', images: [{ data: 'aGk=', mimeType: 'image/png' }] }),
+  ).toBe(true);
+  expect(userTurnSchema.safeParse({ text: '' }).error?.issues[0]?.message).toBe(
+    'Send text or an image',
+  );
+  expect(
+    steeringSchema.safeParse({
+      text: '',
+      images: [{ data: 'aGk=', mimeType: 'image/png' }],
+    }).success,
+  ).toBe(true);
+  expect(steeringSchema.safeParse({ text: ' ' }).success).toBe(false);
   expect(turn({ text: 'hi', voice: 'yes' })).toBe(false);
   expect(steeringSchema.parse({ text: ' hi ' })).toEqual({ text: 'hi' });
 });

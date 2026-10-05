@@ -2,6 +2,7 @@ import {
   Suspense,
   use,
   useCallback,
+  useMemo,
   useReducer,
   useState,
   useTransition,
@@ -22,7 +23,8 @@ import {
 } from '@/components/ui/alert-dialog';
 import { useAgents } from './agents-context';
 import type { AgentSession } from './core-agents';
-import { sessionRows } from './session-rows';
+import { MoreSessions, SessionSearch } from './session-search';
+import { matchingRows, SESSION_PAGE, sessionRows } from './session-rows';
 
 export type ChosenSession = ThreadItem;
 
@@ -98,6 +100,56 @@ function DeleteConfirmation({
   return <DeleteDialog doomed={doomed} onCancel={ask} onConfirm={confirm} />;
 }
 
+function useRows(listed: Promise<AgentSession[]>, hidden?: string) {
+  const sessions = use(listed);
+  const [now] = useState(Date.now);
+  return useMemo(
+    () =>
+      sessionRows(
+        sessions.filter(({ sessionId }) => sessionId !== hidden),
+        now,
+      ),
+    [sessions, hidden, now],
+  );
+}
+
+function usePaging(rows: readonly ThreadItem[]) {
+  const [query, setQuery] = useState('');
+  const [shown, setShown] = useState(SESSION_PAGE);
+  const matching = useMemo(() => matchingRows(rows, query), [rows, query]);
+  const [more] = useState(
+    () => () => setShown((count) => count + SESSION_PAGE),
+  );
+  return { query, setQuery, matching, shown, more };
+}
+
+type Choices = Pick<SessionListProps, 'onChoose' | 'onFork'> & {
+  onDelete?: (session: ThreadItem) => void;
+};
+
+function SessionPage({
+  rows,
+  ...choices
+}: Readonly<Choices & { rows: readonly ThreadItem[] }>) {
+  const { query, setQuery, matching, shown, more } = usePaging(rows);
+  return (
+    <>
+      <SessionSearch query={query} onSearch={setQuery} />
+      <ThreadList
+        aria-label="Sessions"
+        threads={matching.slice(0, shown)}
+        {...choices}
+      />
+      <MoreSessions
+        matching={matching.length}
+        shown={shown}
+        page={SESSION_PAGE}
+        onMore={more}
+      />
+    </>
+  );
+}
+
 function Sessions({
   listed,
   onDeleted,
@@ -108,16 +160,14 @@ function Sessions({
 }: SessionListProps &
   Readonly<{ listed: Promise<AgentSession[]>; onDeleted: () => void }>) {
   const deletion = useDeletion(onDeleted);
-  const [now] = useState(Date.now);
-  const sessions = use(listed).filter(({ sessionId }) => sessionId !== hidden);
-  if (sessions.length === 0) {
+  const rows = useRows(listed, hidden);
+  if (rows.length === 0) {
     return <p className="text-muted-foreground px-3 py-2">No sessions yet</p>;
   }
   return (
     <>
-      <ThreadList
-        aria-label="Sessions"
-        threads={sessionRows(sessions, now)}
+      <SessionPage
+        rows={rows}
         onChoose={onChoose}
         onFork={onFork}
         onDelete={deletable ? deletion.ask : undefined}

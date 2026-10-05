@@ -1,5 +1,4 @@
 import { RTVIEvent } from '@pipecat-ai/client-js';
-import { PipecatClientProvider } from '@pipecat-ai/client-react';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { page } from 'vitest/browser';
 import { render } from 'vitest-browser-react';
@@ -11,46 +10,10 @@ import {
   fakeCore,
 } from '@/test/fake-core';
 import { CATALOG } from '@/test/fake-agents';
-import { CoreCanvas } from '@/canvas/core-canvas';
 import { CoreConversation } from '@/conversation/core-conversation';
-import { CoreInbox } from '@/inbox/core-inbox';
-import { InboxContext } from '@/inbox/inbox-context';
 import { requests, streamOf } from '@/test/fake-event-source';
 import { client } from '@/test/render-app';
-import { VoiceSession } from '@/voice/voice-session';
-import { CoreWorkspace } from '@/workspace/core-workspace';
-import { WorkspaceContext } from '@/workspace/workspace-context';
-import { AgentChat } from './agent-chat';
-import { AgentsContext } from './agents-context';
-import { CoreAgents } from './core-agents';
-import { CoreRateLimits } from './core-rate-limits';
-import { RateLimitsContext } from './rate-limits-context';
-
-const workspace = new CoreWorkspace();
-const inbox = new CoreInbox();
-const agents = new CoreAgents();
-const rateLimits = new CoreRateLimits();
-const context = {
-  workspace,
-  voice: new VoiceSession(client, workspace),
-  canvas: new CoreCanvas(),
-};
-
-function chatOf(conversation: CoreConversation) {
-  return (
-    <PipecatClientProvider client={client}>
-      <WorkspaceContext value={context}>
-        <InboxContext value={inbox}>
-          <AgentsContext value={agents}>
-            <RateLimitsContext value={rateLimits}>
-              <AgentChat conversation={conversation} isVoice />
-            </RateLimitsContext>
-          </AgentsContext>
-        </InboxContext>
-      </WorkspaceContext>
-    </PipecatClientProvider>
-  );
-}
+import { chatOf } from '@/test/render-chat';
 
 beforeEach(() => {
   fakeCore();

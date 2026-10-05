@@ -11,19 +11,33 @@ const imagesSchema = z
   )
   .optional();
 
-const textSchema = z.string().trim().min(1);
+const contentShape = { text: z.string().trim(), images: imagesSchema };
 
-export const steeringSchema = z.object({
-  text: textSchema,
-  images: imagesSchema,
-});
+function hasContent({
+  text,
+  images = [],
+}: {
+  text: string;
+  images?: unknown[];
+}): boolean {
+  return text.length > 0 || images.length > 0;
+}
+
+const SAYS_NOTHING = { message: 'Send text or an image' };
+
+export const steeringSchema = z
+  .object(contentShape)
+  .refine(hasContent, SAYS_NOTHING);
 
 export type Steering = z.infer<typeof steeringSchema>;
 
-export const userTurnSchema = steeringSchema.extend({
-  early: z.boolean().optional(),
-  voice: z.boolean().optional(),
-});
+export const userTurnSchema = z
+  .object({
+    ...contentShape,
+    early: z.boolean().optional(),
+    voice: z.boolean().optional(),
+  })
+  .refine(hasContent, SAYS_NOTHING);
 
 export type UserTurn = z.infer<typeof userTurnSchema>;
 

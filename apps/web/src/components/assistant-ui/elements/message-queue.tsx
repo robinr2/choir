@@ -5,9 +5,24 @@ import {
   QueueItemPrimitive,
   useAuiState,
 } from "@assistant-ui/react";
-import { CornerDownRightIcon, XIcon } from "lucide-react";
+import { CornerDownRightIcon, ImageIcon, XIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { field, ghostButton, mono } from "./surfaces";
+
+function QueuedImages({ count }: { count: number }) {
+  if (count === 0) return null;
+  const label = count === 1 ? "1 image" : `${count} images`;
+  return (
+    <span
+      aria-label={label}
+      title={label}
+      className={cn(mono, "text-foreground/45 flex shrink-0 items-center gap-1")}
+    >
+      <ImageIcon aria-hidden className="size-3.5" />
+      {count}
+    </span>
+  );
+}
 
 export function MessageQueue({ className }: { className?: string }) {
   const queueLength = useAuiState((s) => s.composer.queue.length);
@@ -40,6 +55,11 @@ export function MessageQueue({ className }: { className?: string }) {
               <span className="text-foreground/60 min-w-0 flex-1 truncate text-[13.5px]">
                 <QueueItemPrimitive.Text />
               </span>
+              <QueuedImages
+                count={
+                  queueItem.parts.filter((part) => part.type === "file").length
+                }
+              />
               <QueueItemPrimitive.Steer
                 aria-label="Steer into the running turn"
                 title="Steer into the running turn"

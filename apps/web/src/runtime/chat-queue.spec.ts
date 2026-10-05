@@ -81,7 +81,14 @@ test('shows the turns core queued', () => {
     onResume,
   );
   expect(queue.items).toEqual([
-    { id: 'q1', prompt: 'next', parts: [{ type: 'text', text: 'next' }] },
+    {
+      id: 'q1',
+      prompt: 'next',
+      parts: [
+        { type: 'text', text: 'next' },
+        { type: 'file', filename: 'image', data: '', mimeType: 'image/*' },
+      ],
+    },
   ]);
   expect(queue.steerItems).toEqual([]);
 });
