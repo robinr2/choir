@@ -367,3 +367,24 @@ test('closes the place of a removed workspace for a gesture while zooming', () =
   );
   expect(motion.space('third').index.get()).toBe(1);
 });
+
+test('moves workspaces to their new place while the stack still slides', () => {
+  const two = [
+    { id: 'first', index: 0, viewX: -4 },
+    { id: 'second', index: 1, viewX: -4 },
+  ];
+  const motion = new LayoutMotion();
+  motion.apply(frameOf([], { spaces: two }));
+  motion.apply(
+    frameOf([], {
+      spaces: [
+        { ...two[1], index: 0 },
+        { ...two[0], index: 1 },
+      ],
+      renderIndex: 1,
+    }),
+  );
+  expect(motion.renderIndex.isAnimating()).toBe(true);
+  expect(motion.space('first').index.get()).toBe(1);
+  expect(motion.space('second').index.get()).toBe(0);
+});
