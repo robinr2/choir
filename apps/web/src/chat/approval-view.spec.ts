@@ -11,3 +11,24 @@ test('offers nothing and names no choice for an approval without options', () =>
     label: undefined,
   });
 });
+
+test('shows an allowed tool call as running until it settles', () => {
+  const allowed = {
+    id: 'i1',
+    approved: true,
+    optionId: 'go',
+    options: [{ id: 'go', label: 'Allow', kind: 'allow-once' as const }],
+  };
+  expect(approvalViewOf(allowed, 'pending')).toEqual({
+    state: 'running',
+    label: 'Allow',
+  });
+  expect(approvalViewOf(allowed, 'in_progress')).toEqual({
+    state: 'running',
+    label: 'Allow',
+  });
+  expect(approvalViewOf(allowed, 'failed')).toEqual({
+    state: 'done',
+    label: 'Allow',
+  });
+});

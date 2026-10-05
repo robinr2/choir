@@ -9,7 +9,12 @@ import {
   coreShowsConversation,
   fakeCore,
 } from '@/test/fake-core';
-import { CATALOG } from '@/test/fake-agents';
+import {
+  CATALOG,
+  coreHasSessions,
+  OTHER_SESSION,
+  session,
+} from '@/test/fake-agents';
 import { CoreConversation } from '@/conversation/core-conversation';
 import { requests, streamOf } from '@/test/fake-event-source';
 import { client } from '@/test/render-app';
@@ -83,6 +88,54 @@ test('changes the settings of the conversation it was last given', async () => {
   await vi.waitFor(() =>
     expect(requests().filter(([url]) => url.endsWith('/settings'))).toEqual([
       [`/conversations/${B}/settings`, 'PUT', { mode: 'plan' }],
+    ]),
+  );
+});
+
+test('resumes a session in the conversation it was last given', async () => {
+  coreHasSessions([session({ sessionId: OTHER_SESSION, title: 'Older work' })]);
+  const screen = await render(chatOf(new CoreConversation(A)));
+  await screen.rerender(chatOf(new CoreConversation(B)));
+  await vi.waitFor(() =>
+    expect(streamOf(`/conversations/${B}/events`)).toBeDefined(),
+  );
+  coreShowsConversation(B, {});
+  await screen.getByRole('textbox').fill('/resume');
+  await screen.getByRole('button', { name: 'Send message' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Resume a session' });
+  await dialog.getByRole('button', { name: /Older work/ }).click();
+  await expect.element(dialog).not.toBeInTheDocument();
+  await vi.waitFor(() =>
+    expect(requests().filter(([url]) => url.endsWith('/user-turns'))).toEqual([
+      [
+        `/conversations/${B}/user-turns`,
+        'POST',
+        { text: `/resume ${OTHER_SESSION}`, images: [] },
+      ],
+    ]),
+  );
+});
+
+test('sends a chosen command to the conversation it was last given', async () => {
+  const screen = await render(chatOf(new CoreConversation(A)));
+  await screen.rerender(chatOf(new CoreConversation(B)));
+  await vi.waitFor(() =>
+    expect(streamOf(`/conversations/${B}/events`)).toBeDefined(),
+  );
+  coreShowsConversation(B, {
+    commands: [
+      { name: 'compact', description: 'Compact the conversation', hint: null },
+    ],
+  });
+  await screen.getByRole('textbox').fill('/');
+  await screen.getByRole('option', { name: /compact/ }).click();
+  await vi.waitFor(() =>
+    expect(requests().filter(([url]) => url.endsWith('/user-turns'))).toEqual([
+      [
+        `/conversations/${B}/user-turns`,
+        'POST',
+        { text: '/compact ', images: [] },
+      ],
     ]),
   );
 });

@@ -9,6 +9,15 @@ const RENAMED_MODES = [
   { value: 'plan', name: 'Planning', description: null },
 ];
 
+const RENAMED_MODELS = [
+  {
+    value: 'default',
+    name: 'Default (Sonnet)',
+    description: null,
+    efforts: [],
+  },
+];
+
 const NOTHING_CHOSEN = { model: null, effort: null, mode: 'plan' };
 
 test('leaves the model and effort open when none is chosen', async () => {
@@ -28,6 +37,23 @@ test('leaves the model and effort open when none is chosen', async () => {
   await expect
     .element(screen.getByRole('combobox', { name: 'Mode', exact: true }))
     .toHaveTextContent('Plan');
+});
+
+test('follows the models it was last given', async () => {
+  const props = {
+    modes: CATALOG.modes,
+    chosen: NOTHING_CHOSEN,
+    onModel: vi.fn<(model: string) => void>(),
+    onEffort: vi.fn<(effort: string) => void>(),
+    onMode: vi.fn<(mode: string) => void>(),
+  };
+  const screen = await render(
+    <AgentSettings {...props} models={CATALOG.models} />,
+  );
+  await screen.rerender(<AgentSettings {...props} models={RENAMED_MODELS} />);
+  await expect
+    .element(screen.getByRole('combobox', { name: 'Model', exact: true }))
+    .toHaveTextContent('Default (Sonnet)');
 });
 
 test('follows the modes and the handler it was last given', async () => {

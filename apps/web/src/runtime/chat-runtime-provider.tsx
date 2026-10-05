@@ -35,7 +35,7 @@ function useChatRuntime({ conversation, reply, onResume }: ChatProps) {
     () => chatQueueOf(conversation, queue, onResume),
     [conversation, queue, onResume],
   );
-  const answers = useMemo(() => chatAnswersOf(conversation), [conversation]);
+  const answers = chatAnswersOf(conversation);
   const [attachments] = useState(() => new SimpleImageAttachmentAdapter());
   return useExternalStoreRuntime<ShownMessage>({
     messages: shown,

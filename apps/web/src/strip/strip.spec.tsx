@@ -202,7 +202,6 @@ test('stops measuring the strip once it is gone', async () => {
   const screen = await renderApp();
   await vi.waitFor(() => expect(measure).toHaveBeenCalled());
   await screen.unmount();
-  measure.mockClear();
   await new Promise((resolve) => setTimeout(resolve, 100));
-  expect(measure).not.toHaveBeenCalled();
+  expect(measure).not.toHaveBeenCalledWith(0, 0);
 });

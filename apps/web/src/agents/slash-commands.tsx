@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useAui } from '@assistant-ui/react';
 import { SquareSlashIcon } from 'lucide-react';
 import { ComposerTriggerPopover } from '@/components/assistant-ui/elements/composer-trigger-popover.aui';
@@ -17,15 +17,12 @@ export function SlashCommands() {
     () => commandAdapter(state.commands),
     [state.commands],
   );
-  const directive = useMemo(
-    () => ({
-      formatter: commandFormatter,
-      onInserted: (item: Parameters<typeof sendsRightAway>[0]) => {
-        if (sendsRightAway(item)) aui.composer().send({ steer: false });
-      },
-    }),
-    [aui],
-  );
+  const [directive] = useState(() => ({
+    formatter: commandFormatter,
+    onInserted: (item: Parameters<typeof sendsRightAway>[0]) => {
+      if (sendsRightAway(item)) aui.composer().send({ steer: false });
+    },
+  }));
   return (
     <ComposerTriggerPopover
       char="/"

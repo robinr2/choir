@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { page, userEvent } from 'vitest/browser';
+import type { ConversationState } from '@/conversation/core-conversation';
 import {
   coreHasSessions,
   OTHER_SESSION,
@@ -22,17 +23,22 @@ function composer(screen: Screen) {
   });
 }
 
-function turns() {
+function sent(path: string) {
   return requests()
-    .filter(([url]) => url === `/conversations/${A}/user-turns`)
+    .filter(([url]) => url === `/conversations/${A}/${path}`)
     .map(([, , body]) => body);
 }
 
-async function showChat() {
+function turns() {
+  return sent('user-turns');
+}
+
+async function showChat(change: Partial<ConversationState> = {}) {
   const screen = await renderApp();
   coreShowsConversation(A, {
     commands: COMMANDS,
     session: { id: SESSION, title: 'Now', cwd: '/home/sam' },
+    ...change,
   });
   await composer(screen).click();
   return screen;
@@ -84,6 +90,18 @@ test('sends a command without arguments as soon as it is chosen', async () => {
   await vi.waitFor(() =>
     expect(turns()).toEqual([{ text: '/compact ', images: [] }]),
   );
+});
+
+test('queues a command without arguments behind the running turn', async () => {
+  const screen = await showChat({ status: { state: 'working', since: 0 } });
+  await userEvent.keyboard('/');
+  await pane(screen, 'agent 1')
+    .getByRole('option', { name: /compact/ })
+    .click();
+  await vi.waitFor(() =>
+    expect(turns()).toEqual([{ text: '/compact ', images: [] }]),
+  );
+  expect(sent('steerings')).toEqual([]);
 });
 
 test('resumes a session picked from the list', async () => {

@@ -1,4 +1,4 @@
-import { type KeyboardEvent, useMemo } from 'react';
+import type { KeyboardEvent } from 'react';
 import { useAui } from '@assistant-ui/react';
 
 function steers(event: KeyboardEvent): boolean {
@@ -9,23 +9,20 @@ function steers(event: KeyboardEvent): boolean {
 
 export function useComposerKeys() {
   const aui = useAui();
-  return useMemo(
-    () => ({
-      onSubmit: () => {
-        aui.composer().send({ steer: false });
-      },
-      onKeyDown: (event: KeyboardEvent) => {
-        if (!steers(event)) return;
-        const composer = aui.composer();
-        const { canSend, queue } = composer.getState();
-        if (canSend) composer.send({ steer: true });
-        else if (queue.length > 0) {
-          composer
-            .queueItem({ index: 0 })
-            .move({ lane: 'steer', insertAfter: null });
-        }
-      },
-    }),
-    [aui],
-  );
+  return {
+    onSubmit: () => {
+      aui.composer().send({ steer: false });
+    },
+    onKeyDown: (event: KeyboardEvent) => {
+      if (!steers(event)) return;
+      const composer = aui.composer();
+      const { canSend, queue } = composer.getState();
+      if (canSend) composer.send({ steer: true });
+      else if (queue.length > 0) {
+        composer
+          .queueItem({ index: 0 })
+          .move({ lane: 'steer', insertAfter: null });
+      }
+    },
+  };
 }

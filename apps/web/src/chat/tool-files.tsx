@@ -45,5 +45,11 @@ function DiffCard({ diff }: Readonly<{ diff: Diff }>) {
 }
 
 export function ToolDiffs({ diffs }: Readonly<{ diffs: readonly Diff[] }>) {
-  return diffs.map((diff) => <DiffCard key={diff.path} diff={diff} />);
+  return (
+    <>
+      {diffs.map((diff) => (
+        <DiffCard key={diff.path} diff={diff} />
+      ))}
+    </>
+  );
 }
