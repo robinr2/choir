@@ -22,7 +22,7 @@ async function running(text: string): Promise<void> {
 
 it('queues messages while a turn runs, sends them one by one and drops removed ones', async () => {
   const { conversation } = testApp;
-  await running('stream-sleep 1500 first');
+  await running('stream-sleep 20000 first');
   const second = Promise.resolve(
     conversation.post('user-turns', {
       text: 'echo second',
@@ -41,9 +41,10 @@ it('queues messages while a turn runs, sends them one by one and drops removed o
     .send('delete', `queue/${unknown}`)
     .expect(404);
   expect(missing.body.message).toBe(`There is no queued message ${unknown}`);
+  await conversation.post('cancellation').expect(204);
   expect((await second).text).toContain('data: {"text":"second"}');
   expect(await conversation.userTexts()).toEqual([
-    'stream-sleep 1500 first',
+    'stream-sleep 20000 first',
     'echo second',
   ]);
   expect(queued(await conversation.state())).toEqual([]);
@@ -53,13 +54,16 @@ it('steers the running turn with a new message or with a queued one', async () =
   const { conversation } = testApp;
   await conversation.post('steerings', { text: 'echo idle' }).expect(204);
   await conversation.waitForAnswer('idle');
-  await running('stream-sleep 1500 working');
+  await running('stream-sleep 20000 working');
   await conversation.waitForAnswer('working');
   await conversation.post('steerings', { text: 'use pnpm' }).expect(204);
+  await conversation.waitForAnswer('steered: use pnpm');
   void conversation.say('use yarn');
   const { queue } = await conversation.until((seen) => seen.queue.length === 1);
   await conversation.post(`queue/${queue[0]?.id}/steering`).expect(204);
   await conversation.post(`queue/${randomUUID()}/steering`).expect(404);
+  await conversation.waitForAnswer('steered: use yarn');
+  await conversation.post('cancellation').expect(204);
   const state = await conversation.until(
     (seen) => seen.status.state === 'idle',
   );
