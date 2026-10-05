@@ -1,28 +1,46 @@
 import {
+  BadRequestException,
   Body,
+  ConflictException,
   Controller,
+  Delete,
   Get,
   HttpCode,
   HttpStatus,
+  Inject,
   type MessageEvent,
+  NotFoundException,
   Param,
   Post,
+  Put,
   RequestMethod,
   Sse,
 } from '@nestjs/common';
-import { from, map, type Observable, switchMap } from 'rxjs';
+import { map, type Observable } from 'rxjs';
+import { ConversationCommandsService } from './conversation-commands.service.js';
+import type { ConversationState } from './conversation-state.js';
+import {
+  CONVERSATIONS,
+  type Conversations,
+  type Reply,
+} from './conversations.port.js';
 import {
   type Confirmation,
   confirmationSchema,
   conversationIdSchema,
+  type InteractionAnswerRequest,
+  interactionAnswerSchema,
   type Interruption,
   interruptionSchema,
+  type Prompt,
+  promptSchema,
+  type SettingsRequest,
+  settingsSchema,
   type SubmittedPrompt,
   submittedPromptSchema,
   type UserTurn,
   userTurnSchema,
 } from './conversations.schemas.js';
-import { ConversationsService } from './conversations.service.js';
 
 const ID = { schema: conversationIdSchema };
 
@@ -35,34 +53,103 @@ const DENIED = {
   },
 };
 
+const REPLIES: Record<Exclude<Reply, 'answered'>, () => Error> = {
+  unknown: () => new NotFoundException('There is no such question'),
+  'answered-before': () => new ConflictException('It is answered already'),
+  unfit: () => new BadRequestException('The answer does not fit the question'),
+};
+
+function found(done: boolean, item: string): void {
+  if (!done) throw new NotFoundException(`There is no queued message ${item}`);
+}
+
 @Controller('conversations/:id')
 export class ConversationsController {
-  constructor(private readonly conversations: ConversationsService) {}
+  constructor(
+    @Inject(CONVERSATIONS) private readonly conversations: Conversations,
+    private readonly commands: ConversationCommandsService,
+  ) {}
 
   @Get()
-  messages(@Param('id', ID) id: string) {
-    return this.conversations.messages(id);
+  state(@Param('id', ID) id: string): Promise<ConversationState> {
+    return this.conversations.state(id);
   }
 
-  @Sse('events')
-  events(@Param('id', ID) id: string): Observable<MessageEvent> {
-    return this.conversations
-      .updates(id)
-      .pipe(map((messages) => ({ data: { messages } })));
+  @Post('queue')
+  @HttpCode(HttpStatus.ACCEPTED)
+  async enqueue(
+    @Param('id', ID) id: string,
+    @Body({ schema: promptSchema }) { text, images }: Prompt,
+  ): Promise<void> {
+    await this.commands.addUserTurn(
+      id,
+      { text, images },
+      { early: false, voice: false },
+    );
   }
 
   @Sse('user-turns', { method: RequestMethod.POST })
-  addUserTurn(
+  async addUserTurn(
     @Param('id', ID) id: string,
     @Body({ schema: userTurnSchema })
-    { text, early = false, voice = false }: UserTurn,
-  ): Observable<MessageEvent> {
-    return from(
-      this.conversations.addUserTurn(id, text, { early, voice }),
-    ).pipe(
-      switchMap((answer) => answer),
-      map((chunk) => ({ data: { text: chunk } })),
+    { text, images, early = false, voice = false }: UserTurn,
+  ): Promise<Observable<MessageEvent>> {
+    const answer = await this.commands.addUserTurn(
+      id,
+      { text, images },
+      { early, voice },
     );
+    return answer.pipe(map((chunk) => ({ data: { text: chunk } })));
+  }
+
+  @Post('steerings')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  steer(
+    @Param('id', ID) id: string,
+    @Body({ schema: promptSchema }) content: Prompt,
+  ): Promise<void> {
+    return this.conversations.steer(id, content);
+  }
+
+  @Delete('queue/:item')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  remove(@Param('id', ID) id: string, @Param('item', ID) item: string): void {
+    found(this.conversations.removeQueued(id, item), item);
+  }
+
+  @Post('queue/:item/steering')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async steerQueued(
+    @Param('id', ID) id: string,
+    @Param('item', ID) item: string,
+  ): Promise<void> {
+    found(await this.conversations.steerQueued(id, item), item);
+  }
+
+  @Post('cancellation')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  cancel(@Param('id', ID) id: string): Promise<void> {
+    return this.conversations.cancel(id);
+  }
+
+  @Post('interactions/:interaction')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async respond(
+    @Param('id', ID) id: string,
+    @Param('interaction', ID) interaction: string,
+    @Body({ schema: interactionAnswerSchema }) answer: InteractionAnswerRequest,
+  ): Promise<void> {
+    const reply = await this.conversations.respond(id, interaction, answer);
+    if (reply !== 'answered') throw REPLIES[reply]();
+  }
+
+  @Put('settings')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  configure(
+    @Param('id', ID) id: string,
+    @Body({ schema: settingsSchema }) settings: SettingsRequest,
+  ): Promise<void> {
+    return this.conversations.configure(id, settings);
   }
 
   @Post('confirmations')

@@ -16,7 +16,6 @@ import {
   ReasoningText,
   ReasoningTrigger,
 } from "@/components/assistant-ui/elements/reasoning.aui";
-import { ToolFallback } from "@/components/assistant-ui/elements/tool-fallback.aui";
 import {
   ToolGroupContent,
   ToolGroupRoot,
@@ -25,7 +24,17 @@ import {
 import { TooltipIconButton } from "@/components/assistant-ui/elements/tooltip-icon-button";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { MessageQueue } from "@/components/assistant-ui/elements/message-queue";
 import { AgentMessage } from "@/components/agents/agent-message";
+import { useComposerKeys } from "@/agents/composer-keys";
+import { AgentToolCall } from "@/chat/agent-tool-call";
+import { ChatData } from "@/chat/chat-data";
+import { ConversationForks } from "@/chat/conversation-forks";
+import { ConversationPlan } from "@/chat/conversation-plan";
+import { standsAlone } from "@/chat/tool-groups";
+import { ComposerSettings, ContextRing } from "@/agents/composer-settings";
+import { Quota } from "@/agents/quota";
+import { SlashCommands } from "@/agents/slash-commands";
 import { SpokenText } from "@/components/voice/spoken-text";
 import { VoiceControls } from "@/components/voice/voice-controls";
 import { isSpokenIn } from "@/conversation/transcript";
@@ -54,6 +63,7 @@ import {
   ChevronLeftIcon,
   ChevronRightIcon,
   CopyIcon,
+  CornerDownRightIcon,
   DownloadIcon,
   MicIcon,
   MoreHorizontalIcon,
@@ -116,6 +126,7 @@ const taskAwareGroupBy = (
   part: Parameters<typeof messageGroupBy>[0],
   context?: Parameters<typeof messageGroupBy>[1],
 ): readonly ThreadGroupKey[] => {
+  if (standsAlone(part)) return [];
   const path = messageGroupBy(part, context);
   return part.type === "tool-call" &&
     part.messages !== undefined &&
@@ -177,6 +188,7 @@ export const Thread: FC<ThreadProps> = ({
 
   return (
     <ThreadComponentsContext.Provider value={components}>
+      <ChatData />
       <ThreadRoot isEmpty={isEmpty} autoFocus={autoFocus} />
     </ThreadComponentsContext.Provider>
   );
@@ -235,7 +247,13 @@ const ThreadRoot: FC<{ isEmpty: boolean; autoFocus: boolean }> = ({
           >
             <ThreadScrollToBottom />
             <ThreadFollowupSuggestions />
-            <Composer autoFocus={autoFocus} />
+            <ConversationForks />
+            <ConversationPlan />
+            <MessageQueue />
+            <div className="flex flex-col gap-1.5">
+              <Quota />
+              <Composer autoFocus={autoFocus} />
+            </div>
             <AuiIf condition={(s) => isNewChatView(s) && s.composer.isEmpty}>
               <ThreadSuggestions />
             </AuiIf>
@@ -304,32 +322,37 @@ const ThreadSuggestionItem: FC = () => {
 };
 
 const Composer: FC<{ autoFocus: boolean }> = ({ autoFocus }) => {
+  const keys = useComposerKeys();
   return (
-    <ComposerPrimitive.Root className="aui-composer-root relative flex w-full flex-col">
-      <ComposerPrimitive.AttachmentDropzone render={<div data-slot="aui_composer-shell" className="border-foreground/10 focus-within:border-foreground/25 data-[dragging=true]:border-ring flex w-full cursor-text flex-col gap-2 rounded-(--composer-radius) border bg-(--composer-bg) p-(--composer-padding) transition-[border-color] data-[dragging=true]:border-dashed data-[dragging=true]:bg-[color-mix(in_oklab,var(--color-accent)_50%,var(--color-background))]" />}><ComposerAttachments /><ComposerPrimitive.Input
-                      placeholder="Send a message..."
-                      className="aui-composer-input caret-primary placeholder:text-muted-foreground/60 max-h-48 min-h-10 w-full resize-none bg-transparent px-2.5 py-1 text-base leading-6 outline-none"
-                      rows={1}
-                      autoFocus={autoFocus}
-                      enterKeyHint="send"
-                      aria-label="Message input"
-                    /><ComposerAction /></ComposerPrimitive.AttachmentDropzone>
-    </ComposerPrimitive.Root>
+    <ComposerPrimitive.Unstable_TriggerPopoverRoot>
+      <ComposerPrimitive.Root
+        className="aui-composer-root relative flex w-full flex-col"
+        onSubmit={keys.onSubmit}
+      >
+        <SlashCommands />
+        <ComposerPrimitive.AttachmentDropzone render={<div data-slot="aui_composer-shell" className="border-foreground/10 focus-within:border-foreground/25 data-[dragging=true]:border-ring flex w-full cursor-text flex-col gap-2 rounded-(--composer-radius) border bg-(--composer-bg) p-(--composer-padding) transition-[border-color] data-[dragging=true]:border-dashed data-[dragging=true]:bg-[color-mix(in_oklab,var(--color-accent)_50%,var(--color-background))]" />}><ComposerAttachments /><ComposerPrimitive.Input
+                        placeholder="Send a message, / for commands"
+                        className="aui-composer-input caret-primary placeholder:text-muted-foreground/60 max-h-48 min-h-10 w-full resize-none bg-transparent px-2.5 py-1 text-base leading-6 outline-none"
+                        rows={1}
+                        autoFocus={autoFocus}
+                        enterKeyHint="send"
+                        aria-label="Message input"
+                        onKeyDown={keys.onKeyDown}
+                      /><ComposerAction /></ComposerPrimitive.AttachmentDropzone>
+      </ComposerPrimitive.Root>
+    </ComposerPrimitive.Unstable_TriggerPopoverRoot>
   );
 };
 
 const ComposerAction: FC = () => {
-  // The stop control only cancels the send while no run it could stop is going.
-  const isSending = useAuiState(
-    (s) =>
-      s.composer.submission !== undefined &&
-      !(s.thread.isRunning && s.thread.capabilities.cancel),
-  );
-
   return (
-    <div className="aui-composer-action-wrapper relative flex items-center justify-between">
-      <ComposerAddAttachment />
-      <div className="flex items-center gap-1.5">
+    <div className="aui-composer-action-wrapper relative flex items-center justify-between gap-2">
+      <div className="flex min-w-0 items-center gap-1">
+        <ComposerAddAttachment />
+        <ComposerSettings />
+      </div>
+      <div className="flex shrink-0 items-center gap-1.5">
+        <ContextRing />
         <AuiIf condition={(s) => s.thread.capabilities.dictation}>
           <AuiIf condition={(s) => s.composer.dictation == null}>
             <ComposerPrimitive.Dictate render={<TooltipIconButton tooltip="Voice input" side="bottom" type="button" variant="ghost" size="icon" className="aui-composer-dictate text-muted-foreground hover:text-foreground size-7 rounded-full" aria-label="Start voice input" />}><MicIcon className="aui-composer-dictate-icon size-4" /></ComposerPrimitive.Dictate>
@@ -339,26 +362,23 @@ const ComposerAction: FC = () => {
           </AuiIf>
         </AuiIf>
         <VoiceControls />
-        <AuiIf
-          condition={(s) =>
-            !s.composer.canCancel ||
-            (s.thread.voice !== undefined &&
-              s.composer.submission === undefined)
-          }
-        >
-          <ComposerPrimitive.Send render={<TooltipIconButton tooltip="Send message" side="bottom" type="button" variant="default" size="icon" className="aui-composer-send size-7 rounded-full" aria-label="Send message" />}><ArrowUpIcon className="aui-composer-send-icon size-4" /></ComposerPrimitive.Send>
+        <AuiIf condition={(s) => s.composer.canCancel}>
+          <ComposerPrimitive.Cancel render={<TooltipIconButton tooltip="Stop" side="bottom" type="button" variant="outline" size="icon" className="aui-composer-cancel size-7 rounded-full" aria-label="Stop generating" />}><SquareIcon className="aui-composer-cancel-icon size-3 fill-current" /></ComposerPrimitive.Cancel>
         </AuiIf>
-        <AuiIf
-          condition={(s) =>
-            s.composer.canCancel &&
-            (s.thread.voice === undefined ||
-              s.composer.submission !== undefined)
-          }
-        >
-          <ComposerPrimitive.Cancel render={<Button type="button" variant="default" size="icon" className="aui-composer-cancel size-7 rounded-full" aria-label={isSending ? "Cancel sending" : "Stop generating"} />}><SquareIcon className="aui-composer-cancel-icon size-3.5 fill-current" /></ComposerPrimitive.Cancel>
+        <AuiIf condition={(s) => !s.composer.canCancel || !s.composer.isEmpty}>
+          <ComposerSubmit />
         </AuiIf>
       </div>
     </div>
+  );
+};
+
+const ComposerSubmit: FC = () => {
+  const canSend = useAuiState((s) => s.composer.canSend);
+  const isRunning = useAuiState((s) => s.thread.isRunning);
+  const tooltip = isRunning ? "Queue message" : "Send message";
+  return (
+    <TooltipIconButton tooltip={tooltip} side="bottom" type="submit" variant="default" size="icon" className="aui-composer-send size-7 rounded-full" aria-label={tooltip} disabled={!canSend}><ArrowUpIcon className="aui-composer-send-icon size-4" /></TooltipIconButton>
   );
 };
 
@@ -374,7 +394,7 @@ const MessageError: FC = () => {
 
 const AssistantMessage: FC = () => {
   const {
-    ToolFallback: ToolFallbackComponent = ToolFallback,
+    ToolFallback: ToolFallbackComponent = AgentToolCall,
     ToolGroup,
     ReasoningGroup,
     TaskGroup: TaskGroupComponent,
@@ -541,6 +561,13 @@ const UserMessage: FC = () => {
       className="fade-in slide-in-from-bottom-1 animate-in grid auto-rows-auto grid-cols-[minmax(72px,1fr)_auto] content-start gap-y-2 px-2 duration-150 [&:where(>*)]:col-start-2"
       data-role="user"
     >
+      <AuiIf condition={(s) => s.message.metadata.custom.steered === true}>
+        <span className="text-muted-foreground col-start-2 flex items-center justify-self-end gap-1 text-xs">
+          <CornerDownRightIcon aria-hidden className="size-3" />
+          steered into the running turn
+        </span>
+      </AuiIf>
+
       <UserMessageAttachments />
 
       <div className="aui-user-message-content-wrapper relative col-start-2 min-w-0">

@@ -1,14 +1,24 @@
 import { Module } from '@nestjs/common';
 import { AgentModule } from '../agent/agent.module.js';
+import { RateLimitsModule } from '../rate-limits/rate-limits.module.js';
 import { VoiceModule } from '../voice/voice.module.js';
+import { ConversationCommandsService } from './conversation-commands.service.js';
+import { ConversationHostService } from './conversation-host.service.js';
 import { ConversationsController } from './conversations.controller.js';
-import { ConversationsService } from './conversations.service.js';
-import { TurnMarksService } from './turn-marks.service.js';
+import {
+  ConversationsService,
+  conversationsProvider,
+} from './conversations.service.js';
 
 @Module({
-  imports: [AgentModule, VoiceModule],
+  imports: [AgentModule, VoiceModule, RateLimitsModule],
   controllers: [ConversationsController],
-  providers: [ConversationsService, TurnMarksService],
-  exports: [ConversationsService, VoiceModule],
+  providers: [
+    ConversationHostService,
+    ConversationsService,
+    ConversationCommandsService,
+    conversationsProvider,
+  ],
+  exports: [conversationsProvider, VoiceModule, RateLimitsModule],
 })
 export class ConversationsModule {}

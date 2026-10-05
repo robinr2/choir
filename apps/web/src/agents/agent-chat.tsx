@@ -1,27 +1,44 @@
-import { useMemo, useState } from 'react';
-import { Thread } from '@/components/assistant-ui/elements/thread.aui';
-import { CoreConversation } from '@/conversation/core-conversation';
+import { useState } from 'react';
+import { TaskGroup } from '@/components/assistant-ui/elements/task-card.aui';
+import {
+  Thread,
+  type ThreadComponents,
+} from '@/components/assistant-ui/elements/thread.aui';
+import { ConversationContext } from '@/conversation/conversation-context';
+import type { CoreConversation } from '@/conversation/core-conversation';
 import { ChatRuntimeProvider } from '@/runtime/chat-runtime-provider';
 import { LiveTranscriptComposer } from '@/voice/live-transcript-composer';
 import { SpokenReply } from '@/voice/spoken-reply';
 import { SpokenReplyFollower } from '@/voice/spoken-reply-follower';
 import { AgentContext } from '@/workspace/workspace-context';
+import { ResumeDialog } from './resume-dialog';
+
+const THREAD_COMPONENTS: ThreadComponents = {
+  TaskGroup,
+};
 
 export function AgentChat({
-  agentId,
+  conversation,
   isVoice,
-}: Readonly<{ agentId: string; isVoice: boolean }>) {
-  const conversation = useMemo(() => new CoreConversation(agentId), [agentId]);
+}: Readonly<{ conversation: CoreConversation; isVoice: boolean }>) {
   const [reply] = useState(() => new SpokenReply());
+  const [resuming, setResuming] = useState(false);
   return (
-    <AgentContext value={agentId}>
-      <ChatRuntimeProvider conversation={conversation} reply={reply}>
-        {isVoice && <LiveTranscriptComposer conversation={conversation} />}
-        {isVoice && (
-          <SpokenReplyFollower conversation={conversation} reply={reply} />
-        )}
-        <Thread autoFocus={false} />
-      </ChatRuntimeProvider>
+    <AgentContext value={conversation.id}>
+      <ConversationContext value={conversation}>
+        <ChatRuntimeProvider
+          conversation={conversation}
+          reply={reply}
+          onResume={setResuming}
+        >
+          {isVoice && <LiveTranscriptComposer conversation={conversation} />}
+          {isVoice && (
+            <SpokenReplyFollower conversation={conversation} reply={reply} />
+          )}
+          <Thread components={THREAD_COMPONENTS} autoFocus={false} />
+          <ResumeDialog open={resuming} onOpenChange={setResuming} />
+        </ChatRuntimeProvider>
+      </ConversationContext>
     </AgentContext>
   );
 }

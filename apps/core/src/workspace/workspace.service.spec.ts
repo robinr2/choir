@@ -1,6 +1,7 @@
 import { Logger } from '@nestjs/common';
+import type { AgentService } from '../agent/agent.service.js';
 import { BehaviorSubject } from 'rxjs';
-import type { ConversationsService } from '../conversations/conversations.service.js';
+import type { Conversations } from '../conversations/conversations.port.js';
 import { LayoutService } from '../layout/layout.service.js';
 import { VoiceService } from '../voice/voice.service.js';
 import { WorkspaceService } from './workspace.service.js';
@@ -15,14 +16,15 @@ it('logs a message it could not deliver', async () => {
   const conversations = {
     workingChanges: new BehaviorSubject<ReadonlySet<string>>(new Set()),
     sendMessage: vi
-      .fn<ConversationsService['sendMessage']>()
+      .fn<Conversations['sendMessage']>()
       .mockRejectedValue(new Error('agent exited')),
-    close: vi.fn<ConversationsService['close']>(),
+    close: vi.fn<Conversations['close']>(),
   };
   const workspace = new WorkspaceService(
     layout,
     conversations,
     new VoiceService(),
+    { launch: vi.fn<AgentService['launch']>() },
   );
   const [first] = Object.keys(layout.current.panes);
   const second = await layout.openPane({ kind: 'agent' });

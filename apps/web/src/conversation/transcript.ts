@@ -1,30 +1,102 @@
-import type { AppendMessage, ThreadMessageLike } from '@assistant-ui/react';
-
 type TextPart = { type: 'text'; text: string };
 
-type ToolCallPart = {
+type ImagePart = { type: 'image'; image: string };
+
+type ReasoningPart = { type: 'reasoning'; text: string };
+
+type ApprovalOption = {
+  id: string;
+  kind: 'allow-once' | 'allow-always' | 'reject-once' | 'reject-always';
+  label: string;
+};
+
+export type Approval = {
+  id: string;
+  prompt?: string;
+  options: ApprovalOption[];
+  approved?: boolean;
+  optionId?: string;
+  resolution?: 'cancelled';
+};
+
+export type QuestionItem = {
+  id: string;
+  header: string;
+  prompt: string;
+  options: { id: string; label: string; description?: string }[];
+  multiple: boolean;
+  freeform: string | null;
+};
+
+export type Question = {
+  id: string;
+  questions: QuestionItem[];
+  answers?: Record<string, string | string[]>;
+  resolution?: 'declined' | 'cancelled';
+};
+
+export type ToolCallPart = {
   type: 'tool-call';
   toolCallId: string;
   toolName: string;
+  kind: string;
   args: unknown;
   result?: unknown;
   isError?: boolean;
+  status: 'pending' | 'in_progress' | 'completed' | 'failed';
+  diffs: { path: string; oldText: string | null; newText: string }[];
+  locations: { path: string; line?: number }[];
+  timing: { startedAt: number; completedAt?: number };
+  approval?: Approval;
+  question?: Question;
+  messages?: TranscriptMessage[];
 };
+
+export type ElicitationPart = {
+  type: 'elicitation';
+  id: string;
+  server: string | null;
+  message: string;
+  mode: 'form' | 'url';
+  url?: string;
+  fields: {
+    name: string;
+    label: string;
+    kind: 'text' | 'choice' | 'toggle' | 'number';
+    options?: string[];
+    required: boolean;
+  }[];
+  state: 'request' | 'accepted' | 'declined' | 'cancelled';
+};
+
+export type CompactionPart = {
+  type: 'compaction';
+  id: string;
+  status: 'in_progress' | 'completed' | 'failed' | 'cancelled';
+  summary: string;
+};
+
+export type TranscriptPart =
+  | TextPart
+  | ImagePart
+  | ReasoningPart
+  | ToolCallPart
+  | ElicitationPart
+  | CompactionPart;
 
 export type Sender = { id: string; name: string };
 
 export type TranscriptMessage = {
   id: string;
   role: 'user' | 'assistant';
-  parts: (TextPart | ToolCallPart)[];
+  parts: TranscriptPart[];
+  steered?: true;
   spoken?: true;
   heard?: string;
   from?: Sender;
 };
 
 export type ShownMessage = TranscriptMessage & { spokenUpTo?: number };
-
-type ThreadPart = Exclude<ThreadMessageLike['content'], string>[number];
 
 const NO_SENDER: Sender = { id: '', name: '' };
 
@@ -68,38 +140,4 @@ export function spokenTextsOf({ parts }: TranscriptMessage): string[] {
   return parts.flatMap((part) =>
     part.type === 'text' && part.text.trim() ? [part.text] : [],
   );
-}
-
-function threadPart(part: TextPart | ToolCallPart): ThreadPart {
-  if (part.type === 'text') return part;
-  return {
-    type: 'tool-call',
-    toolCallId: part.toolCallId,
-    toolName: part.toolName,
-    argsText: JSON.stringify(part.args ?? {}),
-    result: part.result,
-    isError: part.isError,
-  };
-}
-
-export function threadMessageOf(message: ShownMessage): ThreadMessageLike {
-  return {
-    id: message.id,
-    role: message.role,
-    content: message.parts.map(threadPart),
-    metadata: {
-      custom: {
-        ...(message.spokenUpTo !== undefined && {
-          spokenUpTo: message.spokenUpTo,
-        }),
-        ...(message.from && { from: message.from }),
-      },
-    },
-  };
-}
-
-export function textOf(message: Pick<AppendMessage, 'content'>): string {
-  return message.content
-    .map((part) => (part.type === 'text' ? part.text : ''))
-    .join('');
 }

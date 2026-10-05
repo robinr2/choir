@@ -1,10 +1,19 @@
-import type { ConversationTurn } from './conversation-turn.js';
 import { type Continuation, type FramedTurn, framed } from './turn-framing.js';
+import type { TurnRequest } from './turn-request.js';
 
-export class TurnGate {
-  readonly unfinished = new Set<ConversationTurn>();
-  current?: ConversationTurn;
-  latest?: ConversationTurn;
+type GatedTurn = {
+  readonly request: TurnRequest;
+  readonly settled: Promise<void>;
+  readonly confirmed: Promise<boolean>;
+  confirm(): void;
+  cancel(): Promise<void>;
+};
+
+export class TurnGate<Turn extends GatedTurn> {
+  readonly unfinished = new Set<Turn>();
+  current?: Turn;
+  running?: Turn;
+  latest?: Turn;
   private continuation?: Continuation;
   private confirmedWords?: string;
 
@@ -14,17 +23,21 @@ export class TurnGate {
     return turn;
   }
 
-  admit(turn: ConversationTurn): void {
+  admit(turn: Turn): void {
     this.unfinished.add(turn);
     void turn.settled.then(() => this.unfinished.delete(turn));
     this.current = turn;
-    this.latest = turn;
     if (this.confirmedWords === turn.request.words) turn.confirm();
     this.confirmedWords = undefined;
   }
 
-  release(turn: ConversationTurn): void {
-    if (this.current === turn) this.current = undefined;
+  started(turn: Turn): void {
+    this.running = turn;
+    this.latest = turn;
+  }
+
+  release(turn: Turn): void {
+    if (this.running === turn) this.running = undefined;
   }
 
   confirm(words: string): void {
@@ -32,7 +45,7 @@ export class TurnGate {
     else this.confirmedWords = words;
   }
 
-  async withdraw(): Promise<ConversationTurn | undefined> {
+  async withdraw(): Promise<Turn | undefined> {
     const turn = this.current;
     if (!turn?.request.early) return undefined;
     this.continuation = { kind: 'withdrawn', words: turn.request.words };
@@ -40,13 +53,13 @@ export class TurnGate {
     return turn;
   }
 
-  async interrupt(heard: string): Promise<ConversationTurn | undefined> {
+  async interrupt(heard: string): Promise<Turn | undefined> {
     this.continuation = { kind: 'interrupted', heard };
-    await this.current?.cancel();
+    await this.running?.cancel();
     return this.latest;
   }
 
   toolCallAllowed(): Promise<boolean> {
-    return this.current?.confirmed ?? Promise.resolve(false);
+    return this.running?.confirmed ?? Promise.resolve(false);
   }
 }

@@ -52,7 +52,7 @@ async function exists(file: string): Promise<boolean> {
 
 type Saved = {
   setup: { cwd: string; mcpServers: unknown[]; _meta: unknown };
-  updates: { sessionUpdate: string }[];
+  updates: { update: { sessionUpdate: string } }[];
 };
 
 async function savedSessions(): Promise<Saved[]> {
@@ -74,7 +74,7 @@ it('judges each notification in a fresh session with the judge prompt and remove
   await claude.judge('n2');
   const saved = await savedSessions();
   expect(saved).toHaveLength(2);
-  expect(saved.map(({ updates: [first] }) => first)).toContainEqual({
+  expect(saved.map(({ updates: [first] }) => first?.update)).toContainEqual({
     sessionUpdate: 'user_message_chunk',
     content: { type: 'text', text: 'Judge the notification n1.' },
   });
@@ -82,7 +82,12 @@ it('judges each notification in a fresh session with the judge prompt and remove
     cwd: path.join(dataDir, 'judge'),
     mcpServers: [],
     _meta: {
-      claudeCode: { options: { settingSources: ['project', 'local'] } },
+      claudeCode: {
+        options: {
+          settingSources: ['project', 'local'],
+          thinking: { type: 'adaptive', display: 'summarized' },
+        },
+      },
       systemPrompt: { append: PROMPT },
     },
   });
@@ -101,9 +106,25 @@ it('fails when the judge does not finish its turn', async () => {
 
 it('fails when Claude Code cannot start', async () => {
   const claude = judge({
-    agentCommand: mockAgentCommand(sessions(), '--set-session-mode-fails'),
+    agentCommand: mockAgentCommand(sessions(), '--set-config-fails'),
   });
   await expect(claude.judge('n1')).rejects.toThrow('Internal error');
+});
+
+it('cancels whatever the judge asks, since nobody is there to answer', async () => {
+  const claude = judge({
+    agentCommand: mockAgentCommand(
+      sessions(),
+      '--respond',
+      'ask-permission allow_once',
+    ),
+  });
+  await claude.judge('n1');
+  const [{ updates }] = await savedSessions();
+  expect(updates.at(-1)?.update).toEqual({
+    sessionUpdate: 'agent_message_chunk',
+    content: { type: 'text', text: '{"outcome":"cancelled"}' },
+  });
 });
 
 it('stops a running judge when the app shuts down', async () => {

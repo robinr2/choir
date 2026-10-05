@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
+import { CoreEvents } from '@/lib/core-events';
 import { A, agent, B, column, strip, viewOf } from '@/test/fake-core';
 import {
   FakeEventSource,
@@ -25,7 +26,7 @@ afterEach(() => {
 });
 
 test('follows the workspace core streams', () => {
-  const workspace = new CoreWorkspace();
+  const workspace = new CoreWorkspace(new CoreEvents().feed('workspace'));
   expect(workspace.getSnapshot()).toEqual({
     loaded: false,
     workspaces: [],
@@ -36,26 +37,34 @@ test('follows the workspace core streams', () => {
   const listener = vi.fn<() => void>();
   const unsubscribe = workspace.subscribe(listener);
   const [source] = FakeEventSource.opened;
-  expect(source?.url).toBe('/workspace/events');
-  source?.receive(view);
+  expect(source?.url).toBe('/events');
+  source?.emit('workspace', view);
   expect(workspace.getSnapshot()).toEqual({ ...view, loaded: true });
   expect(listener).toHaveBeenCalledOnce();
   unsubscribe();
 });
 
 test('asks core to change the layout', async () => {
-  const workspace = new CoreWorkspace();
+  const workspace = new CoreWorkspace(new CoreEvents().feed('workspace'));
   await workspace.openPane();
-  await workspace.open(B, 'excalidraw');
+  await workspace.openCanvas(B);
+  await workspace.launch(A, { cwd: '/home/sam', mode: 'plan' });
   await workspace.act({ action: 'focusColumnRight' });
   await workspace.rename(A, 'planner');
   await workspace.close(B);
+  await workspace.openConversation(B, A);
   expect(requests()).toEqual([
     ['/workspace/panes', 'POST', undefined],
     [`/workspace/panes/${B}/content`, 'PUT', { kind: 'excalidraw' }],
+    [
+      `/workspace/panes/${A}/content`,
+      'PUT',
+      { kind: 'agent', launch: { cwd: '/home/sam', mode: 'plan' } },
+    ],
     ['/workspace/actions', 'POST', { action: 'focusColumnRight' }],
     [`/workspace/panes/${A}`, 'PATCH', { name: 'planner' }],
     [`/workspace/panes/${B}`, 'DELETE', undefined],
+    ['/workspace/panes', 'POST', { conversationId: B, nextTo: A }],
   ]);
   expect(vi.mocked(window.fetch).mock.calls[0]?.[1]?.headers).toEqual({
     'Content-Type': 'application/json',
@@ -70,7 +79,7 @@ test('sends layout actions one after another, even after a refusal', async () =>
         replies.push(resolve);
       }),
   );
-  const workspace = new CoreWorkspace();
+  const workspace = new CoreWorkspace(new CoreEvents().feed('workspace'));
   const first = workspace.act({ action: 'focusWindowUp' });
   const second = workspace.act({ action: 'focusWindowDown' });
   await new Promise((resolve) => setTimeout(resolve, 50));
@@ -85,7 +94,7 @@ test('sends layout actions one after another, even after a refusal', async () =>
 });
 
 test('shows a voice change before core confirms it', async () => {
-  const workspace = new CoreWorkspace();
+  const workspace = new CoreWorkspace(new CoreEvents().feed('workspace'));
   const voiced = workspace.setVoice(B);
   expect(workspace.getSnapshot().voiceAgentId).toBe(B);
   await voiced;
@@ -96,9 +105,9 @@ test('fails when core refuses a change', async () => {
   vi.mocked(window.fetch).mockResolvedValue(
     new Response(null, { status: 404 }),
   );
-  await expect(new CoreWorkspace().close(A)).rejects.toThrow(
-    `DELETE /workspace/panes/${A} replied with status 404`,
-  );
+  await expect(
+    new CoreWorkspace(new CoreEvents().feed('workspace')).close(A),
+  ).rejects.toThrow(`DELETE /workspace/panes/${A} replied with status 404`);
 });
 
 test('finds only agents by their ID', () => {

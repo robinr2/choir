@@ -10,6 +10,7 @@ import {
   fakeCore,
   said,
   strip,
+  toolCall,
   twoAgents,
   viewOf,
 } from './test/fake-core';
@@ -151,9 +152,9 @@ test('sends a typed message to the agent of its pane', async () => {
     .click();
   await vi.waitFor(() =>
     expect(requests()).toContainEqual([
-      `/conversations/${B}/user-turns`,
+      `/conversations/${B}/queue`,
       'POST',
-      { text: 'hello choir' },
+      { text: 'hello choir', images: [] },
     ]),
   );
 });
@@ -164,14 +165,12 @@ test('shows the whole session of an agent with its tool calls', async () => {
     id: 'm1',
     role: 'assistant',
     parts: [
-      {
-        type: 'tool-call',
-        toolCallId: 'tool-1',
-        toolName: 'Read',
-        args: { filePath: 'notes.md' },
-        result: { content: 'buy milk' },
-        isError: false,
-      },
+      toolCall(
+        'tool-1',
+        'Read',
+        { filePath: 'notes.md' },
+        { result: { content: 'buy milk' }, isError: false },
+      ),
       { type: 'text', text: 'You need milk.' },
     ],
   });
@@ -196,7 +195,7 @@ test('shows messages from agents with their name, and spoken exchanges like type
       role: 'assistant',
       parts: [
         { type: 'text', text: 'Let me look.' },
-        { type: 'tool-call', toolCallId: 't1', toolName: 'Read', args: {} },
+        toolCall('t1', 'Read', {}),
         { type: 'text', text: 'Cut off here.' },
       ],
       spoken: true,

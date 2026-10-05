@@ -1,17 +1,24 @@
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
-import { FakeEventSource, fakeEventSources } from '@/test/fake-event-source';
+import { CoreEvents } from '@/lib/core-events';
+import { conversationState } from '@/test/fake-core';
+import {
+  FakeEventSource,
+  fakeEventSources,
+  requests,
+  stream,
+} from '@/test/fake-event-source';
 import { CoreConversation } from './core-conversation';
-import type { TranscriptMessage } from './transcript';
 
-const said: TranscriptMessage[] = [
-  { id: 'm0', role: 'user', parts: [{ type: 'text', text: 'hello' }] },
-];
+const IMAGE = { data: 'iVBOR', mimeType: 'image/png' };
 
 let conversation: CoreConversation;
 
 beforeEach(() => {
   fakeEventSources();
-  conversation = new CoreConversation('c1');
+  conversation = new CoreConversation(
+    'c1',
+    new CoreEvents().conversation('c1'),
+  );
 });
 
 afterEach(() => {
@@ -19,75 +26,71 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-test('follows the conversation while anyone listens', () => {
+test('follows the state of the conversation while anyone listens', () => {
   const first = vi.fn<() => void>();
   const second = vi.fn<() => void>();
   expect(conversation.getSnapshot()).toEqual({
-    messages: [],
+    ...conversationState({ status: { state: 'starting', since: 0 } }),
     loaded: false,
-    running: false,
   });
   const stopFirst = conversation.subscribe(first);
   const stopSecond = conversation.subscribe(second);
-  const [source] = FakeEventSource.opened;
+  const source = stream();
   expect(FakeEventSource.opened).toHaveLength(1);
-  expect(source?.url).toBe('/conversations/c1/events');
-  source?.receive({ messages: said });
-  expect(conversation.getSnapshot()).toEqual({
-    messages: said,
-    loaded: true,
-    running: false,
+  expect(source.url).toBe('/events');
+  const state = conversationState({
+    status: { state: 'working', since: 5 },
+    queue: [{ id: 'q1', text: 'next', images: 0 }],
   });
+  source.emit('conversation', { id: 'c2', state: conversationState() });
+  source.emit('conversation', { id: 'c1', state });
+  expect(conversation.getSnapshot()).toEqual({ ...state, loaded: true });
   expect(first).toHaveBeenCalledOnce();
   stopFirst();
-  expect(source?.closed).toBe(false);
+  expect(source.closed).toBe(false);
   stopSecond();
-  expect(source?.closed).toBe(true);
-  conversation.subscribe(first);
-  expect(FakeEventSource.opened).toHaveLength(2);
+  expect(source.closed).toBe(true);
 });
 
-test('ignores events it cannot read', () => {
-  const listener = vi.fn<() => void>();
-  conversation.subscribe(listener);
-  const [source] = FakeEventSource.opened;
-  source?.receive(null);
-  source?.receive({});
-  expect(listener).not.toHaveBeenCalled();
-  expect(conversation.getSnapshot()).toEqual({
-    messages: [],
-    loaded: false,
-    running: false,
+test('queues a turn with its images without waiting for its answer', async () => {
+  const fetch = vi
+    .spyOn(window, 'fetch')
+    .mockResolvedValue(new Response(null, { status: 202 }));
+  await conversation.send({ text: 'look', images: [IMAGE] });
+  expect(fetch).toHaveBeenCalledExactlyOnceWith('/conversations/c1/queue', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text: 'look', images: [IMAGE] }),
   });
 });
 
-test('sends a typed turn and runs until its answer is complete', async () => {
-  const fetch = vi
-    .spyOn(window, 'fetch')
-    .mockResolvedValue(new Response('data: {"text":"Hi"}\n\n'));
-  const listener = vi.fn<() => void>();
-  conversation.subscribe(listener);
-  const sent = conversation.send('hello choir');
-  expect(conversation.getSnapshot().running).toBe(true);
-  expect(fetch).toHaveBeenCalledExactlyOnceWith(
-    '/conversations/c1/user-turns',
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text: 'hello choir' }),
-    },
+test('steers, unqueues, cancels, changes settings and answers in core', async () => {
+  vi.spyOn(window, 'fetch').mockImplementation(
+    async () => new Response(null, { status: 204 }),
   );
-  await sent;
-  expect(conversation.getSnapshot().running).toBe(false);
-  expect(listener).toHaveBeenCalledTimes(2);
+  await conversation.steer({ text: 'faster', images: [] });
+  await conversation.steerQueued('q1');
+  await conversation.unqueue('q2');
+  await conversation.cancel();
+  await conversation.change({ model: 'haiku' });
+  await conversation.answer('i1', { optionId: 'allow' });
+  await conversation.answer('i2', { action: 'decline' });
+  expect(requests()).toEqual([
+    ['/conversations/c1/steerings', 'POST', { text: 'faster', images: [] }],
+    ['/conversations/c1/queue/q1/steering', 'POST', undefined],
+    ['/conversations/c1/queue/q2', 'DELETE', undefined],
+    ['/conversations/c1/cancellation', 'POST', undefined],
+    ['/conversations/c1/settings', 'PUT', { model: 'haiku' }],
+    ['/conversations/c1/interactions/i1', 'POST', { optionId: 'allow' }],
+    ['/conversations/c1/interactions/i2', 'POST', { action: 'decline' }],
+  ]);
 });
 
-test('stops running when the conversation rejects the turn', async () => {
+test('fails a turn core rejects', async () => {
   vi.spyOn(window, 'fetch').mockResolvedValue(
-    new Response('', { status: 500 }),
+    new Response('', { status: 400 }),
   );
-  await expect(conversation.send('hello')).rejects.toThrow(
-    new Error('POST /conversations/c1/user-turns replied with status 500'),
+  await expect(conversation.send({ text: '', images: [] })).rejects.toThrow(
+    new Error('POST /conversations/c1/queue replied with status 400'),
   );
-  expect(conversation.getSnapshot().running).toBe(false);
 });

@@ -1,4 +1,4 @@
-import { LiveStore, send } from '@/lib/live-store';
+import { type Feed, LiveStore, send } from '@/lib/live-store';
 
 export type Height = { auto: number } | { fixed: number };
 
@@ -31,7 +31,9 @@ export type PaneView =
   | AgentView
   | { id: string; kind: 'excalidraw' };
 
-export type OpenableKind = 'agent' | 'excalidraw';
+export type Launch =
+  | { cwd: string; model?: string; effort?: string; mode?: string }
+  | { resume: string; cwd: string; fork?: boolean };
 
 export type WorkspaceView = {
   loaded: boolean;
@@ -85,8 +87,8 @@ export function agentOf(view: WorkspaceView, id: string): AgentView | null {
 export class CoreWorkspace extends LiveStore<WorkspaceView> {
   #acting: Promise<unknown> = Promise.resolve();
 
-  constructor() {
-    super(`${PATH}/events`, {
+  constructor(feed: Feed) {
+    super(feed, {
       loaded: false,
       workspaces: [],
       activeWorkspace: 0,
@@ -99,8 +101,24 @@ export class CoreWorkspace extends LiveStore<WorkspaceView> {
     await send('POST', `${PATH}/panes`);
   }
 
-  async open(paneId: string, kind: OpenableKind): Promise<void> {
-    await send('PUT', `${PATH}/panes/${paneId}/content`, { kind });
+  async openConversation(
+    conversationId: string,
+    nextTo: string,
+  ): Promise<void> {
+    await send('POST', `${PATH}/panes`, { conversationId, nextTo });
+  }
+
+  async openCanvas(paneId: string): Promise<void> {
+    await send('PUT', `${PATH}/panes/${paneId}/content`, {
+      kind: 'excalidraw',
+    });
+  }
+
+  async launch(paneId: string, launch: Launch): Promise<void> {
+    await send('PUT', `${PATH}/panes/${paneId}/content`, {
+      kind: 'agent',
+      launch,
+    });
   }
 
   async act(action: LayoutAction): Promise<void> {

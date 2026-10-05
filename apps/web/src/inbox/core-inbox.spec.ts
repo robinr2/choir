@@ -1,5 +1,10 @@
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
-import { fakeEventSources, requests, streamOf } from '@/test/fake-event-source';
+import { CoreEvents } from '@/lib/core-events';
+import {
+  coreSends,
+  fakeEventSources,
+  requests,
+} from '@/test/fake-event-source';
 import { attachmentUrl, CoreInbox, listPath } from './core-inbox';
 
 beforeEach(() => {
@@ -15,15 +20,15 @@ afterEach(() => {
 });
 
 test('counts the active entries and moves to a new revision with every change', () => {
-  const inbox = new CoreInbox();
+  const inbox = new CoreInbox(new CoreEvents().feed('inbox'));
   expect(inbox.getSnapshot()).toEqual({
     notifications: 0,
     todos: 0,
     revision: 0,
   });
   const stop = inbox.subscribe(() => undefined);
-  streamOf('/inbox/events')?.receive({ notifications: 2, todos: 1 });
-  streamOf('/inbox/events')?.receive({ notifications: 2, todos: 3 });
+  coreSends('inbox', { notifications: 2, todos: 1 });
+  coreSends('inbox', { notifications: 2, todos: 3 });
   expect(inbox.getSnapshot()).toEqual({
     notifications: 2,
     todos: 3,
@@ -33,7 +38,7 @@ test('counts the active entries and moves to a new revision with every change', 
 });
 
 test('reads each path once per revision', async () => {
-  const inbox = new CoreInbox();
+  const inbox = new CoreInbox(new CoreEvents().feed('inbox'));
   const first = inbox.read('/todos/t1', 1);
   expect(inbox.read('/todos/t1', 1)).toBe(first);
   expect(await first).toEqual({ id: 't1' });
@@ -48,7 +53,7 @@ test('reads each path once per revision', async () => {
 });
 
 test('sends the changes of the user to core', async () => {
-  const inbox = new CoreInbox();
+  const inbox = new CoreInbox(new CoreEvents().feed('inbox'));
   const draft = { title: 'Call', description: '', dueAt: null };
   await inbox.archive('notifications', 'n1', true);
   await inbox.move('todos', 't1', { before: 't2' });

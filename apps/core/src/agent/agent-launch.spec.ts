@@ -21,6 +21,7 @@ it('runs the Claude ACP adapter with the profile and the installed Claude Code',
       CLAUDE_CODE_PLUGIN_DIRS: '/profile',
       CHOIR_CORE_URL: 'http://localhost:3100',
       CHOIR_CONVERSATION_ID: 'c1',
+      CLAUDE_CODE_FORK_SUBAGENT: '1',
       CLAUDE_CODE_EXECUTABLE: '/bin/claude',
     },
   });
@@ -38,12 +39,18 @@ it('runs another agent command when one is given', () => {
   });
 });
 
-it('keeps the user settings of Claude Code out of every session', () => {
+const THINKING = { type: 'adaptive', display: 'summarized' };
+
+it('keeps the user settings of Claude Code out of every session and shows its thinking', () => {
   expect(sessionMeta()).toEqual({
-    claudeCode: { options: { settingSources: ['project', 'local'] } },
+    claudeCode: {
+      options: { settingSources: ['project', 'local'], thinking: THINKING },
+    },
   });
   expect(sessionMeta({ systemPrompt: { append: 'Judge.' } })).toEqual({
-    claudeCode: { options: { settingSources: ['project', 'local'] } },
+    claudeCode: {
+      options: { settingSources: ['project', 'local'], thinking: THINKING },
+    },
     systemPrompt: { append: 'Judge.' },
   });
 });

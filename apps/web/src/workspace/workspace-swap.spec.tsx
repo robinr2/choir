@@ -1,7 +1,10 @@
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
+import { CoreAgents } from '@/agents/core-agents';
+import { CoreRateLimits } from '@/agents/core-rate-limits';
 import App from '@/App';
 import { CoreCanvas } from '@/canvas/core-canvas';
 import { CoreInbox } from '@/inbox/core-inbox';
+import { CoreEvents } from '@/lib/core-events';
 import {
   A,
   B,
@@ -18,16 +21,20 @@ async function swapWorkspace(
   screen: Screen,
   view: Omit<WorkspaceView, 'loaded'> = twoAgents(),
 ) {
-  const workspace = new CoreWorkspace();
+  const events = new CoreEvents();
+  const workspace = new CoreWorkspace(events.feed('workspace'));
   const client = createPipecatClient();
   const stop = workspace.subscribe(() => undefined);
   coreShowsWorkspace(view);
   await screen.rerender(
     <App
       client={client}
+      events={events}
       workspace={workspace}
       canvas={new CoreCanvas()}
-      inbox={new CoreInbox()}
+      inbox={new CoreInbox(events.feed('inbox'))}
+      agents={new CoreAgents()}
+      rateLimits={new CoreRateLimits(events.feed('rate-limits'))}
     />,
   );
   stop();
@@ -81,7 +88,9 @@ test('opens panes in the workspace it was last given', async () => {
   };
   const screen = await renderApp(withEmptyPane);
   const { workspace } = await swapWorkspace(screen, withEmptyPane);
-  const open = vi.spyOn(workspace, 'open');
-  await pane(screen, 'New pane').getByRole('button', { name: 'Agent' }).click();
-  await vi.waitFor(() => expect(open).toHaveBeenCalledWith(B, 'agent'));
+  const openCanvas = vi.spyOn(workspace, 'openCanvas');
+  await pane(screen, 'New pane')
+    .getByRole('button', { name: 'Excalidraw' })
+    .click();
+  await vi.waitFor(() => expect(openCanvas).toHaveBeenCalledWith(B));
 });

@@ -5,15 +5,19 @@ import {
   Logger,
 } from '@nestjs/common';
 import { combineLatest, firstValueFrom, map, type Observable } from 'rxjs';
-import { ConversationsService } from '../conversations/conversations.service.js';
+import { AgentService } from '../agent/agent.service.js';
+import {
+  CONVERSATIONS,
+  type Conversations,
+} from '../conversations/conversations.port.js';
 import { LayoutService } from '../layout/layout.service.js';
 import { VoiceService } from '../voice/voice.service.js';
 import {
   type AgentListing,
   type LayoutAction,
   type NewPane,
-  type OpenableKind,
   type Pane,
+  type PaneOpening,
   type PaneContent,
   type PaneView,
   WORKSPACE,
@@ -48,12 +52,14 @@ export class WorkspaceService implements Workspace {
 
   constructor(
     @Inject(LayoutService) private readonly layout: LayoutService,
-    @Inject(ConversationsService)
+    @Inject(CONVERSATIONS)
     private readonly conversations: Pick<
-      ConversationsService,
+      Conversations,
       'workingChanges' | 'sendMessage' | 'close'
     >,
     @Inject(VoiceService) private readonly voice: VoiceService,
+    @Inject(AgentService)
+    private readonly agent: Pick<AgentService, 'launch'>,
   ) {}
 
   get changes(): Observable<WorkspaceView> {
@@ -80,8 +86,16 @@ export class WorkspaceService implements Workspace {
     return this.layout.openPane(pane);
   }
 
-  open(id: string, kind: OpenableKind): Promise<Pane> {
-    return this.layout.open(id, kind);
+  async open(id: string, opening: PaneOpening): Promise<Pane> {
+    this.layout.openable(id, opening.kind);
+    if (opening.kind === 'agent' && opening.launch) {
+      await this.agent.launch(id, opening.launch);
+    }
+    return this.layout.open(id, opening.kind);
+  }
+
+  openConversation(conversationId: string, nextTo: string): Promise<Pane> {
+    return this.layout.openNextTo(conversationId, nextTo);
   }
 
   act(action: LayoutAction): Promise<void> {

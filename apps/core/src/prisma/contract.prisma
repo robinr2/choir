@@ -110,7 +110,11 @@ model Pane {
   @@index([columnId])
 }
 
-model AgentSession {
-  conversationId Uuid   @id
-  sessionId      String
+model AgentLink {
+  conversationId Uuid    @id
+  sessionId      String?
+  cwd            String
+  model          String?
+  effort         String?
+  mode           String?
 }

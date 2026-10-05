@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
+import { CoreEvents } from '@/lib/core-events';
 import {
   A,
   column,
@@ -16,7 +17,9 @@ import { ViewStore } from './view-store';
 const metrics = { width: 1000, height: 800, gap: 4 };
 
 function listening(): ViewStore {
-  const store = new ViewStore(new CoreWorkspace());
+  const store = new ViewStore(
+    new CoreWorkspace(new CoreEvents().feed('workspace')),
+  );
   store.subscribe(() => undefined);
   store.measure(1000, 800);
   return store;
@@ -121,6 +124,8 @@ test('expands nothing on an empty workspace', async () => {
   const store = listening();
   coreShowsWorkspace(viewOf([], []));
   await expand(store);
-  await expand(new ViewStore(new CoreWorkspace()));
+  await expand(
+    new ViewStore(new CoreWorkspace(new CoreEvents().feed('workspace'))),
+  );
   expect(requests()).toEqual([]);
 });

@@ -27,9 +27,7 @@ export const paneIdSchema = z.uuid();
 
 export const agentNameSchema = z.string().trim().min(1).max(40);
 
-export const openableKindSchema = z.enum(['agent', 'excalidraw']);
-
-export type OpenableKind = z.infer<typeof openableKindSchema>;
+export type OpenableKind = 'agent' | 'excalidraw';
 
 export type PaneContent =
   { kind: 'empty' } | { kind: 'agent'; name: string } | { kind: 'excalidraw' };

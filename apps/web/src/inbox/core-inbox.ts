@@ -1,4 +1,4 @@
-import { LiveStore, send } from '@/lib/live-store';
+import { type Feed, LiveStore, send } from '@/lib/live-store';
 
 export type ListKind = 'notifications' | 'todos';
 
@@ -85,8 +85,8 @@ async function json<T>(response: Promise<Response>): Promise<T> {
 export class CoreInbox extends LiveStore<InboxSnapshot> {
   readonly #reads = new Map<string, Read>();
 
-  constructor() {
-    super('/inbox/events', { notifications: 0, todos: 0, revision: 0 });
+  constructor(feed: Feed) {
+    super(feed, { notifications: 0, todos: 0, revision: 0 });
   }
 
   read<T>(path: string, revision: number): Promise<T> {

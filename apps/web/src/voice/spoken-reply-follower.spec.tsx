@@ -4,6 +4,7 @@ import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { render } from 'vitest-browser-react';
 import { CoreConversation } from '@/conversation/core-conversation';
 import type { TranscriptMessage } from '@/conversation/transcript';
+import { CoreEvents } from '@/lib/core-events';
 import { A, coreShowsChat, fakeCore } from '@/test/fake-core';
 import { client } from '@/test/render-app';
 import { SpokenReply } from './spoken-reply';
@@ -43,7 +44,7 @@ function botSaid(accumulated_text: string): void {
 
 beforeEach(() => {
   fakeCore();
-  conversation = new CoreConversation(A);
+  conversation = new CoreConversation(A, new CoreEvents().conversation(A));
 });
 
 afterEach(() => {

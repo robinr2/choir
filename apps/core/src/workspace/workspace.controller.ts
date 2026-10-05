@@ -6,14 +6,11 @@ import {
   HttpCode,
   HttpStatus,
   Inject,
-  type MessageEvent,
   Param,
   Patch,
   Post,
   Put,
-  Sse,
 } from '@nestjs/common';
-import { map, type Observable } from 'rxjs';
 import {
   type LayoutAction,
   layoutActionSchema,
@@ -28,6 +25,8 @@ import {
 import {
   type ContentRequest,
   contentRequestSchema,
+  type NewPaneRequest,
+  newPaneSchema,
   type RenameRequest,
   renameRequestSchema,
   type VoiceRequest,
@@ -47,22 +46,25 @@ export class WorkspaceController {
     return this.workspace.view();
   }
 
-  @Sse('events')
-  events(): Observable<MessageEvent> {
-    return this.workspace.changes.pipe(map((data) => ({ data })));
-  }
-
   @Post('panes')
-  openPane(): Promise<Pane> {
-    return this.workspace.openPane(EMPTY);
+  openPane(
+    @Body({ schema: newPaneSchema }) request: NewPaneRequest,
+  ): Promise<Pane> {
+    if (!request || !('conversationId' in request)) {
+      return this.workspace.openPane(EMPTY);
+    }
+    return this.workspace.openConversation(
+      request.conversationId,
+      request.nextTo,
+    );
   }
 
   @Put('panes/:id/content')
   open(
     @Param('id', ID) id: string,
-    @Body({ schema: contentRequestSchema }) { kind }: ContentRequest,
+    @Body({ schema: contentRequestSchema }) content: ContentRequest,
   ): Promise<Pane> {
-    return this.workspace.open(id, kind);
+    return this.workspace.open(id, content);
   }
 
   @Post('actions')

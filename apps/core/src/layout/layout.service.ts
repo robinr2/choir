@@ -19,7 +19,12 @@ import type {
 } from './layout.schemas.js';
 import { LayoutStore } from './layout.store.js';
 import { emptyLayout, updateActiveSpace } from './monitor.js';
-import { openPane, paneIds, removePane } from './monitor-panes.js';
+import {
+  openPane,
+  openPaneNextTo,
+  paneIds,
+  removePane,
+} from './monitor-panes.js';
 import { isSpaceAction, spaceChange } from './space-actions.js';
 
 type Filled = { content: PaneContent; nextNumber: number };
@@ -79,16 +84,35 @@ export class LayoutService implements OnModuleInit {
     return { id, ...content };
   }
 
-  async open(id: string, kind: OpenableKind): Promise<Pane> {
+  openable(id: string, kind: OpenableKind): void {
     if (this.pane(id).kind !== 'empty') {
       throw new ConflictException(`The pane ${id} is not empty`);
     }
     if (kind === 'excalidraw' && this.showsExcalidraw()) {
       throw new ConflictException('Excalidraw is already open in another pane');
     }
+  }
+
+  async open(id: string, kind: OpenableKind): Promise<Pane> {
+    this.openable(id, kind);
     const { content, nextNumber } = this.filled({ kind });
     const panes = { ...this.current.panes, [id]: content };
     await this.commit({ ...this.current, panes, nextNumber });
+    return { id, ...content };
+  }
+
+  async openNextTo(id: string, nextTo: string): Promise<Pane> {
+    if (this.current.panes[id]) {
+      await this.act({ action: 'focusPane', paneId: id });
+      return this.pane(id);
+    }
+    this.pane(nextTo);
+    const { content, nextNumber } = this.filled({ kind: 'agent' });
+    await this.commit({
+      layout: openPaneNextTo(this.current.layout, id, nextTo),
+      panes: { ...this.current.panes, [id]: content },
+      nextNumber,
+    });
     return { id, ...content };
   }
 
