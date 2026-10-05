@@ -16,6 +16,7 @@ Do all work based on the documentation of the tools the current task involves. O
 - Prisma ORM 8: https://www.prisma.io/docs/llms/orm.txt
 - niri: https://niri-wm.github.io/niri/
 - Agent Client Protocol and its TypeScript SDK: https://agentclientprotocol.com/llms.txt
+- Motion: https://motion.dev/llms.txt
 
 ## Development
 
