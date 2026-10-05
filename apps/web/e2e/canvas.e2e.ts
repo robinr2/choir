@@ -62,5 +62,7 @@ test('draws the shape an agent creates through the Excalidraw MCP server in the 
     .poll(() => magentaPixels(scene), { timeout: 180_000 })
     .toBeGreaterThan(1000);
   await drawer.getByRole('button', { name: 'Close' }).click();
+  await expect(page.locator('section[data-kind="agent"]')).toHaveCount(1);
   await canvasPane.getByRole('button', { name: 'Close' }).click();
+  await expect(canvasPane).toHaveCount(0);
 });
