@@ -1,11 +1,13 @@
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
-import { FakeEventSource, fakeEventSources } from '@/test/fake-event-source';
+import { conversationState } from '@/test/fake-core';
+import {
+  FakeEventSource,
+  fakeEventSources,
+  requests,
+} from '@/test/fake-event-source';
 import { CoreConversation } from './core-conversation';
-import type { TranscriptMessage } from './transcript';
 
-const said: TranscriptMessage[] = [
-  { id: 'm0', role: 'user', parts: [{ type: 'text', text: 'hello' }] },
-];
+const IMAGE = { data: 'iVBOR', mimeType: 'image/png' };
 
 let conversation: CoreConversation;
 
@@ -19,75 +21,69 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-test('follows the conversation while anyone listens', () => {
+test('follows the state of the conversation while anyone listens', () => {
   const first = vi.fn<() => void>();
   const second = vi.fn<() => void>();
   expect(conversation.getSnapshot()).toEqual({
-    messages: [],
+    ...conversationState({ status: { state: 'starting', since: 0 } }),
     loaded: false,
-    running: false,
   });
   const stopFirst = conversation.subscribe(first);
   const stopSecond = conversation.subscribe(second);
   const [source] = FakeEventSource.opened;
   expect(FakeEventSource.opened).toHaveLength(1);
   expect(source?.url).toBe('/conversations/c1/events');
-  source?.receive({ messages: said });
-  expect(conversation.getSnapshot()).toEqual({
-    messages: said,
-    loaded: true,
-    running: false,
+  const state = conversationState({
+    status: { state: 'working', since: 5 },
+    queue: [{ id: 'q1', text: 'next', images: 0 }],
   });
+  source?.receive(state);
+  expect(conversation.getSnapshot()).toEqual({ ...state, loaded: true });
   expect(first).toHaveBeenCalledOnce();
   stopFirst();
   expect(source?.closed).toBe(false);
   stopSecond();
   expect(source?.closed).toBe(true);
-  conversation.subscribe(first);
-  expect(FakeEventSource.opened).toHaveLength(2);
 });
 
-test('ignores events it cannot read', () => {
-  const listener = vi.fn<() => void>();
-  conversation.subscribe(listener);
-  const [source] = FakeEventSource.opened;
-  source?.receive(null);
-  source?.receive({});
-  expect(listener).not.toHaveBeenCalled();
-  expect(conversation.getSnapshot()).toEqual({
-    messages: [],
-    loaded: false,
-    running: false,
-  });
-});
-
-test('sends a typed turn and runs until its answer is complete', async () => {
+test('sends a turn with its images and reads its answer to the end', async () => {
   const fetch = vi
     .spyOn(window, 'fetch')
     .mockResolvedValue(new Response('data: {"text":"Hi"}\n\n'));
-  const listener = vi.fn<() => void>();
-  conversation.subscribe(listener);
-  const sent = conversation.send('hello choir');
-  expect(conversation.getSnapshot().running).toBe(true);
+  await conversation.send({ text: 'look', images: [IMAGE] });
   expect(fetch).toHaveBeenCalledExactlyOnceWith(
     '/conversations/c1/user-turns',
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text: 'hello choir' }),
+      body: JSON.stringify({ text: 'look', images: [IMAGE] }),
     },
   );
-  await sent;
-  expect(conversation.getSnapshot().running).toBe(false);
-  expect(listener).toHaveBeenCalledTimes(2);
 });
 
-test('stops running when the conversation rejects the turn', async () => {
+test('steers, unqueues, cancels and changes settings in core', async () => {
+  vi.spyOn(window, 'fetch').mockImplementation(
+    async () => new Response(null, { status: 204 }),
+  );
+  await conversation.steer({ text: 'faster', images: [] });
+  await conversation.steerQueued('q1');
+  await conversation.unqueue('q2');
+  await conversation.cancel();
+  await conversation.change({ model: 'haiku' });
+  expect(requests()).toEqual([
+    ['/conversations/c1/steerings', 'POST', { text: 'faster', images: [] }],
+    ['/conversations/c1/queue/q1/steering', 'POST', undefined],
+    ['/conversations/c1/queue/q2', 'DELETE', undefined],
+    ['/conversations/c1/cancellation', 'POST', undefined],
+    ['/conversations/c1/settings', 'PUT', { model: 'haiku' }],
+  ]);
+});
+
+test('fails a turn core rejects', async () => {
   vi.spyOn(window, 'fetch').mockResolvedValue(
-    new Response('', { status: 500 }),
+    new Response('', { status: 400 }),
   );
-  await expect(conversation.send('hello')).rejects.toThrow(
-    new Error('POST /conversations/c1/user-turns replied with status 500'),
+  await expect(conversation.send({ text: '', images: [] })).rejects.toThrow(
+    new Error('POST /conversations/c1/user-turns replied with status 400'),
   );
-  expect(conversation.getSnapshot().running).toBe(false);
 });

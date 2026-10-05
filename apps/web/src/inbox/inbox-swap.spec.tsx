@@ -1,4 +1,6 @@
 import { expect, test, vi } from 'vitest';
+import { CoreAgents } from '@/agents/core-agents';
+import { CoreRateLimits } from '@/agents/core-rate-limits';
 import App from '@/App';
 import { CoreCanvas } from '@/canvas/core-canvas';
 import { coreShowsWorkspace, twoAgents } from '@/test/fake-core';
@@ -30,6 +32,8 @@ async function swapInbox(screen: Screen) {
       workspace={workspace}
       canvas={new CoreCanvas()}
       inbox={inbox}
+      agents={new CoreAgents()}
+      rateLimits={new CoreRateLimits()}
     />,
   );
   stop();

@@ -2,6 +2,8 @@ import '@/index.css';
 import { RTVIEvent } from '@pipecat-ai/client-js';
 import { vi } from 'vitest';
 import { render } from 'vitest-browser-react';
+import { CoreAgents } from '@/agents/core-agents';
+import { CoreRateLimits } from '@/agents/core-rate-limits';
 import App from '@/App';
 import { CoreCanvas } from '@/canvas/core-canvas';
 import { CoreInbox } from '@/inbox/core-inbox';
@@ -20,6 +22,8 @@ export async function renderApp(view = twoAgents()): Promise<Screen> {
       workspace={new CoreWorkspace()}
       canvas={new CoreCanvas()}
       inbox={new CoreInbox()}
+      agents={new CoreAgents()}
+      rateLimits={new CoreRateLimits()}
     />,
   );
   coreShowsWorkspace(view);

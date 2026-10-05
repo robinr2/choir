@@ -6,19 +6,30 @@ const MAGENTA_PIXEL = 0xffff00ff;
 
 const DRAW = `Use the create_element tool of the excalidraw MCP server to draw one rectangle at x 100, y 100 with width 300, height 200, backgroundColor ${MAGENTA}, strokeColor ${MAGENTA} and fillStyle solid. Do nothing else.`;
 
-async function openInNewPane(page: Page, kind: string): Promise<void> {
+async function newPane(page: Page): Promise<Locator> {
   await page.keyboard.press('Alt+KeyT');
-  const empty = page.getByRole('region', { name: 'New pane' });
-  await empty.getByRole('button', { name: kind }).click();
+  return page.getByRole('region', { name: 'New pane' });
+}
+
+async function openCanvas(page: Page): Promise<void> {
+  const empty = await newPane(page);
+  await empty.getByRole('button', { name: 'Excalidraw' }).click();
+  await expect(empty).toHaveCount(0);
+}
+
+async function startAgent(page: Page): Promise<void> {
+  const empty = await newPane(page);
+  await empty.getByRole('button', { name: 'Agent' }).click();
+  await empty.getByRole('button', { name: 'Start' }).click();
   await expect(empty).toHaveCount(0);
 }
 
 async function openCanvasAndAgent(page: Page) {
   await page.setViewportSize({ width: 1600, height: 1000 });
   await page.goto('/');
-  await openInNewPane(page, 'Excalidraw');
+  await openCanvas(page);
   const canvasPane = page.getByRole('region', { name: 'Excalidraw' });
-  await openInNewPane(page, 'Agent');
+  await startAgent(page);
   const scene = canvasPane
     .frameLocator('iframe[title="Excalidraw canvas"]')
     .locator('canvas.excalidraw__canvas.static');

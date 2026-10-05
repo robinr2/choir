@@ -31,7 +31,9 @@ export type PaneView =
   | AgentView
   | { id: string; kind: 'excalidraw' };
 
-export type OpenableKind = 'agent' | 'excalidraw';
+export type Launch =
+  | { cwd: string; model?: string; effort?: string; mode?: string }
+  | { resume: string; cwd: string; fork?: boolean };
 
 export type WorkspaceView = {
   loaded: boolean;
@@ -99,8 +101,17 @@ export class CoreWorkspace extends LiveStore<WorkspaceView> {
     await send('POST', `${PATH}/panes`);
   }
 
-  async open(paneId: string, kind: OpenableKind): Promise<void> {
-    await send('PUT', `${PATH}/panes/${paneId}/content`, { kind });
+  async openCanvas(paneId: string): Promise<void> {
+    await send('PUT', `${PATH}/panes/${paneId}/content`, {
+      kind: 'excalidraw',
+    });
+  }
+
+  async launch(paneId: string, launch: Launch): Promise<void> {
+    await send('PUT', `${PATH}/panes/${paneId}/content`, {
+      kind: 'agent',
+      launch,
+    });
   }
 
   async act(action: LayoutAction): Promise<void> {

@@ -27,6 +27,10 @@ function panes(
   );
 }
 
+function settled(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, 100));
+}
+
 function contentRequests() {
   return requests().filter(([url]) => url.endsWith('/content'));
 }
@@ -47,14 +51,18 @@ test('offers to open an agent or Excalidraw in an empty pane', async () => {
   await expect
     .element(empty.getByRole('button', { name: 'Rename' }))
     .not.toBeInTheDocument();
-  await empty.getByRole('button', { name: 'Agent' }).click();
   await empty.getByRole('button', { name: 'Excalidraw' }).click();
   await vi.waitFor(() =>
     expect(contentRequests()).toEqual([
-      [`/workspace/panes/${B}/content`, 'PUT', { kind: 'agent' }],
       [`/workspace/panes/${B}/content`, 'PUT', { kind: 'excalidraw' }],
     ]),
   );
+  await empty.getByRole('button', { name: 'Agent' }).click();
+  await expect.element(empty.getByText('New agent')).toBeVisible();
+  await empty.getByRole('button', { name: 'Back' }).click();
+  await expect
+    .element(empty.getByRole('button', { name: 'Agent' }))
+    .toBeVisible();
   expect(empty.element().hasAttribute('data-voice')).toBe(false);
 });
 
@@ -69,12 +77,8 @@ test('greys out Excalidraw while another pane shows it', async () => {
     .element(screen.getByText('Excalidraw is already open in another pane'))
     .toBeVisible();
   await excalidraw.click({ force: true });
-  await empty.getByRole('button', { name: 'Agent' }).click();
-  await vi.waitFor(() =>
-    expect(contentRequests()).toEqual([
-      [`/workspace/panes/${C}/content`, 'PUT', { kind: 'agent' }],
-    ]),
-  );
+  await settled();
+  expect(contentRequests()).toEqual([]);
 });
 
 test('shows the canvas of the Excalidraw server in its pane', async () => {

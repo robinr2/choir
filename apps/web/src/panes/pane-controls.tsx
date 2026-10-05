@@ -7,7 +7,7 @@ export function PaneControls({ id }: Readonly<{ id: string }>) {
   const { workspace } = useWorkspace();
   const close = useCallback(() => void workspace.close(id), [workspace, id]);
   return (
-    <div className="ms-auto flex items-center gap-0.5">
+    <div className="flex shrink-0 items-center gap-0.5">
       <TooltipIconButton
         tooltip="Close"
         side="bottom"

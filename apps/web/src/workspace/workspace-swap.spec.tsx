@@ -1,4 +1,6 @@
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
+import { CoreAgents } from '@/agents/core-agents';
+import { CoreRateLimits } from '@/agents/core-rate-limits';
 import App from '@/App';
 import { CoreCanvas } from '@/canvas/core-canvas';
 import { CoreInbox } from '@/inbox/core-inbox';
@@ -28,6 +30,8 @@ async function swapWorkspace(
       workspace={workspace}
       canvas={new CoreCanvas()}
       inbox={new CoreInbox()}
+      agents={new CoreAgents()}
+      rateLimits={new CoreRateLimits()}
     />,
   );
   stop();
@@ -81,7 +85,9 @@ test('opens panes in the workspace it was last given', async () => {
   };
   const screen = await renderApp(withEmptyPane);
   const { workspace } = await swapWorkspace(screen, withEmptyPane);
-  const open = vi.spyOn(workspace, 'open');
-  await pane(screen, 'New pane').getByRole('button', { name: 'Agent' }).click();
-  await vi.waitFor(() => expect(open).toHaveBeenCalledWith(B, 'agent'));
+  const openCanvas = vi.spyOn(workspace, 'openCanvas');
+  await pane(screen, 'New pane')
+    .getByRole('button', { name: 'Excalidraw' })
+    .click();
+  await vi.waitFor(() => expect(openCanvas).toHaveBeenCalledWith(B));
 });

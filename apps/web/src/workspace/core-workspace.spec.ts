@@ -46,13 +46,19 @@ test('follows the workspace core streams', () => {
 test('asks core to change the layout', async () => {
   const workspace = new CoreWorkspace();
   await workspace.openPane();
-  await workspace.open(B, 'excalidraw');
+  await workspace.openCanvas(B);
+  await workspace.launch(A, { cwd: '/home/sam', mode: 'plan' });
   await workspace.act({ action: 'focusColumnRight' });
   await workspace.rename(A, 'planner');
   await workspace.close(B);
   expect(requests()).toEqual([
     ['/workspace/panes', 'POST', undefined],
     [`/workspace/panes/${B}/content`, 'PUT', { kind: 'excalidraw' }],
+    [
+      `/workspace/panes/${A}/content`,
+      'PUT',
+      { kind: 'agent', launch: { cwd: '/home/sam', mode: 'plan' } },
+    ],
     ['/workspace/actions', 'POST', { action: 'focusColumnRight' }],
     [`/workspace/panes/${A}`, 'PATCH', { name: 'planner' }],
     [`/workspace/panes/${B}`, 'DELETE', undefined],

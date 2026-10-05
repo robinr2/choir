@@ -1,10 +1,14 @@
-import { useEffect, useMemo, useReducer } from 'react';
+import { type ReactNode, useEffect, useMemo, useReducer } from 'react';
 import type { PipecatClient } from '@pipecat-ai/client-js';
 import {
   PipecatClientAudio,
   PipecatClientProvider,
 } from '@pipecat-ai/client-react';
 import { LayoutGridIcon } from 'lucide-react';
+import { AgentsContext } from '@/agents/agents-context';
+import type { CoreAgents } from '@/agents/core-agents';
+import type { CoreRateLimits } from '@/agents/core-rate-limits';
+import { RateLimitsContext } from '@/agents/rate-limits-context';
 import type { CoreCanvas } from '@/canvas/core-canvas';
 import type { CoreInbox } from '@/inbox/core-inbox';
 import { InboxButton } from '@/inbox/inbox-button';
@@ -53,6 +57,8 @@ type AppProps = {
   workspace: CoreWorkspace;
   canvas: CoreCanvas;
   inbox: CoreInbox;
+  agents: CoreAgents;
+  rateLimits: CoreRateLimits;
 };
 
 function flip(open: boolean): boolean {
@@ -72,7 +78,22 @@ function Screen() {
   );
 }
 
-function App({ client, workspace, canvas, inbox }: Readonly<AppProps>) {
+function AgentServices({
+  agents,
+  rateLimits,
+  children,
+}: Readonly<
+  Pick<AppProps, 'agents' | 'rateLimits'> & { children: ReactNode }
+>) {
+  return (
+    <AgentsContext value={agents}>
+      <RateLimitsContext value={rateLimits}>{children}</RateLimitsContext>
+    </AgentsContext>
+  );
+}
+
+function App(props: Readonly<AppProps>) {
+  const { client, workspace, canvas, inbox } = props;
   const voice = useMemo(
     () => new VoiceSession(client, workspace),
     [client, workspace],
@@ -89,7 +110,9 @@ function App({ client, workspace, canvas, inbox }: Readonly<AppProps>) {
       <WorkspaceContext value={context}>
         <StripContext value={strip}>
           <InboxContext value={inbox}>
-            <Screen />
+            <AgentServices agents={props.agents} rateLimits={props.rateLimits}>
+              <Screen />
+            </AgentServices>
           </InboxContext>
         </StripContext>
       </WorkspaceContext>

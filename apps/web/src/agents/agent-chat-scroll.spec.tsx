@@ -84,6 +84,14 @@ function userSays(text: string): void {
   });
 }
 
+function scrollUp(viewport: HTMLElement): Promise<Event> {
+  const scrolled = new Promise<Event>((resolve) => {
+    viewport.addEventListener('scroll', resolve, { once: true });
+  });
+  viewport.scrollTo({ top: viewport.scrollTop - 50, behavior: 'instant' });
+  return scrolled;
+}
+
 async function voiceAndTypedPanes() {
   stubVoice();
   const screen = await renderApp(twoAgents(A));
@@ -138,8 +146,7 @@ test('leaves every pane where the user scrolled up to when messages arrive', asy
     viewportOf(screen, 'agent 1'),
     viewportOf(screen, 'agent 2'),
   ];
-  for (const viewport of viewports)
-    viewport.scrollTo({ top: viewport.scrollTop - 50, behavior: 'instant' });
+  await Promise.all(viewports.map(scrollUp));
   await vi.waitFor(() =>
     expect(viewports.map(distanceToBottom)).toEqual([50, 50]),
   );

@@ -1,6 +1,8 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import './index.css';
+import { CoreAgents } from './agents/core-agents.ts';
+import { CoreRateLimits } from './agents/core-rate-limits.ts';
 import App from './App.tsx';
 import { CoreCanvas } from './canvas/core-canvas.ts';
 import { CoreInbox } from './inbox/core-inbox.ts';
@@ -17,6 +19,8 @@ if (root) {
         workspace={new CoreWorkspace()}
         canvas={new CoreCanvas()}
         inbox={new CoreInbox()}
+        agents={new CoreAgents()}
+        rateLimits={new CoreRateLimits()}
       />
     </StrictMode>,
   );

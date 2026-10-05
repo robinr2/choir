@@ -1,11 +1,10 @@
-import type { AppendMessage } from '@assistant-ui/react';
 import { expect, test } from 'vitest';
+import { toolCall } from '@/test/fake-core';
 import {
   isSpokenIn,
   senderIn,
   spokenTextsOf,
   textBefore,
-  textOf,
   threadMessageOf,
   userTurnsIn,
 } from './transcript';
@@ -16,20 +15,24 @@ test('shows the text and tool calls of a message in the thread', () => {
       id: 'm1',
       role: 'assistant',
       parts: [
+        toolCall(
+          'tool-1',
+          'Read',
+          { filePath: 'notes.md' },
+          { result: { content: 'buy milk' }, isError: false },
+        ),
+        toolCall('tool-2', 'Bash', undefined),
+        { type: 'reasoning', text: 'hmm' },
         {
-          type: 'tool-call',
-          toolCallId: 'tool-1',
-          toolName: 'Read',
-          args: { filePath: 'notes.md' },
-          result: { content: 'buy milk' },
-          isError: false,
+          type: 'elicitation',
+          id: 'e1',
+          server: null,
+          message: 'Pick one',
+          mode: 'form',
+          fields: [],
+          state: 'request',
         },
-        {
-          type: 'tool-call',
-          toolCallId: 'tool-2',
-          toolName: 'Bash',
-          args: undefined,
-        },
+        { type: 'compaction', id: 'c1', status: 'completed', summary: '' },
         { type: 'text', text: 'Done.' },
       ],
     }),
@@ -53,22 +56,21 @@ test('shows the text and tool calls of a message in the thread', () => {
         result: undefined,
         isError: undefined,
       },
+      { type: 'reasoning', text: 'hmm' },
       { type: 'text', text: 'Done.' },
     ],
     metadata: { custom: {} },
   });
 });
 
-test('takes the words of a typed message', () => {
-  const message = {
-    role: 'user',
-    content: [
-      { type: 'text', text: 'hello ' },
-      { type: 'image', image: 'data:image/png;base64,' },
-      { type: 'text', text: 'choir' },
-    ],
-  } as const satisfies Pick<AppendMessage, 'role' | 'content'>;
-  expect(textOf(message)).toBe('hello choir');
+test('shows the images of a user message', () => {
+  const image = {
+    type: 'image',
+    image: 'data:image/png;base64,iVBOR',
+  } as const;
+  expect(
+    threadMessageOf({ id: 'm0', role: 'user', parts: [image] }).content,
+  ).toEqual([image]);
 });
 
 test('shows spoken exchanges like typed ones', () => {
@@ -118,7 +120,7 @@ test('reads the text parts a reply speaks and counts the user turns', () => {
       role: 'assistant',
       parts: [
         { type: 'text', text: 'Let me look.' },
-        { type: 'tool-call', toolCallId: 't', toolName: 'Read', args: {} },
+        toolCall('t', 'Read', {}),
         { type: 'text', text: '  ' },
         { type: 'text', text: 'Found it.' },
       ],
