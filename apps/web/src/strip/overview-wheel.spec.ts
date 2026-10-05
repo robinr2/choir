@@ -28,6 +28,18 @@ test('focuses columns on the workspace under the pointer', () => {
     { action: 'focusColumnLeft', workspaceId: 'v' },
   ]);
   expect(binds.commands(wheel({ deltaX: -120 }), undefined)).toEqual([]);
+  expect(binds.commands(wheel({ deltaX: 3, deltaMode: 1 }), 'w')).toEqual([
+    { action: 'focusColumnRight', workspaceId: 'w' },
+  ]);
+});
+
+test('lets wheel events without a step leave the cooldown alone', () => {
+  const binds = new OverviewWheel();
+  expect(binds.commands(wheel({ deltaY: 120 }, 1000), 'w')).toHaveLength(1);
+  expect(binds.commands(wheel({ deltaY: 0 }, 1060), 'w')).toEqual([]);
+  expect(binds.commands(wheel({ deltaY: 120 }, 1070), 'w')).toEqual([
+    { action: 'focusWorkspaceDown' },
+  ]);
 });
 
 test('focuses columns with Shift and the vertical wheel, once per 50 ms', () => {

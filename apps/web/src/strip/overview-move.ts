@@ -39,7 +39,7 @@ class OverviewMoveSession implements Session {
   readonly #edge = new EdgeScroll();
   readonly #side = new EdgeScroll();
   #views: Record<string, number> = {};
-  #view: Strip;
+  #layout: Strip['layout'];
   #renderIndex: number;
   #recognized = false;
   #moving = false;
@@ -50,7 +50,7 @@ class OverviewMoveSession implements Session {
   constructor(store: Store, start: Start & { point: Point }) {
     this.#store = store;
     this.#start = start;
-    this.#view = start.strip;
+    this.#layout = start.strip.layout;
     this.#pointer = start.point;
     this.#renderIndex = store.getSnapshot().renderIndex;
   }
@@ -80,8 +80,7 @@ class OverviewMoveSession implements Session {
     this.#moving = true;
     this.#store.grab('grabbing');
     const { strip, location } = this.#start;
-    this.#view = { ...strip, layout: withoutPane(strip.layout, location) };
-    this.#store.show({ ...this.#view, workspaceId: this.#sourceId() });
+    this.#layout = withoutPane(strip.layout, location);
     this.#scroll(performance.now());
   }
 
@@ -107,10 +106,19 @@ class OverviewMoveSession implements Session {
     return this.#start.strip.layout.id;
   }
 
+  #overlay() {
+    return {
+      layout: this.#layout,
+      workspaceId: this.#sourceId(),
+      scrolled: this.#views,
+    };
+  }
+
   #target(): Drop {
     const snapshot = this.#store.getSnapshot();
     const stack = stackOf(snapshot, this.#renderIndex);
-    return dropAt(snapshot, stack, this.#pointer);
+    const overlaid = { ...snapshot, overlay: this.#overlay() };
+    return dropAt(overlaid, stack, this.#pointer);
   }
 
   #dragged() {
@@ -125,9 +133,7 @@ class OverviewMoveSession implements Session {
 
   #render(): void {
     this.#store.show({
-      ...this.#view,
-      workspaceId: this.#sourceId(),
-      scrolled: this.#views,
+      ...this.#overlay(),
       dragged: this.#dragged(),
       hint: this.#target().hint,
     });
@@ -136,7 +142,8 @@ class OverviewMoveSession implements Session {
   #drop(): void {
     const target = this.#target();
     const ids = this.#store.getSnapshot().view.workspaces.map(({ id }) => id);
-    this.#store.commit(this.#view.layout, this.#view.viewX);
+    const viewX = this.#views[this.#sourceId()] ?? this.#start.strip.viewX;
+    this.#store.commit(this.#layout, viewX);
     this.#store.show({
       workspaceId: this.#sourceId(),
       scrolled: this.#views,
@@ -163,14 +170,10 @@ class OverviewMoveSession implements Session {
     const factor = edgeFactor(this.#pointer.x, stack.metrics.width);
     const step = this.#side.step(factor, now) / stack.zoom;
     const target = this.#target();
-    if (step === 0 || target.fresh) return;
+    if (target.fresh) return;
     const { layout, viewX } = target.strip;
     const scrolled = clampView(layout, viewX + step, stack.metrics);
-    if (layout.id !== this.#sourceId()) {
-      this.#views = { ...this.#views, [layout.id]: scrolled };
-      return;
-    }
-    this.#view = { layout, viewX: scrolled };
+    this.#views = { ...this.#views, [layout.id]: scrolled };
   }
 
   #scrollBy(step: number, last: number): void {

@@ -17,6 +17,7 @@ import {
   stripElement,
   setUpStripScreen,
   measured,
+  watchStyles,
 } from '@/test/strip-screen';
 
 setUpStripScreen();
@@ -46,6 +47,20 @@ test('moves the view sideways and snaps it to the columns', async () => {
   await expect
     .element(pane(screen, 'agent 2'))
     .toHaveAttribute('data-focused', 'true');
+});
+
+test('follows the pointer directly while panning', async () => {
+  const screen = await renderApp();
+  await measured(screen);
+  const first = pane(screen, 'agent 1').element();
+  press(stripElement(), { x: 600, y: 400 }, MIDDLE);
+  drag('pointermove', { x: 594, y: 402 });
+  const xs = watchStyles(() => boxOf(first).x);
+  drag('pointermove', { x: 500, y: 400 });
+  await vi.waitFor(() => expect(boxOf(first).x).toBe(-40));
+  xs.stop();
+  expect(xs.seen.filter((x) => x !== 60 && x !== -40)).toEqual([]);
+  drag('pointerup', { x: 500, y: 400 });
 });
 
 test('keeps the focused column when the view snaps to it', async () => {

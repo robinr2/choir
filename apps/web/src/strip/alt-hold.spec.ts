@@ -16,8 +16,8 @@ function pressAlt(init: KeyboardEventInit = {}) {
 beforeEach(() => {
   vi.useFakeTimers();
   shown = [];
-  hold = new AltHold((visible) => shown.push(visible));
-  stop = hold.subscribe(window);
+  hold = new AltHold(window);
+  stop = hold.subscribe(() => shown.push(hold.getSnapshot()));
 });
 
 afterEach(() => {
@@ -82,6 +82,13 @@ test('stops listening once stopped', () => {
   pressAlt();
   vi.advanceTimersByTime(HOLD_DELAY);
   expect(shown).toEqual([]);
+});
+
+test('hides when stopped while shown', () => {
+  pressAlt();
+  vi.advanceTimersByTime(HOLD_DELAY);
+  stop();
+  expect(hold.getSnapshot()).toBe(false);
 });
 
 test('forgets a pending show when stopped', () => {

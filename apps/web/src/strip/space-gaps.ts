@@ -1,10 +1,6 @@
 export class SpaceGaps {
   #gaps: number[] = [];
 
-  get open(): boolean {
-    return this.#gaps.length > 0;
-  }
-
   shown(index: number): number {
     return this.#gaps.reduce(
       (shown, gap) => (gap <= shown ? shown + 1 : shown),

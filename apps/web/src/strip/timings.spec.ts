@@ -6,6 +6,7 @@ import {
   OVERVIEW,
   RESIZE,
   SHEET,
+  SHEET_HIDDEN,
   VIEW,
   WORKSPACE,
 } from './timings';
@@ -28,4 +29,8 @@ test('opens with ease-out-expo and closes with ease-out-quad in 150 ms', () => {
     1,
   ]);
   expect([CLOSE.ease(0), CLOSE.ease(0.5), CLOSE.ease(1)]).toEqual([0, 0.75, 1]);
+});
+
+test('slides the key hint in from below the strip', () => {
+  expect(SHEET_HIDDEN).toEqual({ y: '100%', opacity: 0 });
 });

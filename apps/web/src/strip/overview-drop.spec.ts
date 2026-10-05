@@ -23,3 +23,13 @@ test('leaves the workspaces still beside their strip or without height', () => {
   const flat = { ...STACK, metrics: { ...STACK.metrics, height: 0 } };
   expect(scrollFactor(flat, { x: 500, y: 0 })).toBe(0);
 });
+
+test('starts scrolling right at the edge zone', () => {
+  expect(scrollFactor(STACK, { x: 500, y: 50 })).toBe(0);
+  expect(scrollFactor(STACK, { x: 500, y: 49 })).toBe(-0.02);
+});
+
+test('shrinks the edge zones to half of a short strip', () => {
+  const short = { ...STACK, metrics: { ...STACK.metrics, height: 60 } };
+  expect(scrollFactor(short, { x: 500, y: 15 })).toBe(-0.5);
+});

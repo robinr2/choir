@@ -49,6 +49,14 @@ function wheel(init: WheelEventInit): boolean {
   );
 }
 
+function menu(target: Element): boolean {
+  const event = new MouseEvent('contextmenu', {
+    bubbles: true,
+    cancelable: true,
+  });
+  return target.dispatchEvent(event);
+}
+
 function overview() {
   return page.elementLocator(stripElement());
 }
@@ -140,7 +148,7 @@ test('keeps the keys from the panes while it is open', async () => {
 test('closes on the workspace of a clicked pane', async () => {
   const screen = await renderApp(STACKED);
   const second = await openedOnSecond(screen);
-  press(second, { x: 400, y: 700 });
+  expect(press(second, { x: 400, y: 700 }, { altKey: true })).toBe(false);
   drag('pointerup', { x: 400, y: 700 });
   await expect.element(overview()).toHaveAttribute('data-overview', 'false');
   await vi.waitFor(() =>
@@ -152,10 +160,11 @@ test('closes on the workspace of a clicked pane', async () => {
 
 test('closes on a clicked workspace', async () => {
   const screen = await renderApp();
-  await opened(screen);
+  const first = await opened(screen);
   const last = workspace('last');
   press(last, { x: 600, y: 700 });
   await expect.element(overview()).toHaveAttribute('data-overview', 'false');
+  await vi.waitFor(() => expect(boxOf(first).y).toBe(-876));
   await vi.waitFor(() =>
     expect(actions()).toEqual([
       { action: 'focusWorkspace', workspaceId: 'last' },
@@ -206,6 +215,8 @@ test('holds a pane back until it is dragged far enough', async () => {
   drag('pointermove', { x: 404, y: 300 });
   drag('pointermove', { x: 500, y: 300 });
   await vi.waitFor(() => expect(boxOf(first).x).toBeGreaterThan(358));
+  expect(first.firstElementChild).toHaveClass('ring-ring/50');
+  expect(first.firstElementChild).not.toHaveClass('ring-muted-foreground/25');
   expect(boxOf(first).x).toBeLessThan(358 + 100);
   expect(document.querySelector('[data-slot="insert-hint"]')).toBeNull();
   drag('pointerup', { x: 500, y: 300 });
@@ -233,6 +244,8 @@ test('ignores other buttons and presses beside the workspaces', async () => {
   const screen = await renderApp();
   const first = await opened(screen);
   press(first, { x: 400, y: 300 }, { button: 1 });
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  expect(stripElement().dataset.gesture).toBe('false');
   press(stripElement(), { x: 10, y: 10 });
   const stranger = document.createElement('div');
   stranger.dataset.paneId = 'nowhere';
@@ -315,15 +328,12 @@ test('pans the view of the focused workspace with a right drag', async () => {
   const screen = await renderApp();
   const first = await opened(screen);
   expect(press(first, { x: 400, y: 300 }, { button: 2 })).toBe(false);
-  expect(
-    first.dispatchEvent(
-      new MouseEvent('contextmenu', { bubbles: true, cancelable: true }),
-    ),
-  ).toBe(false);
+  expect(menu(first)).toBe(false);
+  expect(menu(document.body)).toBe(true);
   await vi.waitFor(() =>
     expect(stripElement().style.cursor).toBe('all-scroll'),
   );
-  drag('pointermove', { x: 350, y: 300 });
+  drag('pointermove', { x: 350, y: 200 });
   await vi.waitFor(() => expect(boxOf(first).x).toBe(308));
   drag('pointermove', { x: 340, y: 340 });
   await vi.waitFor(() => expect(boxOf(first).x).toBe(298));

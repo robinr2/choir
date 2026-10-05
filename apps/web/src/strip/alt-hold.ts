@@ -9,22 +9,25 @@ function aloneAlt(event: KeyboardEvent): boolean {
 }
 
 export class AltHold {
-  readonly #report: (shown: boolean) => void;
+  readonly #target: Window;
   #timer: ReturnType<typeof setTimeout> | undefined;
   #shown = false;
 
-  constructor(report: (shown: boolean) => void) {
-    this.#report = report;
+  constructor(target: Window) {
+    this.#target = target;
   }
 
-  subscribe(target: Window): () => void {
+  readonly getSnapshot = (): boolean => this.#shown;
+
+  readonly subscribe = (changed: () => void): (() => void) => {
+    const target = this.#target;
     const controller = new AbortController();
     const { signal } = controller;
     const capture = { capture: true, signal };
-    const dismiss = () => this.#dismiss();
+    const dismiss = () => this.#dismiss(changed);
     target.addEventListener(
       'keydown',
-      (event) => this.#keydown(event),
+      (event) => this.#keydown(event, changed),
       capture,
     );
     for (const type of ['keyup', 'pointerdown', 'wheel', 'blur']) {
@@ -32,26 +35,26 @@ export class AltHold {
     }
     return () => {
       controller.abort();
-      clearTimeout(this.#timer);
+      this.#dismiss(changed);
     };
-  }
+  };
 
-  #keydown(event: KeyboardEvent): void {
+  #keydown(event: KeyboardEvent, changed: () => void): void {
     if (event.repeat && aloneAlt(event)) return;
-    this.#dismiss();
+    this.#dismiss(changed);
     if (aloneAlt(event)) {
-      this.#timer = setTimeout(() => this.#set(true), HOLD_DELAY);
+      this.#timer = setTimeout(() => this.#set(true, changed), HOLD_DELAY);
     }
   }
 
-  #dismiss(): void {
+  #dismiss(changed: () => void): void {
     clearTimeout(this.#timer);
-    this.#set(false);
+    this.#set(false, changed);
   }
 
-  #set(shown: boolean): void {
+  #set(shown: boolean, changed: () => void): void {
     if (this.#shown === shown) return;
     this.#shown = shown;
-    this.#report(shown);
+    changed();
   }
 }

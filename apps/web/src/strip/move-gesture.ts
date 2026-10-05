@@ -5,9 +5,7 @@ import { pressed } from './placements';
 import { withoutPane } from './preview';
 import { band } from './rubber-band';
 import { type Grab, type Point, type Session, track } from './session';
-import type { Location, Overlay, Rect, Store, Strip } from './types';
-
-type Dragged = Overlay['dragged'];
+import type { Location, Rect, Store, Strip } from './types';
 
 const THRESHOLD = 256 * 256;
 
@@ -41,7 +39,6 @@ class MoveSession implements Session {
   readonly #edge = new EdgeScroll();
   #view: Strip;
   #moving = false;
-  #dragged?: Dragged;
   #pointer: Point;
   #frame = 0;
 
@@ -74,7 +71,6 @@ class MoveSession implements Session {
     const { metrics } = this.#store.getSnapshot();
     const position = insertPosition(this.#view, point, metrics);
     this.#store.commit(this.#view.layout, this.#view.viewX);
-    this.#store.show({ dragged: this.#dragged });
     const paneId = this.#start.paneId;
     void this.#store.workspace.act({ action: 'movePane', paneId, ...position });
   }
@@ -100,7 +96,6 @@ class MoveSession implements Session {
       width,
       height,
     };
-    this.#dragged = dragged;
     const position = insertPosition(this.#view, this.#pointer, metrics);
     const hint = hintRect(this.#view, position, metrics);
     this.#store.show({ ...this.#view, dragged, hint });

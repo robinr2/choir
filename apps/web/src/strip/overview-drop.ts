@@ -47,7 +47,7 @@ function edge(y: number, height: number): number {
 
 export function scrollFactor(stack: Stack, point: Point): number {
   const { height } = stack.metrics;
-  if (height < 0.01 || !across(stack, point.x)) return 0;
+  if (height <= 0 || !across(stack, point.x)) return 0;
   return edge(point.y, height);
 }
 

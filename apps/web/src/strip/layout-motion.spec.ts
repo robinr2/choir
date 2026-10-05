@@ -12,7 +12,7 @@ function placed(
     workspaceId: 'first',
     rect: { x, y: 4, width: 100, height: 200 },
     focused: false,
-    active: false,
+    muted: false,
     dragged: false,
     ...extra,
   };
@@ -45,6 +45,7 @@ test('jumps to the first layout it sees', () => {
   const tile = motion.tile(placed('a', 0));
   motion.apply(frameOf([placed('a', 50)], { renderIndex: 2 }));
   expect(tile.x.get()).toBe(50);
+  expect(tile.opacity.get()).toBe(1);
   expect(tile.x.isAnimating()).toBe(false);
   expect(motion.renderIndex.get()).toBe(2);
   expect(motion.step.get()).toBe(880);
@@ -181,8 +182,11 @@ test('brings back a pane that returns while it closes', async () => {
   const motion = ready([placed('a', 0)]);
   const tile = motion.tile(placed('a', 0));
   void motion.close('a');
+  await vi.waitFor(() => expect(tile.scale.get()).toBeLessThan(0.95));
   motion.apply(frameOf([placed('a', 0)]));
-  await vi.waitFor(() => expect(tile.opacity.get()).toBe(1));
+  await vi.waitFor(() =>
+    expect([tile.opacity.get(), tile.scale.get()]).toEqual([1, 1]),
+  );
   expect(motion.tile(placed('a', 0))).toBe(tile);
 });
 
@@ -302,4 +306,64 @@ test('keeps the closed overview on its workspace when one above goes', async () 
   await vi.waitFor(() => expect(motion.space('third').index.get()).toBe(1));
   expect(motion.shown()).toBe(1);
   expect(motion.renderIndex.isAnimating()).toBe(false);
+});
+
+const LET_GO = { x: 300, y: 50, width: 100, height: 200 };
+
+function droppedOn(spaces: Frame['spaces'], into = 'second') {
+  const motion = ready([placed('a', 0)]);
+  const tile = motion.tile(placed('a', 0));
+  const first = { id: 'first', index: 0, viewX: -4 };
+  const second = { id: 'second', index: 1, viewX: 10 };
+  motion.apply(frameOf([placed('a', 0)], { spaces: [first, second] }));
+  const dragged = placed('a', 0, { dragged: true, rect: LET_GO });
+  motion.apply(
+    frameOf([dragged], { spaces: [first, second], tracking: 'view' }),
+  );
+  const landed = placed('a', 0, { workspaceId: into, rect: LET_GO });
+  motion.apply(frameOf([landed], { spaces: [first, ...spaces] }));
+  return tile;
+}
+
+test('glides a pane dropped on another workspace from where it was let go', () => {
+  const tile = droppedOn([{ id: 'second', index: 1, viewX: 40 }]);
+  expect([tile.x.get(), tile.y.get()]).toEqual([314, 50 - 880]);
+  expect([tile.x.isAnimating(), tile.y.isAnimating()]).toEqual([true, true]);
+});
+
+test('takes the view a new workspace opens with for a pane dropped there', () => {
+  const tile = droppedOn(
+    [
+      { id: 'second', index: 2, viewX: 10 },
+      { id: 'fresh', index: 1, viewX: 40 },
+    ],
+    'fresh',
+  ).x;
+  expect(tile.get()).toBe(344);
+});
+
+test('opens a pane it has not drawn before', () => {
+  const motion = ready([placed('a', 0)]);
+  motion.apply(frameOf([placed('a', 0), placed('c', 200)]));
+  expect(motion.tile(placed('c', 200)).opacity.isAnimating()).toBe(true);
+});
+
+test('shows a workspace that comes back with its own view', () => {
+  const motion = ready([placed('a', 0)]);
+  motion.apply(frameOf([placed('a', 0)], { spaces: THREE }));
+  motion.apply(frameOf([placed('a', 0)], { spaces: LEFT }));
+  const back = [THREE[0], { ...THREE[1], viewX: 300 }, THREE[2]];
+  motion.apply(frameOf([placed('a', 0)], { spaces: back }));
+  expect(motion.space('empty').viewX.get()).toBe(300);
+});
+
+test('closes the place of a removed workspace for a gesture while zooming', () => {
+  const motion = ready([placed('a', 0)]);
+  motion.apply(frameOf([placed('a', 0)], { spaces: THREE }));
+  motion.apply(frameOf([placed('a', 0)], { spaces: LEFT, zoom: 0.5 }));
+  expect(motion.space('third').index.get()).toBe(2);
+  motion.apply(
+    frameOf([placed('a', 0)], { spaces: LEFT, zoom: 0.5, tracking: 'all' }),
+  );
+  expect(motion.space('third').index.get()).toBe(1);
 });

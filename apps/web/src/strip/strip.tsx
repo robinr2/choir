@@ -15,6 +15,7 @@ import { workspaceAt, workspaceStep, zoomOf } from './overview';
 import { OverviewWheel } from './overview-wheel';
 import { focusedPaneId, placements, spaces } from './placements';
 import { useStrip } from './strip-context';
+import { pointOf } from './session';
 import { press } from './strip-press';
 import type { Snapshot, Store } from './types';
 import { WheelBinds } from './wheel';
@@ -31,21 +32,19 @@ function keys(store: Store) {
 
 function workspaceUnder(store: Store, root: HTMLElement, event: WheelEvent) {
   const snapshot = store.getSnapshot();
-  const y = event.clientY - root.getBoundingClientRect().top;
-  const index = workspaceAt(snapshot, y);
+  const index = workspaceAt(snapshot, pointOf(root, event).y);
   return index === null ? undefined : snapshot.view.workspaces[index].id;
 }
 
 function overviewWheel(store: Store, root: HTMLElement) {
   const binds = new OverviewWheel();
   return (event: WheelEvent) => {
-    if (!store.getSnapshot().overview || event.altKey) return false;
+    if (!store.getSnapshot().overview) return;
     event.preventDefault();
     const under = workspaceUnder(store, root, event);
     for (const action of binds.commands(event, under)) {
       void store.workspace.act(action);
     }
-    return true;
   };
 }
 
@@ -53,7 +52,7 @@ function wheel(store: Store, root: HTMLElement) {
   const binds = new WheelBinds();
   const overview = overviewWheel(store, root);
   return (event: WheelEvent) => {
-    if (overview(event) || !event.altKey) return;
+    if (!event.altKey) return overview(event);
     event.preventDefault();
     for (const action of binds.commands(event)) {
       void store.workspace.act({ action });
@@ -142,7 +141,7 @@ function frameOf(snapshot: Snapshot): Frame {
     width: metrics.width,
     height: metrics.height,
     zoom: zoomOf(snapshot.overview),
-    ready: view.loaded && metrics.height > 0,
+    ready: view.loaded,
     tracking: trackingOf(snapshot),
   };
 }

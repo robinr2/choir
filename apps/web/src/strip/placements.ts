@@ -23,7 +23,7 @@ export type Placement = {
   workspaceId: string;
   rect: Rect;
   focused: boolean;
-  active: boolean;
+  muted: boolean;
   dragged: boolean;
 };
 
@@ -113,7 +113,7 @@ function stripPlacements(
         workspaceId: id,
         rect: rects[tile],
         focused: focusable && active,
-        active,
+        muted: active && !focusable,
         dragged: false,
       };
     });
@@ -165,7 +165,7 @@ function draggedPlacement(
     workspaceId: space.id,
     rect: { ...rect, x: x + space.viewX, y },
     focused: true,
-    active: true,
+    muted: false,
     dragged: true,
   };
 }

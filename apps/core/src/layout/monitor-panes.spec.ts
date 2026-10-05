@@ -191,6 +191,15 @@ describe('movePaneToNewWorkspace', () => {
     );
   });
 
+  it('fills the focused empty workspace at the bottom', () => {
+    const start = layout(['A*', 'B*', ''], 2);
+    expect(sketches(movePaneToNewWorkspace(start, 'A', 2))).toEqual([
+      'B*',
+      '> A*',
+      '',
+    ]);
+  });
+
   it('keeps the width of the old column', () => {
     const start = twoWorkspaces();
     start.workspaces[0].columns[0].width = 0.3;

@@ -9,7 +9,7 @@ export type Session = {
 
 export type Grab = { store: Store; root: HTMLElement; event: PointerEvent };
 
-export function pointOf(root: HTMLElement, event: PointerEvent): Point {
+export function pointOf(root: HTMLElement, event: MouseEvent): Point {
   const box = root.getBoundingClientRect();
   return {
     x: event.clientX - box.left,

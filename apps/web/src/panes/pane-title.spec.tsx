@@ -136,8 +136,21 @@ test('closes a pane from its title bar', async () => {
   );
 });
 
+const EDITOR = 'input[aria-label="Agent name"]';
+
 test('renames a pane by clicking its name', async () => {
+  let edited = false;
+  const watch = new MutationObserver((records) => {
+    const removed = records.flatMap(({ removedNodes }) => [...removedNodes]);
+    edited ||= removed.some(
+      (node) => node instanceof Element && node.matches(EDITOR),
+    );
+  });
+  watch.observe(document.body, { subtree: true, childList: true });
   const screen = await renderApp();
+  await expect.element(pane(screen, 'agent 1')).toBeInTheDocument();
+  watch.disconnect();
+  expect(edited).toBe(false);
   await screen.getByRole('button', { name: 'agent 1' }).click();
   const input = screen.getByRole('textbox', { name: 'Agent name' });
   await expect.element(input).toHaveFocus();

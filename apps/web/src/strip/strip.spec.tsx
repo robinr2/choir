@@ -1,5 +1,5 @@
 import { expect, test, vi } from 'vitest';
-import { page } from 'vitest/browser';
+import { page, userEvent } from 'vitest/browser';
 import {
   A,
   agent,
@@ -10,13 +10,14 @@ import {
   twoAgents,
   viewOf,
 } from '@/test/fake-core';
-import { requests } from '@/test/fake-event-source';
+import { requests, stream } from '@/test/fake-event-source';
 import { pane, renderApp } from '@/test/render-app';
 import { ViewStore } from './view-store';
 import {
   actions,
   boxOf,
   measured,
+  watchStyles,
   stripElement,
   setUpStripScreen,
 } from '@/test/strip-screen';
@@ -198,6 +199,54 @@ test('focuses the canvas pane once its frame takes the focus', async () => {
   expect(actions()).toHaveLength(1);
 });
 
+test('puts the first panes in place without animating them', async () => {
+  const frames = watchStyles(() =>
+    [...document.querySelectorAll('[data-pane-id]')].map((found) => ({
+      x: boxOf(found).x,
+      opacity: getComputedStyle(contentOf(found)).opacity,
+    })),
+  );
+  const screen = await renderApp();
+  await measured(screen);
+  await new Promise((resolve) => setTimeout(resolve, 100));
+  frames.stop();
+  const seen = frames.seen.flat();
+  expect(seen.filter(({ opacity }) => opacity !== '1')).toEqual([]);
+  expect(new Set(seen.map(({ x }) => x)).size).toBeLessThan(5);
+  expect(stripElement().tabIndex).toBe(-1);
+});
+
+function ringOf(element: Element): string[] {
+  return [...(element.firstElementChild?.classList ?? [])].filter((name) =>
+    /^ring-(ring|muted)/.test(name),
+  );
+}
+
+test('rings the focused pane of every other workspace in a muted colour', async () => {
+  const C = '5c3d2e1f-0a9b-4c8d-8e7f-6a5b4c3d2e1f';
+  const screen = await renderApp(
+    viewOf(
+      [
+        strip('first', [column('left', [A])]),
+        strip('second', [column('right', [B]), column('third', [C])]),
+      ],
+      [agent(A, 'agent 1'), agent(B, 'agent 2'), agent(C, 'agent 3')],
+    ),
+  );
+  const backdrop = document.querySelector('[data-slot="backdrop"]');
+  const card = document.querySelector('[data-slot="workspace"]');
+  const opacities = () =>
+    [backdrop, card].map((found) => found && getComputedStyle(found).opacity);
+  await vi.waitFor(() => expect(opacities()).toEqual(['0', '0']));
+  await userEvent.keyboard('{Alt>}o{/Alt}');
+  await vi.waitFor(() => expect(opacities()).toEqual(['1', '1']));
+  expect(ringOf(pane(screen, 'agent 1').element())).toEqual(['ring-ring/50']);
+  expect(ringOf(pane(screen, 'agent 2').element())).toEqual([
+    'ring-muted-foreground/25',
+  ]);
+  expect(ringOf(pane(screen, 'agent 3').element())).toEqual([]);
+});
+
 test('stops measuring the strip once it is gone', async () => {
   const measure = vi.spyOn(ViewStore.prototype, 'measure');
   const screen = await renderApp();
@@ -205,6 +254,7 @@ test('stops measuring the strip once it is gone', async () => {
   await screen.unmount();
   await new Promise((resolve) => setTimeout(resolve, 100));
   expect(measure).not.toHaveBeenCalledWith(0, 0);
+  expect(stream().closed).toBe(true);
 });
 
 function contentOf(element: Element): HTMLElement {

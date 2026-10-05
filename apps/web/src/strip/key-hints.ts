@@ -33,10 +33,10 @@ const LABELS: Record<string, [Group, string]> = {
   moveWindowToWorkspaceDown: ['Workspaces', 'Send pane down'],
   moveWorkspaceUp: ['Workspaces', 'Move workspace up'],
   moveWorkspaceDown: ['Workspaces', 'Move workspace down'],
-  'setColumnWidth-': ['Size', 'Narrower column'],
-  'setColumnWidth+': ['Size', 'Wider column'],
-  'setWindowHeight-': ['Size', 'Shorter pane'],
-  'setWindowHeight+': ['Size', 'Taller pane'],
+  'setColumnWidth-1': ['Size', 'Narrower column'],
+  setColumnWidth1: ['Size', 'Wider column'],
+  'setWindowHeight-1': ['Size', 'Shorter pane'],
+  setWindowHeight1: ['Size', 'Taller pane'],
   resetWindowHeight: ['Size', 'Reset pane height'],
   maximizeColumn: ['Size', 'Maximize column'],
   expand: ['Size', 'Fill the free width'],
@@ -70,11 +70,11 @@ const KEY_NAMES: Record<string, string> = {
 function idOf(command: Command): string {
   if (typeof command === 'string') return command;
   if (!('change' in command)) return command.action;
-  return `${command.action}${command.change < 0 ? '-' : '+'}`;
+  return `${command.action}${Math.sign(command.change)}`;
 }
 
 function keyName(code: string): string {
-  return KEY_NAMES[code] ?? code.replace(/^Key/, '');
+  return KEY_NAMES[code] ?? code.replace('Key', '');
 }
 
 function isLetter(code: string): boolean {

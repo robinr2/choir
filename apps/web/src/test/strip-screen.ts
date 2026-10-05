@@ -61,6 +61,17 @@ export function boxOf(element: Element): DOMRect {
   return element.getBoundingClientRect();
 }
 
+export function watchStyles<T>(read: () => T): { seen: T[]; stop(): void } {
+  const seen: T[] = [];
+  const observer = new MutationObserver(() => seen.push(read()));
+  observer.observe(document.body, {
+    subtree: true,
+    attributes: true,
+    attributeFilter: ['style'],
+  });
+  return { seen, stop: () => observer.disconnect() };
+}
+
 export function setUpStripScreen(): void {
   beforeEach(async () => {
     fakeCore();

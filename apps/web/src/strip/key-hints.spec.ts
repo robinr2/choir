@@ -52,11 +52,42 @@ test('keeps Shift with the keys it changes', () => {
 });
 
 test('labels every binding once', () => {
-  const labels = keyHints(false).flatMap(({ name, rows }) =>
-    rows.map(({ label }) => `${name}: ${label}`),
-  );
-  expect(labels).toHaveLength(30);
-  expect(new Set(labels).size).toBe(labels.length);
+  const labels = keyHints(false).map(({ name, rows }) => [
+    name,
+    rows.map(({ label }) => label),
+  ]);
+  expect(Object.fromEntries(labels)).toEqual({
+    Focus: ['Pane below', 'Pane above', 'Column left', 'Column right'],
+    Move: ['Column left', 'Column right', 'Pane down', 'Pane up'],
+    Workspaces: [
+      'Workspace below',
+      'Workspace above',
+      'Send column down',
+      'Send column up',
+      'Move workspace down',
+      'Move workspace up',
+      'Send pane down',
+      'Send pane up',
+    ],
+    Size: [
+      'Narrower column',
+      'Wider column',
+      'Shorter pane',
+      'Taller pane',
+      'Reset pane height',
+      'Maximize column',
+      'Fill the free width',
+    ],
+    Panes: [
+      'Close pane',
+      'Open pane',
+      'Consume or expel left',
+      'Consume or expel right',
+      'Consume into column',
+      'Expel from column',
+    ],
+    Overview: ['Toggle overview'],
+  });
 });
 
 test('lists the overview keys only while the overview is open', () => {

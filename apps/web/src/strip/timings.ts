@@ -27,6 +27,8 @@ export const RESIZE = spring(800);
 
 export const SHEET = spring(800);
 
+export const SHEET_HIDDEN = { y: '100%', opacity: 0 };
+
 export const OPEN = { duration: 0.15, ease: easeOutExpo };
 
 export const CLOSE = { duration: 0.15, ease: easeOutQuad };

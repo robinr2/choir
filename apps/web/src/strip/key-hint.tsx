@@ -5,16 +5,16 @@ import {
   MotionConfig,
 } from 'motion/react';
 import * as m from 'motion/react-m';
-import { useCallback, useEffect, useState } from 'react';
+import { useSyncExternalStore } from 'react';
 import { Kbd, KbdGroup } from '@/components/ui/kbd';
 import { AltHold } from './alt-hold';
 import { type HintGroup, type HintRow, keyHints } from './key-hints';
-import { SHEET } from './timings';
+import { SHEET, SHEET_HIDDEN } from './timings';
+
+const hold = new AltHold(window);
 
 function useAltHeld(): boolean {
-  const [held, setHeld] = useState(false);
-  useEffect(() => new AltHold(setHeld).subscribe(window), []);
-  return held;
+  return useSyncExternalStore(hold.subscribe, hold.getSnapshot);
 }
 
 function Keys({ modifiers, keys }: Readonly<Omit<HintRow, 'label'>>) {
@@ -33,8 +33,6 @@ function Keys({ modifiers, keys }: Readonly<Omit<HintRow, 'label'>>) {
   );
 }
 
-const HIDDEN = { y: '100%', opacity: 0 };
-
 const SHOWN = { y: 0, opacity: 1 };
 
 function Section({ name, rows }: Readonly<HintGroup>) {
@@ -45,7 +43,7 @@ function Section({ name, rows }: Readonly<HintGroup>) {
       </h3>
       {rows.map(({ label, ...keys }) => (
         <div
-          key={`${label}${keys.modifiers.join()}`}
+          key={label}
           className="flex items-center justify-between gap-3 py-0.5 text-sm"
         >
           <span className="min-w-0">{label}</span>
@@ -58,47 +56,37 @@ function Section({ name, rows }: Readonly<HintGroup>) {
 
 const MIN_ZOOM = 0.5;
 
-const ZOOM_STEP = 0.05;
-
 function fitInto(room: number) {
   return (sheet: HTMLDivElement) => {
-    let zoom = 1;
     sheet.style.zoom = '1';
-    while (zoom > MIN_ZOOM && sheet.getBoundingClientRect().height > room) {
-      zoom -= ZOOM_STEP;
-      sheet.style.zoom = String(zoom);
-    }
+    const natural = sheet.getBoundingClientRect().height;
+    sheet.style.zoom = String(Math.max(MIN_ZOOM, Math.min(1, room / natural)));
+    return () => {};
   };
 }
 
 type HintProps = Readonly<{ overview: boolean; height: number }>;
 
 function Sheet({ overview, height }: HintProps) {
-  const fit = useCallback(
-    (sheet: HTMLDivElement) => {
-      const refit = fitInto(height / 3);
-      refit(sheet);
-      const observer = new ResizeObserver(() => refit(sheet));
-      observer.observe(sheet);
-      return () => observer.disconnect();
-    },
-    [height],
-  );
   return (
     <m.div
-      ref={fit}
       data-slot="key-hint"
       aria-hidden
-      initial={HIDDEN}
+      initial={SHEET_HIDDEN}
       animate={SHOWN}
-      exit={HIDDEN}
+      exit={SHEET_HIDDEN}
       transition={SHEET}
-      className="bg-background/80 text-foreground pointer-events-none absolute inset-x-0 bottom-0 z-20 overflow-hidden border-t px-4 py-3 shadow-lg backdrop-blur-md"
+      className="pointer-events-none absolute inset-x-0 bottom-0 z-20"
     >
-      <div className="columns-[18rem] gap-6">
-        {keyHints(overview).map((group) => (
-          <Section key={group.name} {...group} />
-        ))}
+      <div
+        ref={fitInto(height / 3)}
+        className="bg-background/80 text-foreground overflow-hidden border-t px-4 py-3 shadow-lg backdrop-blur-md"
+      >
+        <div className="columns-[18rem] gap-6">
+          {keyHints(overview).map((group) => (
+            <Section key={group.name} {...group} />
+          ))}
+        </div>
       </div>
     </m.div>
   );

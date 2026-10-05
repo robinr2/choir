@@ -1,5 +1,6 @@
 import { expect, test, vi } from 'vitest';
 import { page, userEvent } from 'vitest/browser';
+import { coreShowsWorkspace, twoAgents } from '@/test/fake-core';
 import { renderApp } from '@/test/render-app';
 import { press, setUpStripScreen, stripElement } from '@/test/strip-screen';
 
@@ -31,6 +32,10 @@ async function shown(): Promise<HTMLElement> {
     if (!sheet) throw new Error('The key hint is not shown');
     return sheet;
   });
+}
+
+function zoomOf(sheet: HTMLElement): string | undefined {
+  return sheet.querySelector<HTMLElement>(':scope > div')?.style.zoom;
 }
 
 async function hidden(): Promise<void> {
@@ -70,7 +75,7 @@ test('keeps its full size when the bindings fit', async () => {
   await renderApp();
   holdAlt();
   const sheet = await shown();
-  expect(sheet.style.zoom).toBe('1');
+  expect(zoomOf(sheet)).toBe('1');
 });
 
 test('shrinks until every binding fits a third of a small strip', async () => {
@@ -79,7 +84,7 @@ test('shrinks until every binding fits a third of a small strip', async () => {
   holdAlt();
   const sheet = await shown();
   await vi.waitFor(() => {
-    expect(Number(sheet.style.zoom)).toBeLessThan(1);
+    expect(Number(zoomOf(sheet))).toBeLessThan(1);
     const height = stripElement().getBoundingClientRect().height;
     expect(sheet.getBoundingClientRect().height).toBeLessThanOrEqual(
       height / 3,
@@ -87,11 +92,58 @@ test('shrinks until every binding fits a third of a small strip', async () => {
   });
 });
 
+test('pairs each binding with its modifiers and twin keys', async () => {
+  await renderApp();
+  holdAlt();
+  const sheet = await shown();
+  const focus = [...sheet.querySelectorAll('section')].find(
+    (section) => section.querySelector('h3')?.textContent === 'Focus',
+  );
+  expect(focus).toHaveTextContent('Column leftAltH/←');
+});
+
+test('stops shrinking at half size', async () => {
+  await page.viewport(500, 300);
+  await renderApp();
+  holdAlt();
+  const sheet = await shown();
+  await vi.waitFor(() => expect(zoomOf(sheet)).toBe('0.5'));
+});
+
+test('measures its full size again whenever the strip renders', async () => {
+  await page.viewport(900, 600);
+  await renderApp();
+  holdAlt();
+  const sheet = await shown();
+  await vi.waitFor(() => expect(Number(zoomOf(sheet))).toBeLessThan(1));
+  coreShowsWorkspace(twoAgents());
+  await pause(100);
+  const height = stripElement().getBoundingClientRect().height;
+  expect(sheet.getBoundingClientRect().height).toBeLessThanOrEqual(height / 3);
+});
+
 test('hides when another key joins Alt', async () => {
   await renderApp();
   holdAlt();
   await shown();
   await userEvent.keyboard('{Alt>}j{/Alt}');
+  await hidden();
+  expect(hint()).toBeNull();
+});
+
+test('hides when a bound key joins the held Alt', async () => {
+  await renderApp();
+  holdAlt();
+  await shown();
+  document.body.dispatchEvent(
+    new KeyboardEvent('keydown', {
+      key: 'l',
+      code: 'KeyL',
+      altKey: true,
+      bubbles: true,
+      cancelable: true,
+    }),
+  );
   await hidden();
   expect(hint()).toBeNull();
 });

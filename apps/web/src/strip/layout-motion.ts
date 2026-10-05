@@ -69,7 +69,7 @@ export class LayoutMotion {
   #indices = new Map<string, number>();
   #renderIndex = 0;
   #ready = false;
-  #size = '';
+  #size?: string;
 
   constructor() {
     const settle = () => queueMicrotask(() => this.#settle());
@@ -77,7 +77,7 @@ export class LayoutMotion {
     this.zoom.on('animationComplete', settle);
   }
 
-  tile({ paneId, rect, workspaceId }: Placement): TileMotion {
+  tile({ paneId, rect, workspaceId, dragged }: Placement): TileMotion {
     const known = this.#tiles.get(paneId);
     if (known) return known.values;
     const values = tileValues(rect);
@@ -85,7 +85,7 @@ export class LayoutMotion {
       values.opacity.jump(0);
       values.scale.jump(0.5);
     }
-    this.#tiles.set(paneId, { values, workspaceId, dragged: false });
+    this.#tiles.set(paneId, { values, workspaceId, dragged });
     return values;
   }
 
@@ -136,7 +136,7 @@ export class LayoutMotion {
     const kept = new Set(spaces.map(({ id }) => id));
     for (const [id, space] of this.#spaces) {
       if (kept.has(id)) continue;
-      if (view === 'animate') this.#gaps.add(space.index.get());
+      this.#gaps.add(space.index.get());
       this.#spaces.delete(id);
     }
     if (view !== 'animate') this.#close();
@@ -149,7 +149,6 @@ export class LayoutMotion {
   }
 
   #close(): void {
-    if (!this.#gaps.open) return;
     this.#stack.remap(this.#gaps.collapse(), this.#renderIndex);
     for (const [id, index] of this.#indices) this.space(id).index.jump(index);
   }
@@ -176,10 +175,9 @@ export class LayoutMotion {
     return free;
   }
 
-  #landed({ paneId, workspaceId }: Placement): Tile | undefined {
+  #landed({ paneId }: Placement): Tile | undefined {
     const known = this.#tiles.get(paneId);
-    if (!known?.dragged) return undefined;
-    return known.workspaceId === workspaceId ? undefined : known;
+    return known?.dragged ? known : undefined;
   }
 
   #rebaseDrops(frame: Frame): void {

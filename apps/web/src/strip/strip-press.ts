@@ -64,9 +64,9 @@ function panOverview(grab: Grab, view: boolean): void {
 
 function pansOverview(grab: Grab): boolean {
   const { button, altKey } = grab.event;
-  if (button === 2) panOverview(grab, true);
-  else if (button === 1 && altKey) panOverview(grab, false);
-  return button !== 0;
+  if (button === 0) return false;
+  if (button === 2 || altKey) panOverview(grab, button === 2);
+  return true;
 }
 
 function pressOverview(grab: Grab, target: Element): void {

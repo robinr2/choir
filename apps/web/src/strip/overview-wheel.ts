@@ -7,29 +7,26 @@ const COOLDOWN = 50;
 
 const SCALES = [1, 40, 800];
 
-const COLUMNS = { [-1]: 'focusColumnLeft', 1: 'focusColumnRight' } as const;
+const COLUMNS: Record<number, 'focusColumnLeft' | 'focusColumnRight'> = {
+  [-1]: 'focusColumnLeft',
+  1: 'focusColumnRight',
+};
 
-const WORKSPACES = {
+const WORKSPACES: Record<number, 'focusWorkspaceUp' | 'focusWorkspaceDown'> = {
   [-1]: 'focusWorkspaceUp',
   1: 'focusWorkspaceDown',
-} as const;
-
-type Direction = -1 | 1;
-
-function directionOf(ticks: number): Direction {
-  return ticks < 0 ? -1 : 1;
-}
+};
 
 function columns(ticks: number, workspaceId: string | undefined) {
   if (workspaceId === undefined) return [];
   return Array.from({ length: Math.abs(ticks) }, () => ({
-    action: COLUMNS[directionOf(ticks)],
+    action: COLUMNS[Math.sign(ticks)],
     workspaceId,
   }));
 }
 
 function workspaces(ticks: number): LayoutAction[] {
-  return ticks === 0 ? [] : [{ action: WORKSPACES[directionOf(ticks)] }];
+  return ticks === 0 ? [] : [{ action: WORKSPACES[Math.sign(ticks)] }];
 }
 
 function modified(event: WheelEvent): boolean {
