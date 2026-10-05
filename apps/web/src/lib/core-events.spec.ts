@@ -76,6 +76,14 @@ test('tells core which conversations it watches once the stream connects', async
   expect(first).toHaveBeenCalledExactlyOnceWith({ queue: [] });
   expect(second).toHaveBeenCalledOnce();
   stopFirst();
+  await vi.waitFor(() =>
+    expect(watches()).toEqual([
+      ['PUT', at('c1')],
+      ['PUT', at('c2')],
+    ]),
+  );
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  expect(watches()).toHaveLength(2);
   stopSecond();
   expect(source.closed).toBe(false);
   await vi.waitFor(() =>
