@@ -170,6 +170,23 @@ test('shows the default folder at the bottom of the folder tree', async () => {
   expect(rowBox.top - treeBox.top).toBeGreaterThan(treeBox.height / 2);
 });
 
+test('scrolls the folder tree with the wheel over a folder name', async () => {
+  const screen = await openLaunchForm();
+  const folders = form(screen).getByRole('tree', { name: 'Folder' });
+  await expect.element(folders).toBeVisible();
+  const tree = folders.element();
+  await vi.waitFor(() => expect(tree.scrollTop).toBeGreaterThan(40));
+  const bottom = tree.scrollTop;
+  await form(screen)
+    .getByText('sam', { exact: true })
+    .wheel({ delta: { y: -20 } });
+  await vi.waitFor(() => expect(tree.scrollTop).toBe(bottom - 20));
+  await form(screen)
+    .getByText('home', { exact: true })
+    .wheel({ delta: { y: -20 } });
+  await vi.waitFor(() => expect(tree.scrollTop).toBe(bottom - 40));
+});
+
 test('shows a folder loading until core lists it', async () => {
   const release = coreHoldsFolder('/etc');
   const screen = await openLaunchForm();

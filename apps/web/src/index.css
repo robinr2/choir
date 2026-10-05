@@ -135,10 +135,7 @@
     @apply bg-background text-foreground overflow-hidden;
   }
   html {
-    @apply font-sans overflow-hidden;
-  }
-  [data-slot='pane'] * {
-    overscroll-behavior: contain;
+    @apply font-sans overflow-hidden overscroll-none;
   }
 }
 
