@@ -18,11 +18,10 @@ import { AgentCatalogService } from './agent-catalog.service.js';
 import { agentLaunch, sessionMeta } from './agent-launch.js';
 import {
   type AgentLink,
-  type ClaudeOptions,
-  claudeOptions,
   type Launch,
   newSessionLink,
   sessionLink,
+  sessionSettings,
 } from './agent-links.js';
 import { AgentLinksStore } from './agent-links.store.js';
 import { AgentSession, type SessionSetup } from './agent-session.js';
@@ -133,22 +132,20 @@ export class AgentService implements BeforeApplicationShutdown {
   }
 
   private async start(session: AgentSession, link: AgentLink): Promise<void> {
-    const { sessionId, cwd, mode } = link;
+    const { sessionId, cwd } = link;
     if (sessionId !== null) {
       await session.start(this.setup(cwd), { sessionId });
       return;
     }
-    await session.start(this.setup(cwd, claudeOptions(link)), {
-      ...(mode !== null && { mode }),
-    });
+    await session.start(this.setup(cwd), sessionSettings(link));
     await this.links.save({ ...link, sessionId: session.id });
   }
 
-  private setup(cwd: string, options: ClaudeOptions = {}): SessionSetup {
+  private setup(cwd: string): SessionSetup {
     return {
       cwd,
       mcpServers: [excalidrawMcpServer(this.config)],
-      _meta: sessionMeta(options),
+      _meta: sessionMeta(),
     };
   }
 }

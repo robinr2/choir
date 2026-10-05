@@ -1,7 +1,6 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { ChoirConfig } from '../choir/choir-config.js';
-import type { ClaudeOptions } from './agent-links.js';
 import type { AgentLaunch } from './agent-process.js';
 
 const SETTING_SOURCES = ['project', 'local'];
@@ -39,16 +38,11 @@ export function agentLaunch(
 }
 
 export function sessionMeta(
-  options: ClaudeOptions = {},
   extra: Record<string, unknown> = {},
 ): Record<string, unknown> {
   return {
     claudeCode: {
-      options: {
-        settingSources: SETTING_SOURCES,
-        thinking: THINKING,
-        ...options,
-      },
+      options: { settingSources: SETTING_SOURCES, thinking: THINKING },
     },
     ...extra,
   };

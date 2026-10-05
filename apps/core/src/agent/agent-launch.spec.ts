@@ -47,19 +47,9 @@ it('keeps the user settings of Claude Code out of every session and shows its th
       options: { settingSources: ['project', 'local'], thinking: THINKING },
     },
   });
-  expect(
-    sessionMeta(
-      { model: 'opus', effort: 'high' },
-      { systemPrompt: { append: 'Judge.' } },
-    ),
-  ).toEqual({
+  expect(sessionMeta({ systemPrompt: { append: 'Judge.' } })).toEqual({
     claudeCode: {
-      options: {
-        settingSources: ['project', 'local'],
-        thinking: THINKING,
-        model: 'opus',
-        effort: 'high',
-      },
+      options: { settingSources: ['project', 'local'], thinking: THINKING },
     },
     systemPrompt: { append: 'Judge.' },
   });

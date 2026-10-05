@@ -174,6 +174,16 @@ it('starts a new session in the mode it is given, or else in bypass permissions 
   expect(await say(await opened({ mode: 'plan' }), 'mode')).toBe('plan');
 });
 
+it('starts a new session with the model, then the effort and the mode it is given', async () => {
+  const session = await opened({ model: 'opus', effort: 'max', mode: 'plan' });
+  expect(JSON.parse(await say(session, 'config'))).toEqual({
+    mode: 'plan',
+    model: 'opus',
+    effort: 'max',
+    fast: false,
+  });
+});
+
 it('follows the config options of the session', async () => {
   const session = await opened({ mode: 'plan' });
   const values = () =>

@@ -1,9 +1,7 @@
 import type {
-  NewSessionRequest,
   SessionConfigOption,
   SetSessionConfigOptionRequest,
 } from '@agentclientprotocol/sdk';
-import { z } from 'zod';
 
 export type Config = {
   mode: string;
@@ -44,19 +42,6 @@ const EFFORTS: Record<string, string[]> = {
   haiku: [],
 };
 
-const optionsSchema = z
-  .object({
-    _meta: z.object({
-      claudeCode: z.object({
-        options: z.object({
-          model: z.string().optional(),
-          effort: z.string().optional(),
-        }),
-      }),
-    }),
-  })
-  .transform(({ _meta: meta }) => meta.claudeCode.options);
-
 function title(value: string): string {
   return value.charAt(0).toUpperCase() + value.slice(1);
 }
@@ -65,18 +50,12 @@ function supported(model: string, effort: string): string {
   return EFFORTS[model]?.includes(effort) ? effort : 'default';
 }
 
-export function initialConfig(setup: NewSessionRequest): Config {
-  const parsed = optionsSchema.safeParse(setup);
-  const { model = 'default', effort = 'default' } = parsed.success
-    ? parsed.data
-    : {};
-  return {
-    mode: 'default',
-    model,
-    effort: supported(model, effort),
-    fast: false,
-  };
-}
+export const INITIAL_CONFIG: Config = {
+  mode: 'default',
+  model: 'default',
+  effort: 'default',
+  fast: false,
+};
 
 export function configured(
   config: Config,

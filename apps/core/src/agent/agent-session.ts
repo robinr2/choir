@@ -15,6 +15,7 @@ import {
   Subject,
 } from 'rxjs';
 import { AgentConnection } from './agent-connection.js';
+import type { SessionSettings } from './agent-links.js';
 import type { AgentLaunch } from './agent-process.js';
 import { type AgentUpdate, isSessionUpdate } from './agent-updates.js';
 import {
@@ -33,7 +34,7 @@ import { SessionFamily } from './session-family.js';
 
 export type SessionSetup = NewSessionRequest;
 
-export type SessionStart = { sessionId: string } | { mode?: string };
+export type SessionStart = { sessionId: string } | SessionSettings;
 
 export type SessionHandle = Pick<
   AgentSession,
@@ -110,7 +111,7 @@ export class AgentSession {
     this.folder = setup.cwd;
     const { agentCapabilities } = await this.connection.initialize();
     if (!('sessionId' in start)) {
-      await this.create(setup, start.mode);
+      await this.create(setup, start);
     } else if (!agentCapabilities?.loadSession) {
       throw new Error(`The agent cannot load the session ${start.sessionId}`);
     } else {
@@ -165,11 +166,16 @@ export class AgentSession {
     await this.connection.close();
   }
 
-  private async create(setup: SessionSetup, mode?: string): Promise<void> {
+  private async create(
+    setup: SessionSetup,
+    { model, effort, mode = BYPASS_PERMISSIONS }: SessionSettings,
+  ): Promise<void> {
     const created = await this.agent.request(methods.agent.session.new, setup);
     this.family.root = created.sessionId;
     this.options.next(created.configOptions ?? []);
-    await this.setConfigOption('mode', mode ?? BYPASS_PERMISSIONS);
+    if (model !== undefined) await this.setConfigOption('model', model);
+    if (effort !== undefined) await this.setConfigOption('effort', effort);
+    await this.setConfigOption('mode', mode);
   }
 
   private async load(setup: SessionSetup, sessionId: string): Promise<void> {

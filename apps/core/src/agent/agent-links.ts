@@ -1,5 +1,3 @@
-export type ClaudeOptions = { model?: string; effort?: string };
-
 export type AgentLink = {
   conversationId: string;
   sessionId: string | null;
@@ -9,12 +7,13 @@ export type AgentLink = {
   mode: string | null;
 };
 
-export type NewSessionLaunch = {
-  cwd: string;
+export type SessionSettings = {
   model?: string;
   effort?: string;
   mode?: string;
 };
+
+export type NewSessionLaunch = SessionSettings & { cwd: string };
 
 type ResumeLaunch = { resume: string; cwd: string; fork?: boolean };
 
@@ -42,9 +41,14 @@ export function sessionLink(
   return { ...newSessionLink(conversationId, { cwd }), sessionId };
 }
 
-export function claudeOptions({ model, effort }: AgentLink): ClaudeOptions {
+export function sessionSettings({
+  model,
+  effort,
+  mode,
+}: AgentLink): SessionSettings {
   return {
     ...(model !== null && { model }),
     ...(effort !== null && { effort }),
+    ...(mode !== null && { mode }),
   };
 }

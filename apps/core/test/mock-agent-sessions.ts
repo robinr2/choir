@@ -16,7 +16,7 @@ import {
   type SessionInfo,
   type SessionUpdate,
 } from '@agentclientprotocol/sdk';
-import { type Config, initialConfig } from './mock-agent-config.js';
+import { type Config, INITIAL_CONFIG } from './mock-agent-config.js';
 
 type SubagentNotice = {
   sessionUpdate: 'subagent_spawned' | 'subagent_state_update';
@@ -64,7 +64,7 @@ export class MockSessions {
     this.live.set(sessionId, {
       updates: [],
       setup,
-      config: initialConfig(setup),
+      config: INITIAL_CONFIG,
     });
     return sessionId;
   }
