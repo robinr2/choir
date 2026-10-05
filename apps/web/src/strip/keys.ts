@@ -9,17 +9,24 @@ function both(keys: readonly string[], command: Command) {
   return keys.map((key) => [key, command] as const);
 }
 
-const BINDINGS = new Map<string, Command>([
+export const BINDINGS = new Map<string, Command>([
   ['Alt+KeyQ', 'close'],
-  ...both(['Alt+ArrowDown', 'Alt+KeyJ'], act('focusWindowDown')),
-  ...both(['Alt+ArrowUp', 'Alt+KeyK'], act('focusWindowUp')),
+  ...both(['Alt+ArrowDown', 'Alt+KeyJ'], act('focusWindowOrWorkspaceDown')),
+  ...both(['Alt+ArrowUp', 'Alt+KeyK'], act('focusWindowOrWorkspaceUp')),
   ['Alt+KeyT', 'open'],
+  ['Alt+KeyO', 'overview'],
   ...both(['Alt+ArrowLeft', 'Alt+KeyH'], act('focusColumnLeft')),
   ...both(['Alt+ArrowRight', 'Alt+KeyL'], act('focusColumnRight')),
   ...both(['Alt+Ctrl+ArrowLeft', 'Alt+Ctrl+KeyH'], act('moveColumnLeft')),
   ...both(['Alt+Ctrl+ArrowRight', 'Alt+Ctrl+KeyL'], act('moveColumnRight')),
-  ...both(['Alt+Ctrl+ArrowDown', 'Alt+Ctrl+KeyJ'], act('moveWindowDown')),
-  ...both(['Alt+Ctrl+ArrowUp', 'Alt+Ctrl+KeyK'], act('moveWindowUp')),
+  ...both(
+    ['Alt+Ctrl+ArrowDown', 'Alt+Ctrl+KeyJ'],
+    act('moveWindowDownOrToWorkspaceDown'),
+  ),
+  ...both(
+    ['Alt+Ctrl+ArrowUp', 'Alt+Ctrl+KeyK'],
+    act('moveWindowUpOrToWorkspaceUp'),
+  ),
   ...both(['Alt+PageDown', 'Alt+KeyU'], act('focusWorkspaceDown')),
   ...both(['Alt+PageUp', 'Alt+KeyI'], act('focusWorkspaceUp')),
   ...both(
@@ -50,6 +57,17 @@ const BINDINGS = new Map<string, Command>([
   ['Alt+Ctrl+KeyF', 'expand'],
 ]);
 
+export const OVERVIEW_BINDINGS = new Map<string, Command>([
+  ['Escape', 'overview'],
+  ['Enter', 'overview'],
+  ['ArrowLeft', act('focusColumnLeft')],
+  ['ArrowRight', act('focusColumnRight')],
+  ['ArrowUp', act('focusWindowOrWorkspaceUp')],
+  ['ArrowDown', act('focusWindowOrWorkspaceDown')],
+]);
+
+const ONCE = new Set<Command>(['close', 'overview']);
+
 const MODIFIERS = [
   ['altKey', 'Alt'],
   ['ctrlKey', 'Ctrl'],
@@ -62,8 +80,17 @@ export function chord(event: KeyboardEvent): string {
   return [...held, event.code].join('+');
 }
 
-export function commandFor(event: KeyboardEvent): Command | undefined {
-  const command = BINDINGS.get(chord(event));
-  if (command === 'close' && event.repeat) return undefined;
+function lookup(name: string, overview: boolean): Command | undefined {
+  const command = BINDINGS.get(name);
+  if (command || !overview) return command;
+  return OVERVIEW_BINDINGS.get(name);
+}
+
+export function commandFor(
+  event: KeyboardEvent,
+  overview = false,
+): Command | undefined {
+  const command = lookup(chord(event), overview);
+  if (event.repeat && command && ONCE.has(command)) return undefined;
   return command;
 }

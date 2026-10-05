@@ -33,7 +33,7 @@ function swallowNextClick(): void {
 export function track(
   { store, root, event }: Grab,
   session: Session,
-  cursor: string,
+  cursor: string | null,
 ): void {
   const controller = new AbortController();
   const mine = (other: PointerEvent) => other.pointerId === event.pointerId;

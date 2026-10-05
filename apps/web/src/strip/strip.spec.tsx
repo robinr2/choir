@@ -16,6 +16,7 @@ import { ViewStore } from './view-store';
 import {
   actions,
   boxOf,
+  measured,
   stripElement,
   setUpStripScreen,
 } from '@/test/strip-screen';
@@ -37,7 +38,7 @@ function focusedSecond() {
 test('lays the columns out side by side from their proportions', async () => {
   const screen = await renderApp();
   await vi.waitFor(() =>
-    expect(boxOf(pane(screen, 'agent 1').element()).width).toBe(594),
+    expect(boxOf(pane(screen, 'agent 2').element()).x).toBe(658),
   );
   const left = boxOf(pane(screen, 'agent 1').element());
   const right = boxOf(pane(screen, 'agent 2').element());
@@ -55,7 +56,7 @@ test('marks the focused pane', async () => {
     .element(pane(screen, 'agent 2'))
     .toHaveAttribute('data-focused', 'false');
   const frame = pane(screen, 'agent 1').element().firstElementChild;
-  expect(frame?.classList.contains('border-ring')).toBe(true);
+  expect(frame?.classList.contains('ring-3')).toBe(true);
   coreShowsWorkspace(focusedSecond());
   await expect
     .element(pane(screen, 'agent 2'))
@@ -75,7 +76,7 @@ test('marks the focused pane', async () => {
 test('shows only the empty background when nothing is open', async () => {
   await renderApp(viewOf([], []));
   await expect.element(page.elementLocator(stripElement())).toBeVisible();
-  expect(stripElement().children).toHaveLength(0);
+  expect(stripElement().querySelectorAll('[data-slot="pane"]')).toHaveLength(0);
 });
 
 test('places the panes of other workspaces outside the view', async () => {
@@ -204,4 +205,74 @@ test('stops measuring the strip once it is gone', async () => {
   await screen.unmount();
   await new Promise((resolve) => setTimeout(resolve, 100));
   expect(measure).not.toHaveBeenCalledWith(0, 0);
+});
+
+function contentOf(element: Element): HTMLElement {
+  const content = element.firstElementChild;
+  if (!(content instanceof HTMLElement)) throw new Error('No pane content');
+  return content;
+}
+
+test('opens a new pane by fading it in from half its size', async () => {
+  const screen = await renderApp(
+    viewOf([strip('first', [column('left', [A])])], [agent(A, 'agent 1')]),
+  );
+  await vi.waitFor(() =>
+    expect(boxOf(pane(screen, 'agent 1').element()).x).toBe(60),
+  );
+  const seen: string[] = [];
+  const observer = new MutationObserver(() => {
+    const opening = document.querySelector(`[data-pane-id="${B}"]`);
+    if (opening) seen.push(contentOf(opening).style.opacity);
+  });
+  observer.observe(stripElement(), { subtree: true, attributes: true });
+  coreShowsWorkspace(twoAgents());
+  const opened = pane(screen, 'agent 2');
+  await vi.waitFor(() =>
+    expect(getComputedStyle(contentOf(opened.element())).opacity).toBe('1'),
+  );
+  observer.disconnect();
+  expect(seen.some((opacity) => Number(opacity) < 1)).toBe(true);
+  expect(contentOf(opened.element()).style.transform).toBe('none');
+});
+
+const GHOST = '[data-slot="pane"][aria-hidden="true"]';
+
+test('keeps a closed pane in view while it fades out', async () => {
+  const screen = await renderApp();
+  await measured(screen);
+  coreShowsWorkspace(
+    viewOf([strip('first', [column('left', [A])])], [agent(A, 'agent 1')]),
+  );
+  const ghost = await vi.waitFor(() => {
+    const closing = stripElement().querySelector(GHOST);
+    if (!closing) throw new Error('No closing pane');
+    return closing;
+  });
+  expect(ghost.hasAttribute('data-pane-id')).toBe(false);
+  expect(getComputedStyle(ghost).pointerEvents).toBe('none');
+  await vi.waitFor(() => expect(ghost.isConnected).toBe(false));
+  expect(stripElement().querySelectorAll('[data-slot="pane"]')).toHaveLength(1);
+});
+
+test('slides past an empty workspace that core removes on leaving it', async () => {
+  const panes = twoAgents().panes;
+  const first = strip('first', [column('left', [A])]);
+  const third = strip('third', [column('right', [B])]);
+  const screen = await renderApp(
+    viewOf([first, strip('empty', []), third], panes, { activeWorkspace: 1 }),
+  );
+  const lower = pane(screen, 'agent 2').element();
+  await vi.waitFor(() => expect(boxOf(lower).y).toBe(884));
+  coreShowsWorkspace(viewOf([first, third], panes, { activeWorkspace: 1 }));
+  const moved = await vi.waitFor(
+    () => {
+      const { y } = boxOf(lower);
+      expect(y).toBeLessThan(884);
+      return y;
+    },
+    { interval: 5 },
+  );
+  expect(moved).toBeGreaterThan(100);
+  await vi.waitFor(() => expect(boxOf(lower).y).toBe(4));
 });

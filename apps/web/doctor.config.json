@@ -9,5 +9,8 @@
       "src/components/pipecat/**",
       "src/lib/visualizer.ts"
     ]
+  },
+  "rules": {
+    "react-doctor/require-reduced-motion": "off"
   }
 }

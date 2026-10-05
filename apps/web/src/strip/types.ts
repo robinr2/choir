@@ -20,10 +20,12 @@ export type Strip = { layout: StripLayout; viewX: number };
 export type Location = { column: number; tile: number };
 
 export type Overlay = {
+  workspaceId?: string;
   layout?: StripLayout;
   viewX?: number;
   dragged?: { paneId: string } & Rect;
   hint?: Rect;
+  scrolled?: Readonly<Record<string, number>>;
 };
 
 export type Snapshot = {
@@ -33,6 +35,7 @@ export type Snapshot = {
   overlay: Overlay | null;
   renderIndex: number;
   gesture: string | null;
+  overview: boolean;
 };
 
 export type Edges = {
@@ -46,7 +49,7 @@ export type Press = { paneId: string; time: number; edges: Edges };
 
 export type Anchor = { workspaceId: string; columnId: string; width: number };
 
-export type Command = LayoutAction | 'close' | 'open' | 'expand';
+export type Command = LayoutAction | 'close' | 'open' | 'expand' | 'overview';
 
 export type Store = {
   readonly workspace: CoreWorkspace;
@@ -57,6 +60,7 @@ export type Store = {
   show(overlay: Overlay | null): void;
   grab(gesture: string | null): void;
   scrollWorkspaces(renderIndex: number): void;
+  overview(open: boolean, renderIndex?: number): void;
   commit(layout: StripLayout, viewX: number): void;
   anchor(anchor: Anchor): void;
 };

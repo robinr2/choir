@@ -7,9 +7,10 @@ export function paneTitle(pane: PaneView): string {
   return pane.kind === 'agent' ? pane.name : TITLES[pane.kind];
 }
 
-export function paneClass(focused: boolean): string {
+export function paneClass(focused: boolean, active = false): string {
   return cn(
     'bg-background flex size-full flex-col overflow-hidden rounded-lg border outline-none',
-    focused && 'border-ring',
+    focused && 'border-ring ring-ring/50 ring-3',
+    active && !focused && 'ring-muted-foreground/25 ring-3',
   );
 }

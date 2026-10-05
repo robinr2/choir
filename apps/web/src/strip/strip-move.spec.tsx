@@ -63,8 +63,10 @@ test('drops a dragged pane where the insert hint shows', async () => {
   press(first, { x: 300, y: 400 }, { altKey: true });
   drag('pointermove', { x: 900, y: 400 });
   await vi.waitFor(() => expect(hint()).not.toBeNull());
-  expect(boxOf(pane(screen, 'agent 2').element()).x).toBe(60);
-  expect(first.getAttribute('style')).toContain('opacity: 0.75');
+  await vi.waitFor(() =>
+    expect(boxOf(pane(screen, 'agent 2').element()).x).toBe(60),
+  );
+  expect(getComputedStyle(first).opacity).toBe('0.75');
   expect(boxOf(first)).toMatchObject({ x: 56 + 900 - 296, y: 4, width: 594 });
   await expect
     .element(pane(screen, 'agent 1'))
@@ -82,6 +84,19 @@ test('drops a dragged pane where the insert hint shows', async () => {
   );
   expect(hint()).toBeNull();
   expect(boxOf(pane(screen, 'agent 2').element()).x).toBe(60);
+  expect(first.isConnected).toBe(true);
+  expect(first.dataset.dragged).toBe('true');
+  coreShowsWorkspace(
+    viewOf([strip('first', [column('left', [B, A])])], twoAgents().panes),
+  );
+  await vi.waitFor(() => expect(first.dataset.dragged).toBe('false'));
+  const above = pane(screen, 'agent 2').element();
+  await vi.waitFor(() =>
+    expect([boxOf(first).x, boxOf(first).y]).toEqual([
+      60,
+      boxOf(above).bottom + 4,
+    ]),
+  );
 });
 
 function movedLeft() {

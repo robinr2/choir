@@ -162,3 +162,17 @@ test('forgets the anchor only once it moved the view', () => {
   coreShowsWorkspace(viewOf([layout], []));
   expect(viewX(store)).toBe(-4);
 });
+
+test('opens and closes the overview, optionally on another workspace', () => {
+  const { store, listener } = storeWithListener();
+  coreShowsWorkspace(twoAgents());
+  expect(store.getSnapshot().overview).toBe(false);
+  store.overview(true);
+  expect(store.getSnapshot()).toMatchObject({ overview: true, renderIndex: 0 });
+  store.overview(false, 1);
+  expect(store.getSnapshot()).toMatchObject({
+    overview: false,
+    renderIndex: 1,
+  });
+  expect(listener).toHaveBeenCalledTimes(3);
+});

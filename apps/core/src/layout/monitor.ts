@@ -6,7 +6,9 @@ import {
   isEmpty,
   removeColumnAt,
   removeTile,
+  updateActive,
 } from './scrolling.js';
+import { focusDown, focusUp, moveDown, moveUp } from './column.js';
 import type { Layout, Space } from './layout.schemas.js';
 
 export type Direction = -1 | 1;
@@ -15,7 +17,7 @@ export function emptyLayout(): Layout {
   return { workspaces: [emptySpace()], activeWorkspace: 0 };
 }
 
-export function activeSpace(layout: Layout): Space {
+function activeSpace(layout: Layout): Space {
   return layout.workspaces[layout.activeWorkspace];
 }
 
@@ -126,4 +128,29 @@ export function moveWindowToWorkspace(
       give: (space) => addPane(space, removed.paneId, { size: removed.size }),
     };
   });
+}
+
+function atEnd(layout: Layout, direction: Direction): boolean {
+  const space = activeSpace(layout);
+  if (isEmpty(space)) return true;
+  const { activeTile, tiles } = activeColumn(space);
+  return activeTile === (direction === 1 ? tiles.length - 1 : 0);
+}
+
+export function focusWindowOrWorkspace(
+  layout: Layout,
+  direction: Direction,
+): Layout {
+  if (atEnd(layout, direction)) return focusWorkspace(layout, direction);
+  const focus = direction === 1 ? focusDown : focusUp;
+  return updateActiveSpace(layout, (space) => updateActive(space, focus));
+}
+
+export function moveWindowOrToWorkspace(
+  layout: Layout,
+  direction: Direction,
+): Layout {
+  if (atEnd(layout, direction)) return moveWindowToWorkspace(layout, direction);
+  const move = direction === 1 ? moveDown : moveUp;
+  return updateActiveSpace(layout, (space) => updateActive(space, move));
 }

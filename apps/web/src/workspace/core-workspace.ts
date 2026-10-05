@@ -65,16 +65,27 @@ export type SimpleAction =
   | 'moveColumnToWorkspaceUp'
   | 'moveColumnToWorkspaceDown'
   | 'moveWorkspaceUp'
-  | 'moveWorkspaceDown';
+  | 'moveWorkspaceDown'
+  | 'focusWindowOrWorkspaceUp'
+  | 'focusWindowOrWorkspaceDown'
+  | 'moveWindowUpOrToWorkspaceUp'
+  | 'moveWindowDownOrToWorkspaceDown';
 
 export type LayoutAction =
-  | { action: SimpleAction }
+  | { action: SimpleAction; workspaceId?: string }
   | { action: 'setColumnWidth' | 'setWindowHeight'; change: number }
   | { action: 'expandColumnToAvailableWidth'; visibleColumns: string[] }
   | { action: 'focusPane'; paneId: string }
-  | { action: 'focusColumn'; columnId: string }
+  | { action: 'focusColumn'; columnId: string; workspaceId?: string }
   | { action: 'focusWorkspace'; workspaceId: string }
-  | { action: 'movePane'; paneId: string; column: number; tile?: number }
+  | {
+      action: 'movePane';
+      paneId: string;
+      column: number;
+      tile?: number;
+      workspaceId?: string;
+    }
+  | { action: 'movePaneToNewWorkspace'; paneId: string; index: number }
   | { action: 'resizePane'; paneId: string; width?: number; height?: number };
 
 const PATH = '/workspace';

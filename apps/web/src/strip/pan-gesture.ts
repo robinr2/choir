@@ -1,4 +1,5 @@
-import { activeStrip, workspaceGap } from './placements';
+import { workspaceStep } from './overview';
+import { activeStrip, overlaidStrips } from './placements';
 import { bandClamp } from './rubber-band';
 import { type Grab, type Point, type Session, track } from './session';
 import { snapView } from './snap';
@@ -11,17 +12,22 @@ const WORKSPACE_BAND = { stiffness: 0.5, limit: 0.05 };
 
 type Mode = 'recognizing' | 'view' | 'workspaces';
 
+type Target = { strip: Strip; index: number; zoom: number };
+
 class PanSession implements Session {
   readonly #store: Store;
+  readonly #target: Target;
   readonly #strip: Strip;
   readonly #tracker = new SwipeTracker();
-  #mode: Mode = 'recognizing';
+  #mode: Mode;
   #last: Point;
 
-  constructor(store: Store, point: Point, strip: Strip) {
+  constructor(store: Store, point: Point, target: Target, mode: Mode) {
     this.#store = store;
-    this.#strip = strip;
+    this.#target = target;
+    this.#strip = target.strip;
     this.#last = point;
+    this.#mode = mode;
   }
 
   move(point: Point): void {
@@ -29,7 +35,7 @@ class PanSession implements Session {
     const delta =
       this.#mode === 'view' ? point.x - this.#last.x : point.y - this.#last.y;
     this.#last = point;
-    this.#tracker.push(-delta, point.time);
+    this.#tracker.push(-delta / this.#target.zoom, point.time);
     this.#render();
   }
 
@@ -49,12 +55,16 @@ class PanSession implements Session {
 
   #render(): void {
     if (this.#mode === 'view') {
-      this.#store.show({ viewX: this.#strip.viewX + this.#tracker.pos });
+      const { layout, viewX } = this.#strip;
+      const shown = viewX + this.#tracker.pos;
+      this.#store.show({ workspaceId: layout.id, viewX: shown });
       return;
     }
     const { index, bounds, step } = this.#workspaces();
     const target = index + this.#tracker.pos / step;
-    this.#store.scrollWorkspaces(bandClamp(WORKSPACE_BAND, bounds, target));
+    const { stiffness, limit } = WORKSPACE_BAND;
+    const band = { stiffness, limit: limit / this.#target.zoom };
+    this.#store.scrollWorkspaces(bandClamp(band, bounds, target));
   }
 
   #workspaces() {
@@ -66,7 +76,7 @@ class PanSession implements Session {
       view,
       index,
       bounds,
-      step: metrics.height + workspaceGap(metrics),
+      step: workspaceStep(metrics),
     };
   }
 
@@ -80,7 +90,17 @@ class PanSession implements Session {
     this.#store.commit({ ...layout, activeColumn: snap.column }, snap.viewX);
     if (snap.column === layout.activeColumn) return;
     const columnId = layout.columns[snap.column].id;
-    void this.#store.workspace.act({ action: 'focusColumn', columnId });
+    void this.#store.workspace.act({
+      action: 'focusColumn',
+      columnId,
+      ...this.#elsewhere(),
+    });
+  }
+
+  #elsewhere(): { workspaceId?: string } {
+    const { view } = this.#store.getSnapshot();
+    if (this.#target.index === view.activeWorkspace) return {};
+    return { workspaceId: this.#strip.layout.id };
   }
 
   #snapWorkspace(): void {
@@ -95,8 +115,23 @@ class PanSession implements Session {
   }
 }
 
+function begin(grab: Grab, point: Point, target: Target, mode: Mode): void {
+  track(grab, new PanSession(grab.store, point, target, mode), 'all-scroll');
+}
+
 export function startPan(grab: Grab, point: Point): void {
-  const strip = activeStrip(grab.store.getSnapshot());
+  const snapshot = grab.store.getSnapshot();
+  const strip = activeStrip(snapshot);
   if (!strip) return;
-  track(grab, new PanSession(grab.store, point, strip), 'all-scroll');
+  const index = snapshot.view.activeWorkspace;
+  begin(grab, point, { strip, index, zoom: 1 }, 'recognizing');
+}
+
+export function startOverviewPan(
+  grab: Grab,
+  point: Point,
+  { index, zoom, view }: { index: number; zoom: number; view: boolean },
+): void {
+  const strip = overlaidStrips(grab.store.getSnapshot())[index];
+  begin(grab, point, { strip, index, zoom }, view ? 'view' : 'recognizing');
 }

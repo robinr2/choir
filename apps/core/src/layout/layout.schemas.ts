@@ -74,6 +74,10 @@ const WORKSPACE_ACTIONS = [
   'moveColumnToWorkspaceDown',
   'moveWorkspaceUp',
   'moveWorkspaceDown',
+  'focusWindowOrWorkspaceUp',
+  'focusWindowOrWorkspaceDown',
+  'moveWindowUpOrToWorkspaceUp',
+  'moveWindowDownOrToWorkspaceDown',
 ] as const;
 
 export type SpaceActionName = (typeof SPACE_ACTIONS)[number];
@@ -81,7 +85,7 @@ export type SpaceActionName = (typeof SPACE_ACTIONS)[number];
 export type WorkspaceActionName = (typeof WORKSPACE_ACTIONS)[number];
 
 export const layoutActionSchema = z.union([
-  z.object({ action: z.enum(SPACE_ACTIONS) }),
+  z.object({ action: z.enum(SPACE_ACTIONS), workspaceId: z.uuid().optional() }),
   z.object({ action: z.enum(WORKSPACE_ACTIONS) }),
   z.object({
     action: z.enum(['setColumnWidth', 'setWindowHeight']),
@@ -92,13 +96,23 @@ export const layoutActionSchema = z.union([
     visibleColumns: z.array(z.uuid()),
   }),
   z.object({ action: z.literal('focusPane'), paneId: paneIdSchema }),
-  z.object({ action: z.literal('focusColumn'), columnId: z.uuid() }),
+  z.object({
+    action: z.literal('focusColumn'),
+    columnId: z.uuid(),
+    workspaceId: z.uuid().optional(),
+  }),
   z.object({ action: z.literal('focusWorkspace'), workspaceId: z.uuid() }),
   z.object({
     action: z.literal('movePane'),
     paneId: paneIdSchema,
     column: index,
     tile: index.optional(),
+    workspaceId: z.uuid().optional(),
+  }),
+  z.object({
+    action: z.literal('movePaneToNewWorkspace'),
+    paneId: paneIdSchema,
+    index,
   }),
   z.object({
     action: z.literal('resizePane'),

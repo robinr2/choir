@@ -47,6 +47,15 @@ test('opens a new pane, closes the focused one and sends layout actions', async 
   ]);
 });
 
+test('toggles the overview without asking core', async () => {
+  const store = listening();
+  await run(store, 'overview');
+  expect(store.getSnapshot().overview).toBe(true);
+  await run(store, 'overview');
+  expect(store.getSnapshot().overview).toBe(false);
+  expect(requests()).toEqual([]);
+});
+
 test('closes nothing before core shows any workspace', async () => {
   const store = listening();
   await run(store, 'close');

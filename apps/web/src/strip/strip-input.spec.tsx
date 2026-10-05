@@ -7,6 +7,8 @@ import { actions, stripElement, setUpStripScreen } from '@/test/strip-screen';
 
 setUpStripScreen();
 
+const PANE = '[data-slot="pane"]';
+
 function keydown(code: string, init: KeyboardEventInit = {}): boolean {
   return document.body.dispatchEvent(
     new KeyboardEvent('keydown', {
@@ -28,7 +30,7 @@ test('runs the bound keys wherever the focus is', async () => {
   await userEvent.keyboard('{Alt>}{Shift>}={/Shift}{/Alt}');
   await vi.waitFor(() =>
     expect(actions()).toEqual([
-      { action: 'focusWindowDown' },
+      { action: 'focusWindowOrWorkspaceDown' },
       { action: 'setWindowHeight', change: 10 },
     ]),
   );
@@ -95,7 +97,7 @@ test('expands the focused column into the fully visible space', async () => {
   await renderApp();
   await vi.waitFor(() =>
     expect(
-      stripElement().firstElementChild?.getBoundingClientRect().width,
+      stripElement().querySelector(PANE)?.getBoundingClientRect().width,
     ).toBe(594),
   );
   keydown('KeyF', { ctrlKey: true });

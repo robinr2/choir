@@ -42,7 +42,7 @@ test('moves the view sideways and snaps it to the columns', async () => {
   await vi.waitFor(() =>
     expect(actions()).toEqual([{ action: 'focusColumn', columnId: 'right' }]),
   );
-  expect(boxOf(first).x).toBe(60);
+  await vi.waitFor(() => expect(boxOf(first).x).toBe(60));
   await expect
     .element(pane(screen, 'agent 2'))
     .toHaveAttribute('data-focused', 'true');
@@ -99,7 +99,7 @@ test('switches workspaces by dragging the view up or down', async () => {
       { action: 'focusWorkspace', workspaceId: 'last' },
     ]),
   );
-  expect(boxOf(first).y).toBe(4 - 880);
+  await vi.waitFor(() => expect(boxOf(first).y).toBe(4 - 880));
 });
 
 test('snaps back to the workspace after a short slow drag', async () => {
