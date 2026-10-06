@@ -1,8 +1,10 @@
 import {
   activateWorkspace,
   emptyLayout,
+  focusWindowOrWorkspace,
   focusWorkspace,
   moveColumnToWorkspace,
+  moveWindowOrToWorkspace,
   moveWindowToWorkspace,
   moveWorkspace,
   settle,
@@ -158,6 +160,71 @@ describe('move window to workspace', () => {
     expect(moveWindowToWorkspace(bottom, 1)).toBe(bottom);
     const empty = layout(['', 'A*'], 0);
     expect(moveWindowToWorkspace(empty, 1)).toBe(empty);
+  });
+});
+
+describe('focus window or workspace', () => {
+  it('moves focus inside the column while there is a pane in that direction', () => {
+    const stacked = layout(['A* B', 'C*', '']);
+    expect(sketches(focusWindowOrWorkspace(stacked, 1))).toEqual([
+      '> A B*',
+      'C*',
+      '',
+    ]);
+    const lower = layout(['A*', 'B C*', ''], 1);
+    expect(sketches(focusWindowOrWorkspace(lower, -1))).toEqual([
+      'A*',
+      '> B* C',
+      '',
+    ]);
+  });
+
+  it('switches workspace past the bottom or the top pane', () => {
+    const bottom = layout(['A B*', 'C*', '']);
+    expect(sketches(focusWindowOrWorkspace(bottom, 1))).toEqual([
+      'A B*',
+      '> C*',
+      '',
+    ]);
+    const top = layout(['A*', 'B* C', ''], 1);
+    expect(sketches(focusWindowOrWorkspace(top, -1))).toEqual([
+      '> A*',
+      'B* C',
+      '',
+    ]);
+  });
+
+  it('switches workspace from an empty workspace', () => {
+    expect(sketches(focusWindowOrWorkspace(layout(['A*', ''], 1), -1))).toEqual(
+      ['> A*', ''],
+    );
+  });
+});
+
+describe('move window or to workspace', () => {
+  it('moves the pane inside the column while there is a pane in that direction', () => {
+    expect(sketches(moveWindowOrToWorkspace(layout(['A* B', '']), 1))).toEqual([
+      '> B A*',
+      '',
+    ]);
+    expect(sketches(moveWindowOrToWorkspace(layout(['A B*', '']), -1))).toEqual(
+      ['> B* A', ''],
+    );
+  });
+
+  it('moves the pane to the workspace below past the bottom and follows it', () => {
+    const moved = moveWindowOrToWorkspace(layout(['A B* | C', 'D*', '']), 1);
+    expect(sketches(moved)).toEqual(['A* | C', '> D | B*', '']);
+  });
+
+  it('moves the pane to the workspace above past the top and follows it', () => {
+    const moved = moveWindowOrToWorkspace(layout(['A*', 'B* C', ''], 1), -1);
+    expect(sketches(moved)).toEqual(['> A | B*', 'C*', '']);
+  });
+
+  it('does nothing at the top of the first workspace', () => {
+    const top = layout(['A* B', '']);
+    expect(moveWindowOrToWorkspace(top, -1)).toBe(top);
   });
 });
 

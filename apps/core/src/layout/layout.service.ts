@@ -7,7 +7,7 @@ import {
   type OnModuleInit,
 } from '@nestjs/common';
 import { BehaviorSubject, type Observable } from 'rxjs';
-import { layoutChange } from './layout-actions.js';
+import { changeSpace, layoutChange } from './layout-actions.js';
 import type {
   Agent,
   LayoutAction,
@@ -18,14 +18,14 @@ import type {
   WorkspaceState,
 } from './layout.schemas.js';
 import { LayoutStore } from './layout.store.js';
-import { emptyLayout, updateActiveSpace } from './monitor.js';
+import { emptyLayout } from './monitor.js';
 import {
   openPane,
   openPaneNextTo,
   paneIds,
   removePane,
 } from './monitor-panes.js';
-import { isSpaceAction, spaceChange } from './space-actions.js';
+import { isSpaceAction, spaceChange, workspaceOf } from './space-actions.js';
 
 type Filled = { content: PaneContent; nextNumber: number };
 
@@ -122,7 +122,7 @@ export class LayoutService implements OnModuleInit {
     await this.commit({
       ...this.current,
       layout: isSpaceAction(action)
-        ? updateActiveSpace(layout, spaceChange(action))
+        ? changeSpace(layout, workspaceOf(action), spaceChange(action))
         : layoutChange(layout, action),
     });
   }

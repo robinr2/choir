@@ -19,20 +19,24 @@ test('names a chord by its modifiers and physical key', () => {
 
 test("binds niri's default keys with Alt as the modifier", () => {
   expect(bound('KeyQ')).toBe('close');
-  expect(bound('KeyJ')).toEqual({ action: 'focusWindowDown' });
-  expect(bound('ArrowDown')).toEqual({ action: 'focusWindowDown' });
-  expect(bound('KeyK')).toEqual({ action: 'focusWindowUp' });
-  expect(bound('ArrowUp')).toEqual({ action: 'focusWindowUp' });
+  const down = { action: 'focusWindowOrWorkspaceDown' };
+  expect(bound('KeyJ')).toEqual(down);
+  expect(bound('ArrowDown')).toEqual(down);
+  const up = { action: 'focusWindowOrWorkspaceUp' };
+  expect(bound('KeyK')).toEqual(up);
+  expect(bound('ArrowUp')).toEqual(up);
   expect(bound('KeyL')).toEqual({ action: 'focusColumnRight' });
   const ctrl = { ctrlKey: true };
   expect(bound('KeyH', ctrl)).toEqual({ action: 'moveColumnLeft' });
   expect(bound('ArrowLeft', ctrl)).toEqual({ action: 'moveColumnLeft' });
   expect(bound('KeyL', ctrl)).toEqual({ action: 'moveColumnRight' });
   expect(bound('ArrowRight', ctrl)).toEqual({ action: 'moveColumnRight' });
-  expect(bound('KeyJ', ctrl)).toEqual({ action: 'moveWindowDown' });
-  expect(bound('ArrowDown', ctrl)).toEqual({ action: 'moveWindowDown' });
-  expect(bound('KeyK', ctrl)).toEqual({ action: 'moveWindowUp' });
-  expect(bound('ArrowUp', ctrl)).toEqual({ action: 'moveWindowUp' });
+  const moveDown = { action: 'moveWindowDownOrToWorkspaceDown' };
+  expect(bound('KeyJ', ctrl)).toEqual(moveDown);
+  expect(bound('ArrowDown', ctrl)).toEqual(moveDown);
+  const moveUp = { action: 'moveWindowUpOrToWorkspaceUp' };
+  expect(bound('KeyK', ctrl)).toEqual(moveUp);
+  expect(bound('ArrowUp', ctrl)).toEqual(moveUp);
 });
 
 test('binds the workspace keys', () => {
@@ -100,9 +104,36 @@ test('leaves other keys and repeated closes alone', () => {
   expect(commandFor(key('KeyQ', { shiftKey: true }))).toBeUndefined();
   expect(commandFor(key('KeyQ', { repeat: true }))).toBeUndefined();
   expect(commandFor(key('KeyJ', { repeat: true }))).toEqual({
-    action: 'focusWindowDown',
+    action: 'focusWindowOrWorkspaceDown',
   });
   expect(commandFor(new KeyboardEvent('keydown', { code: 'KeyQ' }))).toBe(
     undefined,
   );
+});
+
+test('toggles the overview once per press of Alt+O', () => {
+  expect(bound('KeyO')).toBe('overview');
+  expect(bound('KeyO', { repeat: true })).toBeUndefined();
+});
+
+function plain(code: string, held: KeyboardEventInit = {}) {
+  return commandFor(new KeyboardEvent('keydown', { code, ...held }), true);
+}
+
+test("adds niri's plain overview keys while the overview is open", () => {
+  expect(plain('Escape')).toBe('overview');
+  expect(plain('Enter')).toBe('overview');
+  expect(plain('Enter', { repeat: true })).toBeUndefined();
+  expect(plain('ArrowLeft')).toEqual({ action: 'focusColumnLeft' });
+  expect(plain('ArrowRight')).toEqual({ action: 'focusColumnRight' });
+  expect(plain('ArrowUp')).toEqual({ action: 'focusWindowOrWorkspaceUp' });
+  expect(plain('ArrowDown', { repeat: true })).toEqual({
+    action: 'focusWindowOrWorkspaceDown',
+  });
+  expect(plain('KeyA')).toBeUndefined();
+  expect(plain('Escape', { shiftKey: true })).toBeUndefined();
+  expect(bound('KeyL')).toEqual({ action: 'focusColumnRight' });
+  expect(
+    commandFor(new KeyboardEvent('keydown', { code: 'Escape' })),
+  ).toBeUndefined();
 });

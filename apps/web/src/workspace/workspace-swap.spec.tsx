@@ -59,7 +59,7 @@ test('acts on the workspace it was last given', async () => {
   await userEvent.keyboard('{Alt>}j{/Alt}');
   await vi.waitFor(() => {
     expect(close).toHaveBeenCalledWith(B);
-    expect(act).toHaveBeenCalledWith({ action: 'focusWindowDown' });
+    expect(act).toHaveBeenCalledWith({ action: 'focusWindowOrWorkspaceDown' });
   });
 });
 

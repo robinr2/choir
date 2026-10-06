@@ -67,3 +67,7 @@ export function spaceChange(action: SpaceAction): SpaceChange {
   }
   return CHANGES[action.action];
 }
+
+export function workspaceOf(action: SpaceAction): string | undefined {
+  return 'workspaceId' in action ? action.workspaceId : undefined;
+}

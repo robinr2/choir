@@ -1,18 +1,31 @@
-import { type CSSProperties, memo, useReducer, useState } from 'react';
+import {
+  AnimatePresence,
+  domAnimation,
+  LazyMotion,
+  MotionConfig,
+} from 'motion/react';
+import { memo, useReducer, useState } from 'react';
 import { AgentChat } from '@/agents/agent-chat';
 import { LaunchForm } from '@/agents/launch-form';
 import { ExcalidrawCanvas } from '@/canvas/excalidraw-canvas';
 import { CoreConversation } from '@/conversation/core-conversation';
 import { useEvents } from '@/lib/events-context';
-import type { Placement } from '@/strip/placements';
-import type { AgentView, PaneView } from '@/workspace/core-workspace';
-import { useWorkspace } from '@/workspace/workspace-context';
+import type { Frame, LayoutMotion } from '@/strip/layout-motion';
+import type {
+  AgentView,
+  PaneView,
+  WorkspaceView,
+} from '@/workspace/core-workspace';
 import { EmptyPane } from './empty-pane';
-import { paneClass, paneTitle } from './pane-frame';
 import { AgentHeading } from './agent-heading';
 import { PaneTitleBar } from './pane-title-bar';
-
-type PaneProps = Readonly<{ pane: PaneView; isVoice: boolean }>;
+import {
+  Backdrop,
+  type PaneProps,
+  PlacedPane,
+  type PlacedProps,
+  Workspace,
+} from './placed';
 
 function flip(open: boolean): boolean {
   return !open;
@@ -32,28 +45,6 @@ const PaneContent = memo(function PaneContent({
   if (pane.kind === 'excalidraw') return <ExcalidrawCanvas />;
   return <NewPane id={pane.id} />;
 });
-
-function focusedElsewhere(): boolean {
-  const focused = document.querySelector(':focus');
-  return !!focused && !focused.matches('[data-slot="strip"] *');
-}
-
-function focusInto(section: HTMLElement | null): void {
-  if (!section || focusedElsewhere()) return;
-  if (section.matches(':focus-within')) return;
-  const target = section.querySelector('textarea') ?? section;
-  target.focus();
-}
-
-function placed({ rect, dragged }: Placement): CSSProperties {
-  return {
-    transform: `translate(${rect.x}px, ${rect.y}px)`,
-    width: rect.width,
-    height: rect.height,
-    opacity: dragged ? 0.75 : undefined,
-    zIndex: dragged ? 1 : undefined,
-  };
-}
 
 function AgentBody({
   agent,
@@ -92,40 +83,55 @@ function PaneBody({ pane, isVoice }: PaneProps) {
   );
 }
 
-function PaneFrame({
-  pane,
-  isVoice,
-  placement,
-}: PaneProps & Readonly<{ placement: Placement }>) {
+function Pane(props: PlacedProps) {
+  const { pane, isVoice } = props;
   return (
-    <section
-      ref={placement.focused ? focusInto : undefined}
-      aria-label={paneTitle(pane)}
-      data-slot="pane"
-      data-pane-id={pane.id}
-      data-kind={pane.kind}
-      data-focused={placement.focused}
-      data-voice={pane.kind === 'agent' ? isVoice : undefined}
-      tabIndex={-1}
-      className="absolute top-0 left-0"
-      style={placed(placement)}
-    >
-      <div className={paneClass(placement.focused)}>
-        <PaneBody pane={pane} isVoice={isVoice} />
-      </div>
-    </section>
+    <PlacedPane {...props}>
+      <PaneBody pane={pane} isVoice={isVoice} />
+    </PlacedPane>
   );
 }
 
-export function Pane({ placement }: Readonly<{ placement: Placement }>) {
-  const { view } = useWorkspace();
-  const pane = view.panes.find(({ id }) => id === placement.paneId);
-  if (!pane) return null;
+type PanesProps = Readonly<{
+  frame: Frame;
+  view: WorkspaceView;
+  layoutMotion: LayoutMotion;
+  overview: boolean;
+}>;
+
+function placedPanes({ frame, view, layoutMotion, overview }: PanesProps) {
+  return frame.placements.map((placement) => {
+    const pane = view.panes.find(({ id }) => id === placement.paneId);
+    return (
+      pane && (
+        <Pane
+          key={placement.paneId}
+          pane={pane}
+          isVoice={view.voiceAgentId === pane.id}
+          placement={placement}
+          layoutMotion={layoutMotion}
+          overview={overview}
+        />
+      )
+    );
+  });
+}
+
+export function Panes(props: PanesProps) {
   return (
-    <PaneFrame
-      pane={pane}
-      isVoice={view.voiceAgentId === pane.id}
-      placement={placement}
-    />
+    <LazyMotion features={domAnimation} strict>
+      <MotionConfig reducedMotion="never">
+        <Backdrop layoutMotion={props.layoutMotion} />
+        {props.frame.spaces.map((space) => (
+          <Workspace
+            key={space.id}
+            space={space}
+            layoutMotion={props.layoutMotion}
+            overview={props.overview}
+          />
+        ))}
+        <AnimatePresence>{placedPanes(props)}</AnimatePresence>
+      </MotionConfig>
+    </LazyMotion>
   );
 }

@@ -50,7 +50,7 @@ test('keeps the right edge in place while resizing from the left', async () => {
       { action: 'resizePane', paneId: B, width: 698 / 1196 },
     ]),
   );
-  expect(boxOf(second).x).toBe(60);
+  await vi.waitFor(() => expect(boxOf(second).x).toBe(60));
 });
 
 test('sets the height of a pane from its bottom or lower top edge', async () => {

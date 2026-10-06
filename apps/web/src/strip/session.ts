@@ -9,7 +9,7 @@ export type Session = {
 
 export type Grab = { store: Store; root: HTMLElement; event: PointerEvent };
 
-export function pointOf(root: HTMLElement, event: PointerEvent): Point {
+export function pointOf(root: HTMLElement, event: MouseEvent): Point {
   const box = root.getBoundingClientRect();
   return {
     x: event.clientX - box.left,
@@ -33,7 +33,7 @@ function swallowNextClick(): void {
 export function track(
   { store, root, event }: Grab,
   session: Session,
-  cursor: string,
+  cursor: string | null,
 ): void {
   const controller = new AbortController();
   const mine = (other: PointerEvent) => other.pointerId === event.pointerId;

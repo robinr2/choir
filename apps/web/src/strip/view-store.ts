@@ -49,6 +49,7 @@ export class ViewStore implements Store {
       overlay: null,
       renderIndex: view.activeWorkspace,
       gesture: null,
+      overview: false,
     };
   }
 
@@ -93,6 +94,11 @@ export class ViewStore implements Store {
     this.#set({ renderIndex });
   }
 
+  overview(open: boolean, renderIndex?: number): void {
+    const current = this.getSnapshot().renderIndex;
+    this.#set({ overview: open, renderIndex: renderIndex ?? current });
+  }
+
   commit(layout: StripLayout, viewX: number): void {
     const { strips, metrics } = this.getSnapshot();
     const saved = strips.get(layout.id)?.saved ?? 0;
@@ -115,8 +121,14 @@ export class ViewStore implements Store {
       ...this.#snapshot,
       view,
       strips: moved || strips,
+      overlay: this.#landed() ? null : this.#snapshot.overlay,
       renderIndex: view.activeWorkspace,
     };
+  }
+
+  #landed(): boolean {
+    const { gesture, overlay } = this.#snapshot;
+    return gesture === null && !!overlay?.dragged;
   }
 
   #set(change: Partial<Snapshot>): void {

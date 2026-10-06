@@ -1,62 +1,28 @@
-import { useCallback, useMemo, useSyncExternalStore } from 'react';
-import { Pane } from '@/panes/pane';
-import { run } from './commands';
+import {
+  useCallback,
+  useLayoutEffect,
+  useMemo,
+  useState,
+  useSyncExternalStore,
+} from 'react';
+import { Panes } from '@/panes/pane';
 import { InsertHint } from './insert-hint';
+import { KeyHint } from './key-hint';
+import { type Frame, LayoutMotion, type Tracking } from './layout-motion';
+import { run } from './commands';
 import { commandFor } from './keys';
-import { startMove } from './move-gesture';
-import { startPan } from './pan-gesture';
-import { focusedPaneId, placements } from './placements';
-import { startResize } from './resize-gesture';
-import { type Grab, type Point, pointOf } from './session';
+import { workspaceAt, workspaceStep, zoomOf } from './overview';
+import { OverviewWheel } from './overview-wheel';
+import { focusedPaneId, placements, spaces } from './placements';
 import { useStrip } from './strip-context';
-import type { Store } from './types';
+import { pointOf } from './session';
+import { press } from './strip-press';
+import type { Snapshot, Store } from './types';
 import { WheelBinds } from './wheel';
-
-type Start = (grab: Grab, paneId: string, point: Point) => void;
-
-const TITLE = '[data-slot="pane-title"], [data-slot="pane-title"] :not(input)';
-
-function onTitle(target: Element): boolean {
-  return target.matches(TITLE);
-}
-
-function moves(event: PointerEvent, target: Element): boolean {
-  return event.button === 0 && (event.altKey || onTitle(target));
-}
-
-function gestureFor(event: PointerEvent, target: Element): Start | null {
-  if (moves(event, target)) return startMove;
-  if (!event.altKey) return null;
-  return event.button === 2 ? startResize : null;
-}
-
-function focus(grab: Grab, paneId: string): void {
-  const { store } = grab;
-  if (focusedPaneId(store.getSnapshot()) === paneId) return;
-  void store.workspace.act({ action: 'focusPane', paneId });
-}
-
-function pressPane(grab: Grab, target: Element): void {
-  const paneId = target.closest('[data-pane-id]')?.getAttribute('data-pane-id');
-  if (!paneId) return;
-  focus(grab, paneId);
-  const start = gestureFor(grab.event, target);
-  if (!start) return;
-  grab.event.preventDefault();
-  start(grab, paneId, pointOf(grab.root, grab.event));
-}
-
-function press(grab: Grab): void {
-  const { event, root } = grab;
-  if (!(event.target instanceof Element)) return;
-  if (!event.altKey || event.button !== 1) return pressPane(grab, event.target);
-  event.preventDefault();
-  startPan(grab, pointOf(root, event));
-}
 
 function keys(store: Store) {
   return (event: KeyboardEvent) => {
-    const command = commandFor(event);
+    const command = commandFor(event, store.getSnapshot().overview);
     if (!command) return;
     event.preventDefault();
     event.stopPropagation();
@@ -64,10 +30,29 @@ function keys(store: Store) {
   };
 }
 
-function wheel(store: Store) {
-  const binds = new WheelBinds();
+function workspaceUnder(store: Store, root: HTMLElement, event: WheelEvent) {
+  const snapshot = store.getSnapshot();
+  const index = workspaceAt(snapshot, pointOf(root, event).y);
+  return index === null ? undefined : snapshot.view.workspaces[index].id;
+}
+
+function overviewWheel(store: Store, root: HTMLElement) {
+  const binds = new OverviewWheel();
   return (event: WheelEvent) => {
-    if (!event.altKey) return;
+    if (!store.getSnapshot().overview) return;
+    event.preventDefault();
+    const under = workspaceUnder(store, root, event);
+    for (const action of binds.commands(event, under)) {
+      void store.workspace.act(action);
+    }
+  };
+}
+
+function wheel(store: Store, root: HTMLElement) {
+  const binds = new WheelBinds();
+  const overview = overviewWheel(store, root);
+  return (event: WheelEvent) => {
+    if (!event.altKey) return overview(event);
     event.preventDefault();
     for (const action of binds.commands(event)) {
       void store.workspace.act({ action });
@@ -75,8 +60,12 @@ function wheel(store: Store) {
   };
 }
 
-function suppressMenu(event: MouseEvent): void {
-  if (event.altKey) event.preventDefault();
+function suppressMenu(store: Store, root: HTMLElement) {
+  return (event: MouseEvent) => {
+    const inside = event.target instanceof Node && root.contains(event.target);
+    const overview = inside && store.getSnapshot().overview;
+    if (event.altKey || overview) event.preventDefault();
+  };
 }
 
 function frameFocus(store: Store) {
@@ -94,11 +83,11 @@ function frameFocus(store: Store) {
 function listen(store: Store, root: HTMLDivElement, signal: AbortSignal) {
   const capture = { capture: true, signal };
   window.addEventListener('keydown', keys(store), capture);
-  window.addEventListener('wheel', wheel(store), {
+  window.addEventListener('wheel', wheel(store, root), {
     ...capture,
     passive: false,
   });
-  window.addEventListener('contextmenu', suppressMenu, capture);
+  window.addEventListener('contextmenu', suppressMenu(store, root), capture);
   window.addEventListener('blur', frameFocus(store), { signal });
   root.addEventListener(
     'pointerdown',
@@ -107,9 +96,16 @@ function listen(store: Store, root: HTMLDivElement, signal: AbortSignal) {
   );
 }
 
+function holdFocus(store: Store, root: HTMLElement) {
+  return store.subscribe(() => {
+    if (store.getSnapshot().overview) root.focus();
+  });
+}
+
 function useStripRoot(store: Store) {
   return useCallback(
     (root: HTMLDivElement) => {
+      const release = holdFocus(store, root);
       const controller = new AbortController();
       const observer = new ResizeObserver(([entry]) => {
         store.measure(entry.contentRect.width, entry.contentRect.height);
@@ -119,6 +115,7 @@ function useStripRoot(store: Store) {
       return () => {
         observer.disconnect();
         controller.abort();
+        release();
       };
     },
     [store],
@@ -129,24 +126,57 @@ function grabbed(cursor: string | null) {
   return { cursor: cursor ?? undefined };
 }
 
+function trackingOf({ gesture, overlay }: Snapshot): Tracking {
+  if (gesture === null) return 'none';
+  return overlay?.dragged ? 'view' : 'all';
+}
+
+function frameOf(snapshot: Snapshot): Frame {
+  const { metrics, view, renderIndex } = snapshot;
+  return {
+    placements: placements(snapshot),
+    spaces: spaces(snapshot),
+    renderIndex,
+    step: workspaceStep(metrics),
+    width: metrics.width,
+    height: metrics.height,
+    zoom: zoomOf(snapshot.overview),
+    ready: view.loaded,
+    tracking: trackingOf(snapshot),
+  };
+}
+
+function useLayoutMotion(frame: Frame): LayoutMotion {
+  const [layoutMotion] = useState(() => new LayoutMotion());
+  useLayoutEffect(() => layoutMotion.apply(frame), [layoutMotion, frame]);
+  return layoutMotion;
+}
+
 export function Strip() {
   const store = useStrip();
   const snapshot = useSyncExternalStore(store.subscribe, store.getSnapshot);
   const root = useStripRoot(store);
-  const placed = useMemo(() => placements(snapshot), [snapshot]);
+  const frame = useMemo(() => frameOf(snapshot), [snapshot]);
+  const layoutMotion = useLayoutMotion(frame);
   const hint = snapshot.overlay?.hint;
   return (
     <div
       ref={root}
       data-slot="strip"
       data-gesture={snapshot.gesture !== null}
+      data-overview={snapshot.overview}
+      tabIndex={-1}
       style={grabbed(snapshot.gesture)}
-      className="relative size-full overflow-clip data-[gesture=true]:select-none data-[gesture=true]:**:cursor-[inherit] data-[gesture=true]:[&_iframe]:pointer-events-none"
+      className="relative size-full overflow-clip outline-none data-[gesture=true]:select-none data-[gesture=true]:**:cursor-[inherit] data-[gesture=true]:[&_iframe]:pointer-events-none"
     >
-      {placed.map((placement) => (
-        <Pane key={placement.paneId} placement={placement} />
-      ))}
+      <Panes
+        frame={frame}
+        view={snapshot.view}
+        layoutMotion={layoutMotion}
+        overview={snapshot.overview}
+      />
       {hint && <InsertHint rect={hint} />}
+      <KeyHint overview={snapshot.overview} height={snapshot.metrics.height} />
     </div>
   );
 }

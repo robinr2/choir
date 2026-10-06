@@ -4,6 +4,7 @@ import {
   focusPane,
   focusWorkspaceById,
   movePane,
+  movePaneToNewWorkspace,
   openPane,
   paneIds,
   removePane,
@@ -83,6 +84,16 @@ it('focuses a column of the focused workspace and keeps its focused pane', () =>
   expect(sketches(focusColumn(strips, column))).toEqual(['> A | B C*', '']);
 });
 
+it('focuses a column of another workspace without switching to it', () => {
+  const strips = layout(['A*', 'B* | C', '']);
+  const column = strips.workspaces[1].columns[1].id;
+  expect(sketches(focusColumn(strips, column, 1))).toEqual([
+    '> A*',
+    'B | C*',
+    '',
+  ]);
+});
+
 it('focuses a workspace by its id', () => {
   const strips = layout(['A*', 'B*', '']);
   const { id } = strips.workspaces[1];
@@ -123,6 +134,86 @@ describe('movePane', () => {
   it('drops into an emptied focused workspace', () => {
     const moved = movePane(layout(['A*', '']), 'A', { column: 0 });
     expect(sketches(moved ?? layout([]))).toEqual(['> A*', '']);
+  });
+
+  it('drops into the workspace it is given without switching to it', () => {
+    const strips = layout(['A* | B', 'C*', '']);
+    const workspaceId = strips.workspaces[1].id;
+    const moved = movePane(strips, 'A', { column: 1, workspaceId });
+    expect(sketches(moved ?? strips)).toEqual(['> B*', 'C | A*', '']);
+  });
+
+  it('removes the workspace the pane leaves empty when it is not focused', () => {
+    const strips = layout(['A*', 'B*', ''], 1);
+    const workspaceId = strips.workspaces[1].id;
+    const moved = movePane(strips, 'A', { column: 0, tile: 1, workspaceId });
+    expect(sketches(moved ?? strips)).toEqual(['> B A*', '']);
+  });
+
+  it('refuses workspaces it does not know', () => {
+    const strips = layout(['A* | B', '']);
+    expect(
+      movePane(strips, 'A', { column: 0, workspaceId: 'nowhere' }),
+    ).toBeUndefined();
+  });
+});
+
+function twoWorkspaces() {
+  return layout(['A* | B', 'C*', '']);
+}
+
+describe('movePaneToNewWorkspace', () => {
+  it('puts the pane alone on a new workspace at the given place', () => {
+    expect(sketches(movePaneToNewWorkspace(twoWorkspaces(), 'A', 1))).toEqual([
+      '> B*',
+      'A*',
+      'C*',
+      '',
+    ]);
+  });
+
+  it('keeps the focused workspace when the new one goes above it', () => {
+    expect(sketches(movePaneToNewWorkspace(twoWorkspaces(), 'A', 0))).toEqual([
+      'A*',
+      '> B*',
+      'C*',
+      '',
+    ]);
+  });
+
+  it('reuses the empty workspace at the bottom', () => {
+    const expected = ['> B*', 'C*', 'A*', ''];
+    expect(sketches(movePaneToNewWorkspace(twoWorkspaces(), 'A', 2))).toEqual(
+      expected,
+    );
+    expect(sketches(movePaneToNewWorkspace(twoWorkspaces(), 'A', 3))).toEqual(
+      expected,
+    );
+  });
+
+  it('fills the focused empty workspace at the bottom', () => {
+    const start = layout(['A*', 'B*', ''], 2);
+    expect(sketches(movePaneToNewWorkspace(start, 'A', 2))).toEqual([
+      'B*',
+      '> A*',
+      '',
+    ]);
+  });
+
+  it('keeps the width of the old column', () => {
+    const start = twoWorkspaces();
+    start.workspaces[0].columns[0].width = 0.3;
+    const moved = movePaneToNewWorkspace(start, 'A', 1);
+    expect(moved.workspaces[1].columns[0].width).toBe(0.3);
+  });
+
+  it('removes the workspace the pane leaves empty when it is not focused', () => {
+    const start = layout(['A*', 'B*', ''], 1);
+    expect(sketches(movePaneToNewWorkspace(start, 'A', 1))).toEqual([
+      'A*',
+      '> B*',
+      '',
+    ]);
   });
 });
 

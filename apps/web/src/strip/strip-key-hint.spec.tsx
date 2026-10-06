@@ -1,0 +1,178 @@
+import { expect, test, vi } from 'vitest';
+import { page, userEvent } from 'vitest/browser';
+import { coreShowsWorkspace, twoAgents } from '@/test/fake-core';
+import { renderApp } from '@/test/render-app';
+import { press, setUpStripScreen, stripElement } from '@/test/strip-screen';
+
+setUpStripScreen();
+
+const HINT = '[data-slot="key-hint"]';
+
+function hint(): HTMLElement | null {
+  return document.querySelector<HTMLElement>(HINT);
+}
+
+function keydown(init: KeyboardEventInit): void {
+  window.dispatchEvent(
+    new KeyboardEvent('keydown', { bubbles: true, cancelable: true, ...init }),
+  );
+}
+
+function holdAlt(): void {
+  keydown({ key: 'Alt', code: 'AltLeft', altKey: true });
+}
+
+function pause(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function shown(): Promise<HTMLElement> {
+  return vi.waitFor(() => {
+    const sheet = hint();
+    if (!sheet) throw new Error('The key hint is not shown');
+    return sheet;
+  });
+}
+
+function zoomOf(sheet: HTMLElement): string | undefined {
+  return sheet.querySelector<HTMLElement>(':scope > div')?.style.zoom;
+}
+
+async function hidden(): Promise<void> {
+  await vi.waitFor(() => expect(hint()).toBeNull());
+}
+
+test('shows the key bindings once Alt is held on its own', async () => {
+  await renderApp();
+  holdAlt();
+  await pause(200);
+  expect(hint()).toBeNull();
+  const sheet = await shown();
+  expect(sheet).toHaveTextContent('Column left');
+  expect(sheet).toHaveTextContent('Toggle overview');
+  expect(sheet).not.toHaveTextContent('Close overview');
+  expect(sheet).toHaveAttribute('aria-hidden', 'true');
+  expect(getComputedStyle(sheet).pointerEvents).toBe('none');
+  await expect.element(page.getByText('Focus', { exact: true })).toBeVisible();
+});
+
+test('sits along the bottom of the strip, at most a third of it high', async () => {
+  await renderApp();
+  holdAlt();
+  const sheet = await shown();
+  await vi.waitFor(() => {
+    const box = sheet.getBoundingClientRect();
+    const strip = stripElement().getBoundingClientRect();
+    expect(box.bottom).toBeCloseTo(strip.bottom, 0);
+    expect(box.left).toBe(strip.left);
+    expect(box.width).toBe(strip.width);
+    expect(box.height).toBeLessThanOrEqual(strip.height / 3);
+  });
+});
+
+test('keeps its full size when the bindings fit', async () => {
+  await page.viewport(2400, 1400);
+  await renderApp();
+  holdAlt();
+  const sheet = await shown();
+  expect(zoomOf(sheet)).toBe('1');
+});
+
+test('shrinks until every binding fits a third of a small strip', async () => {
+  await page.viewport(900, 600);
+  await renderApp();
+  holdAlt();
+  const sheet = await shown();
+  await vi.waitFor(() => {
+    expect(Number(zoomOf(sheet))).toBeLessThan(1);
+    const height = stripElement().getBoundingClientRect().height;
+    expect(sheet.getBoundingClientRect().height).toBeLessThanOrEqual(
+      height / 3,
+    );
+  });
+});
+
+test('pairs each binding with its modifiers and twin keys', async () => {
+  await renderApp();
+  holdAlt();
+  const sheet = await shown();
+  const focus = [...sheet.querySelectorAll('section')].find(
+    (section) => section.querySelector('h3')?.textContent === 'Focus',
+  );
+  expect(focus).toHaveTextContent('Column leftAltH/←');
+});
+
+test('stops shrinking at half size', async () => {
+  await page.viewport(500, 300);
+  await renderApp();
+  holdAlt();
+  const sheet = await shown();
+  await vi.waitFor(() => expect(zoomOf(sheet)).toBe('0.5'));
+});
+
+test('measures its full size again whenever the strip renders', async () => {
+  await page.viewport(900, 600);
+  await renderApp();
+  holdAlt();
+  const sheet = await shown();
+  await vi.waitFor(() => expect(Number(zoomOf(sheet))).toBeLessThan(1));
+  coreShowsWorkspace(twoAgents());
+  await pause(100);
+  const height = stripElement().getBoundingClientRect().height;
+  expect(sheet.getBoundingClientRect().height).toBeLessThanOrEqual(height / 3);
+});
+
+test('hides when another key joins Alt', async () => {
+  await renderApp();
+  holdAlt();
+  await shown();
+  await userEvent.keyboard('{Alt>}j{/Alt}');
+  await hidden();
+  expect(hint()).toBeNull();
+});
+
+test('hides when a bound key joins the held Alt', async () => {
+  await renderApp();
+  holdAlt();
+  await shown();
+  document.body.dispatchEvent(
+    new KeyboardEvent('keydown', {
+      key: 'l',
+      code: 'KeyL',
+      altKey: true,
+      bubbles: true,
+      cancelable: true,
+    }),
+  );
+  await hidden();
+  expect(hint()).toBeNull();
+});
+
+test('hides on a click without catching it', async () => {
+  await renderApp();
+  holdAlt();
+  await shown();
+  expect(press(stripElement(), { x: 100, y: 100 })).toBe(true);
+  await hidden();
+});
+
+test('lists the overview keys while the overview is open', async () => {
+  await renderApp();
+  await userEvent.keyboard('{Alt>}o{/Alt}');
+  holdAlt();
+  const sheet = await shown();
+  expect(sheet).toHaveTextContent('Close overview');
+  expect(sheet).toHaveTextContent('Esc');
+});
+
+test('names the keys as the keyboard layout prints them', async () => {
+  const keyboard = navigator.keyboard;
+  if (!keyboard) throw new Error('This browser has no keyboard layout');
+  vi.spyOn(keyboard, 'getLayoutMap').mockResolvedValue(
+    new Map([['BracketLeft', 'ü']]),
+  );
+  await renderApp();
+  holdAlt();
+  const sheet = await shown();
+  await vi.waitFor(() => expect(sheet).toHaveTextContent('Ü'));
+});

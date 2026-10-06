@@ -71,5 +71,9 @@ export function run(store: Store, command: Command): Promise<void> {
   if (command === 'open') return store.workspace.openPane();
   if (command === 'close') return closeFocused(store);
   if (command === 'expand') return expand(store);
+  if (command === 'overview') {
+    store.overview(!store.getSnapshot().overview);
+    return Promise.resolve();
+  }
   return store.workspace.act(command);
 }

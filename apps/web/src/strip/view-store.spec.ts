@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { CoreEvents } from '@/lib/core-events';
 import {
+  A,
   agent,
   column,
   coreShowsWorkspace,
@@ -161,4 +162,34 @@ test('forgets the anchor only once it moved the view', () => {
   coreShowsWorkspace(viewOf([strip('first', [])], []));
   coreShowsWorkspace(viewOf([layout], []));
   expect(viewX(store)).toBe(-4);
+});
+
+test('opens and closes the overview, optionally on another workspace', () => {
+  const { store, listener } = storeWithListener();
+  coreShowsWorkspace(twoAgents());
+  expect(store.getSnapshot().overview).toBe(false);
+  store.overview(true);
+  expect(store.getSnapshot()).toMatchObject({ overview: true, renderIndex: 0 });
+  store.overview(false, 1);
+  expect(store.getSnapshot()).toMatchObject({
+    overview: false,
+    renderIndex: 1,
+  });
+  expect(listener).toHaveBeenCalledTimes(3);
+});
+
+test('keeps a dropped pane in place until core moves it, but not a dragged one', () => {
+  const { store } = storeWithListener();
+  coreShowsWorkspace(twoAgents());
+  const dragged = { paneId: A, x: 10, y: 20, width: 100, height: 200 };
+  store.grab('grabbing');
+  store.show({ dragged });
+  coreShowsWorkspace(twoAgents());
+  expect(store.getSnapshot().overlay).toEqual({ dragged });
+  store.grab(null);
+  coreShowsWorkspace(twoAgents());
+  expect(store.getSnapshot().overlay).toBeNull();
+  store.show({ viewX: 40 });
+  coreShowsWorkspace(twoAgents());
+  expect(store.getSnapshot().overlay).toEqual({ viewX: 40 });
 });

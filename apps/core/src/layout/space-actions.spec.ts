@@ -1,5 +1,5 @@
 import type { LayoutAction, SpaceAction } from './layout.schemas.js';
-import { isSpaceAction, spaceChange } from './space-actions.js';
+import { isSpaceAction, spaceChange, workspaceOf } from './space-actions.js';
 import { space, sketch } from '../test/sketch.js';
 
 const START = 'A | B C* | D';
@@ -61,4 +61,12 @@ it('tells the actions on the focused workspace from the others', () => {
   ];
   expect(inSpace.map(isSpaceAction)).toEqual([true, true, true, true]);
   expect(elsewhere.map(isSpaceAction)).toEqual([false, false, false]);
+});
+
+it('names the workspace an action targets', () => {
+  expect(workspaceOf({ action: 'focusColumnLeft', workspaceId: 'W' })).toBe(
+    'W',
+  );
+  expect(workspaceOf({ action: 'focusColumnLeft' })).toBeUndefined();
+  expect(workspaceOf({ action: 'setColumnWidth', change: 10 })).toBeUndefined();
 });
