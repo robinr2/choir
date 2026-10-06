@@ -5,7 +5,7 @@ import {
   MotionConfig,
 } from 'motion/react';
 import * as m from 'motion/react-m';
-import { useEffect, useSyncExternalStore } from 'react';
+import { useSyncExternalStore } from 'react';
 import { Kbd, KbdGroup } from '@/components/ui/kbd';
 import { AltHold } from './alt-hold';
 import { type HintGroup, type HintRow, keyHints } from './key-hints';
@@ -17,9 +17,6 @@ const hold = new AltHold(window);
 const keyLayout = new KeyLayout(navigator);
 
 function useKeyLayout() {
-  useEffect(() => {
-    void keyLayout.load();
-  }, []);
   return useSyncExternalStore(keyLayout.subscribe, keyLayout.getSnapshot);
 }
 

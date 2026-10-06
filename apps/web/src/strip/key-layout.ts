@@ -15,14 +15,18 @@ export class KeyLayout {
 
   readonly subscribe = (changed: () => void): (() => void) => {
     this.#listeners.add(changed);
+    this.#load();
     return () => this.#listeners.delete(changed);
   };
 
-  async load(): Promise<void> {
-    const keyboard = this.#navigator.keyboard;
-    if (!keyboard) return;
-    const map = await keyboard.getLayoutMap().catch(() => {});
-    if (!map) return;
+  #load(): void {
+    void this.#navigator.keyboard?.getLayoutMap().then(
+      (map) => this.#show(map),
+      () => {},
+    );
+  }
+
+  #show(map: LayoutMap): void {
     this.#map = map;
     this.#listeners.forEach((changed) => changed());
   }
