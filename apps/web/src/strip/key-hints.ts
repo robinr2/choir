@@ -1,3 +1,4 @@
+import type { LayoutMap } from './key-layout';
 import { BINDINGS, OVERVIEW_BINDINGS } from './keys';
 import type { Command } from './types';
 
@@ -73,7 +74,14 @@ function idOf(command: Command): string {
   return `${command.action}${Math.sign(command.change)}`;
 }
 
-function keyName(code: string): string {
+function capital(key: string): string {
+  const upper = key.toUpperCase();
+  return upper.length === 1 ? upper : key;
+}
+
+function keyName(code: string, layout: LayoutMap): string {
+  const typed = layout.get(code);
+  if (typed) return capital(typed);
   return KEY_NAMES[code] ?? code.replace('Key', '');
 }
 
@@ -116,7 +124,7 @@ function overviewEntry(id: string): [Group, string] {
   return ['Overview', OVERVIEW_LABELS[id] ?? LABELS[id][1]];
 }
 
-export function keyHints(overview: boolean): HintGroup[] {
+export function keyHints(overview: boolean, layout: LayoutMap): HintGroup[] {
   const rows = [
     ...rowsOf(BINDINGS, (id) => LABELS[id]),
     ...(overview ? rowsOf(OVERVIEW_BINDINGS, overviewEntry) : []),
@@ -128,7 +136,7 @@ export function keyHints(overview: boolean): HintGroup[] {
       .map(({ label, modifiers, codes }) => ({
         label,
         modifiers,
-        keys: letterFirst(codes).map(keyName),
+        keys: letterFirst(codes).map((code) => keyName(code, layout)),
       })),
   }));
 }

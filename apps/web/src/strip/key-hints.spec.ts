@@ -1,8 +1,10 @@
 import { expect, test } from 'vitest';
 import { keyHints } from './key-hints';
 
+const US = new Map<string, string>();
+
 function rowsOf(overview: boolean) {
-  return keyHints(overview).flatMap(({ rows }) => rows);
+  return keyHints(overview, US).flatMap(({ rows }) => rows);
 }
 
 function row(label: string, overview = false) {
@@ -10,7 +12,7 @@ function row(label: string, overview = false) {
 }
 
 test('groups the bindings as niri groups its actions', () => {
-  expect(keyHints(false).map(({ name }) => name)).toEqual([
+  expect(keyHints(false, US).map(({ name }) => name)).toEqual([
     'Focus',
     'Move',
     'Workspaces',
@@ -52,7 +54,7 @@ test('keeps Shift with the keys it changes', () => {
 });
 
 test('labels every binding once', () => {
-  const labels = keyHints(false).map(({ name, rows }) => [
+  const labels = keyHints(false, US).map(({ name, rows }) => [
     name,
     rows.map(({ label }) => label),
   ]);
@@ -91,11 +93,11 @@ test('labels every binding once', () => {
 });
 
 test('lists the overview keys only while the overview is open', () => {
-  const closed = keyHints(false).at(-1);
+  const closed = keyHints(false, US).at(-1);
   expect(closed?.rows).toEqual([
     { label: 'Toggle overview', modifiers: ['Alt'], keys: ['O'] },
   ]);
-  const open = keyHints(true).at(-1);
+  const open = keyHints(true, US).at(-1);
   expect(open?.name).toBe('Overview');
   expect(open?.rows).toEqual([
     { label: 'Toggle overview', modifiers: ['Alt'], keys: ['O'] },
@@ -105,4 +107,22 @@ test('lists the overview keys only while the overview is open', () => {
     { label: 'Pane above', modifiers: [], keys: ['↑'] },
     { label: 'Pane below', modifiers: [], keys: ['↓'] },
   ]);
+});
+
+test('names each key by what it types on the current layout', () => {
+  const german = new Map([
+    ['BracketLeft', 'ü'],
+    ['BracketRight', '+'],
+    ['KeyJ', 'j'],
+    ['Minus', 'ß'],
+  ]);
+  const keysOf = (label: string) =>
+    keyHints(false, german)
+      .flatMap(({ rows }) => rows)
+      .find((candidate) => candidate.label === label)?.keys;
+  expect(keysOf('Consume or expel left')).toEqual(['Ü']);
+  expect(keysOf('Consume or expel right')).toEqual(['+']);
+  expect(keysOf('Pane below')).toEqual(['J', '↓']);
+  expect(keysOf('Narrower column')).toEqual(['ß']);
+  expect(keysOf('Expel from column')).toEqual(['.']);
 });

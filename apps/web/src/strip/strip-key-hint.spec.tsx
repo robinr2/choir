@@ -164,3 +164,15 @@ test('lists the overview keys while the overview is open', async () => {
   expect(sheet).toHaveTextContent('Close overview');
   expect(sheet).toHaveTextContent('Esc');
 });
+
+test('names the keys as the keyboard layout prints them', async () => {
+  const keyboard = navigator.keyboard;
+  if (!keyboard) throw new Error('This browser has no keyboard layout');
+  vi.spyOn(keyboard, 'getLayoutMap').mockResolvedValue(
+    new Map([['BracketLeft', 'ü']]),
+  );
+  await renderApp();
+  holdAlt();
+  const sheet = await shown();
+  await vi.waitFor(() => expect(sheet).toHaveTextContent('Ü'));
+});
